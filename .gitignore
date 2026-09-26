@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+state/
+backend/workspace/
+backend/tests/fixtures/big_synthetic.csv
+backend/docs/benchmark/targeted_regression/raw/*.partial
