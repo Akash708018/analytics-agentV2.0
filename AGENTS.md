@@ -1,0 +1,27 @@
+# analytics-agent v2
+
+- Read the other agent's handoff in `docs/handoff/` before each session.
+- Frontend owns `frontend/`, `docs/steps/F*`, and `docs/handoff/FRONTEND.md`.
+- Backend owns `backend/`, `packs/`, `bench/`, `docs/api/`, and `docs/steps/B*`.
+- Never edit the other agent's paths. Coordinate through GitHub only.
+- Shared `README.md`, `docs/COORDINATION.md`, and `docs/decisions.md` are append-only; use PRs.
+- Use an isolated clone/worktree; frontend branches are `frontend/F<n>-<slug>`.
+- Target PRs at `main`; the human merges. Never push to the v1 reference repo.
+- `docs/api/openapi.yaml` is the API source of truth; frontend consumes it without edits.
+- Request API changes with a GitHub issue labelled `api-request`: endpoint, shape, reason.
+- The frontend communicates with the backend only over HTTP; never import the engine.
+- The frontend never computes analytics, writes SQL, or reformats returned figures.
+- Charts plot only backend chart-ready series; show provenance and approval status.
+- Prioritize digital marketing; no domain or fork choice is silently preselected.
+- Keep API keys, data rows, and PII out of `ui_state` and URLs.
+- URLs contain only a random session UUID and page identity.
+- Persist user work through the backend; Streamlit session memory is only a cache.
+- After refresh, resume an existing turn by ID; never resubmit its question.
+- Use stable `ui.*` widget keys; show explicit choices for version conflicts.
+- Approved stack: Streamlit, httpx, pytest, and Streamlit AppTest; built-in charts.
+- Ask before adding other dependencies. Playwright is allowed only in F7.
+- State expected behavior before running checks; claims require real printed output.
+- Each milestone records its plan, pytest tail, and browser observations in `docs/steps/F<n>.md`.
+- If evidence challenges a decision, append to `docs/decisions.md` and ask before changing course.
+- At each milestone end: update handoff, commit, push, open/update PR, summarize, STOP.
+- Do not start the next milestone without the human's instruction.

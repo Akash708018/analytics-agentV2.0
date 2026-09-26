@@ -1,0 +1,4 @@
+# Current stable versions installed and measured in F0 (2026-09-27).
+streamlit==1.64.0
+httpx==0.28.1
+pytest==9.1.1
