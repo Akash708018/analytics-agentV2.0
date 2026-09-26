@@ -1,0 +1,497 @@
+"""API contract v0.1: every request/response model, each with an example.
+
+This module IS the contract. `docs/api/openapi.yaml` is exported from it and a test fails on
+drift. Change a model -> bump API_VERSION -> add a docs/api/CHANGELOG.md entry.
+"""
+from __future__ import annotations
+
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+API_VERSION = "0.1.0"
+
+
+def _ex(*examples: dict) -> ConfigDict:
+    return ConfigDict(json_schema_extra={"examples": list(examples)})
+
+
+# --- errors ------------------------------------------------------------------------------------
+
+class ErrorDetail(BaseModel):
+    code: str = Field(description="Stable machine code, e.g. not_found, version_conflict, "
+                                  "not_implemented, ui_state_too_large, ui_state_rejected")
+    message: str
+    milestone: str | None = Field(None, description="For not_implemented: the milestone "
+                                                    "that makes the endpoint live")
+    model_config = _ex({"code": "not_implemented",
+                        "message": "GET /datasets/{id}/profile is spec'd but not live yet",
+                        "milestone": "B2"})
+
+
+class ErrorBody(BaseModel):
+    error: ErrorDetail
+    model_config = _ex({"error": {"code": "not_found", "message": "session x not found or expired", "milestone": None}})
+
+
+# --- sessions ----------------------------------------------------------------------------------
+
+class SessionCreate(BaseModel):
+    workspace_id: str | None = Field(None, description="Reuse a workspace (its datasets "
+                                     "persist). Omitted: a new workspace is created.")
+    model_config = _ex({}, {"workspace_id": "ws_3f9a1c2b7d10"})
+
+
+class SessionCreated(BaseModel):
+    sid: str = Field(description="UUID4")
+    version: int
+    model_config = _ex({"sid": "0b8e0c64-5b0e-4c55-9c1e-2f1c2b9d7a11", "version": 1})
+
+
+class Session(BaseModel):
+    sid: str
+    version: int = Field(description="Increments on every ui-state write; send it back "
+                                     "with PUT /ui-state (optimistic concurrency)")
+    workspace_id: str
+    ui_state: dict[str, Any]
+    created_at: str
+    updated_at: str
+    expires_at: str = Field(description="Sliding: 30 days after the last activity")
+    model_config = _ex({
+        "sid": "0b8e0c64-5b0e-4c55-9c1e-2f1c2b9d7a11", "version": 3,
+        "workspace_id": "ws_3f9a1c2b7d10",
+        "ui_state": {"screen": "ask", "dataset_id": "ds_ads_2026q3", "panel_open": True},
+        "created_at": "2026-09-26T10:00:00Z", "updated_at": "2026-09-26T10:05:00Z",
+        "expires_at": "2026-10-26T10:05:00Z"})
+
+
+class UiStatePut(BaseModel):
+    ui_state: dict[str, Any] = Field(description="<=256 KB JSON. No data rows, API keys "
+                                     "or PII: rejected with 422")
+    version: int = Field(description="The version you last read")
+    model_config = _ex({"ui_state": {"screen": "contract", "dataset_id": "ds_ads_2026q3"},
+                        "version": 3})
+
+
+class VersionConflict(BaseModel):
+    error: ErrorDetail
+    current: Session
+    model_config = _ex({
+        "error": {"code": "version_conflict",
+                  "message": "version 2 is stale; current is 3", "milestone": None},
+        "current": Session.model_config["json_schema_extra"]["examples"][0]})
+
+
+# --- turns -------------------------------------------------------------------------------------
+
+EventType = Literal["plan", "tool_call", "provider_wait", "failover", "answer",
+                    "figure_check", "interpretation_check", "error"]
+TurnStatus = Literal["queued", "running", "done", "failed", "interrupted"]
+
+
+class TurnCreate(BaseModel):
+    sid: str
+    dataset_id: str
+    question: str = Field(min_length=1, max_length=4000)
+    model_config = _ex({"sid": "0b8e0c64-5b0e-4c55-9c1e-2f1c2b9d7a11",
+                        "dataset_id": "ds_ads_2026q3",
+                        "question": "Why did ROAS drop in September?"})
+
+
+class TurnCreated(BaseModel):
+    turn_id: str
+    model_config = _ex({"turn_id": "t_7c1d9e0a4b2f4e59"})
+
+
+class TurnEvent(BaseModel):
+    seq: int
+    type: EventType
+    at: str
+    data: dict[str, Any] = Field(description=(
+        "plan: {playbook, steps[]} | tool_call: {tool_id, params, result_ref, ms} | "
+        "provider_wait: {provider, seconds} | failover: {from, to, reason} | "
+        "answer: {text} | figure_check: {status, checked, corrected[]} | "
+        "interpretation_check: {rule, status, detail} | error: {code, message}"))
+    model_config = _ex(
+        {"seq": 0, "type": "plan", "at": "2026-09-26T10:06:00Z",
+         "data": {"playbook": "why_roas_dropped",
+                  "steps": ["marketing.roas_change_explainer", "marketing.channel_mix_shift"]}},
+        {"seq": 1, "type": "tool_call", "at": "2026-09-26T10:06:01Z",
+         "data": {"tool_id": "marketing.roas_change_explainer",
+                  "params": {"period": "2026-09", "baseline": "2026-08"}, "ms": 412}},
+        {"seq": 2, "type": "provider_wait", "at": "2026-09-26T10:06:02Z",
+         "data": {"provider": "gemini", "seconds": 12}},
+        {"seq": 3, "type": "answer", "at": "2026-09-26T10:06:20Z",
+         "data": {"text": "ROAS fell from 4.1 to 3.2 ..."}},
+        {"seq": 4, "type": "figure_check", "at": "2026-09-26T10:06:21Z",
+         "data": {"status": "passed", "checked": 6, "corrected": []}})
+
+
+class Turn(BaseModel):
+    turn_id: str
+    sid: str
+    dataset_id: str
+    question: str
+    status: TurnStatus
+    events: list[TurnEvent]
+    answer: dict[str, Any] | None = Field(None, description="{text, results[]} when done")
+    created_at: str
+    model_config = _ex({
+        "turn_id": "t_7c1d9e0a4b2f4e59", "sid": "0b8e0c64-5b0e-4c55-9c1e-2f1c2b9d7a11",
+        "dataset_id": "ds_ads_2026q3", "question": "Why did ROAS drop in September?",
+        "status": "done",
+        "events": [{"seq": 0, "type": "answer", "at": "2026-09-26T10:06:20Z",
+                    "data": {"text": "ROAS fell from 4.1 to 3.2 ..."}}],
+        "answer": {"text": "ROAS fell from 4.1 to 3.2 ...", "results": []},
+        "created_at": "2026-09-26T10:06:00Z"})
+
+
+class TurnList(BaseModel):
+    turns: list[Turn]
+    model_config = _ex({"turns": [Turn.model_config["json_schema_extra"]["examples"][0]]})
+
+
+# --- results (provenance) ----------------------------------------------------------------------
+
+class Figure(BaseModel):
+    name: str
+    value: float | int | str | None
+    unit: str | None = None
+    provenance: Literal["contract", "provisional", "derived"]
+    model_config = _ex({"name": "ROAS", "value": 3.21, "unit": "x", "provenance": "contract"})
+
+
+class SeriesPoint(BaseModel):
+    x: str | float | int
+    y: float | int | None
+
+
+class ChartSeries(BaseModel):
+    """Chart-ready: computed by the backend. The frontend only plots."""
+    chart: Literal["line", "bar", "stacked_bar", "scatter", "table", "funnel"]
+    name: str
+    x_label: str
+    y_label: str
+    points: list[SeriesPoint]
+    model_config = _ex({"chart": "bar", "name": "ROAS by channel", "x_label": "channel",
+                        "y_label": "ROAS",
+                        "points": [{"x": "google", "y": 3.8}, {"x": "meta", "y": 2.4}]})
+
+
+class FigureCheck(BaseModel):
+    status: Literal["passed", "corrected", "flagged", "not_run"]
+    notes: list[str] = []
+
+
+class ToolResult(BaseModel):
+    tool_id: str
+    dataset_id: str
+    summary: str
+    figures: list[Figure]
+    series: list[ChartSeries] = []
+    validity_filters_applied: list[str] = Field(description="By name")
+    pack_rules_applied: list[str]
+    forks: dict[str, str] = Field({}, description="fork id -> the option the person chose")
+    caveats: list[str] = []
+    figure_check: FigureCheck
+    model_config = _ex({
+        "tool_id": "marketing.channel_efficiency", "dataset_id": "ds_ads_2026q3",
+        "summary": "Google ROAS 3.8 vs Meta 2.4 on net-of-GST revenue",
+        "figures": [{"name": "ROAS google", "value": 3.8, "unit": "x",
+                     "provenance": "contract"}],
+        "series": [{"chart": "bar", "name": "ROAS by channel", "x_label": "channel",
+                    "y_label": "ROAS", "points": [{"x": "google", "y": 3.8},
+                                                   {"x": "meta", "y": 2.4}]}],
+        "validity_filters_applied": ["exclude_test_campaigns", "roas_spend_positive"],
+        "pack_rules_applied": ["no_sum_of_rate"],
+        "forks": {"roas_revenue_basis": "net_excl_gst"},
+        "caveats": ["3 spend rows with 0 impressions flagged, not dropped"],
+        "figure_check": {"status": "passed", "notes": []}})
+
+
+class ToolRunRequest(BaseModel):
+    dataset_id: str
+    params: dict[str, Any] = {}
+    model_config = _ex({"dataset_id": "ds_ads_2026q3", "params": {"by": "channel"}})
+
+
+# --- datasets ----------------------------------------------------------------------------------
+
+class Dataset(BaseModel):
+    dataset_id: str
+    workspace_id: str
+    name: str
+    rows: int
+    columns: int
+    created_at: str
+    model_config = _ex({"dataset_id": "ds_ads_2026q3", "workspace_id": "ws_3f9a1c2b7d10",
+                        "name": "google_ads_q3.csv", "rows": 18240, "columns": 14,
+                        "created_at": "2026-09-26T10:01:00Z"})
+
+
+class ColumnProfile(BaseModel):
+    name: str
+    type: str
+    null_pct: float
+    distinct: int
+    sample: list[Any]
+
+
+class Profile(BaseModel):
+    dataset_id: str
+    rows: int
+    columns: list[ColumnProfile]
+    warnings: list[str]
+    model_config = _ex({"dataset_id": "ds_ads_2026q3", "rows": 18240,
+                        "columns": [{"name": "cost", "type": "DOUBLE", "null_pct": 0.0,
+                                     "distinct": 9120, "sample": [12.5, 40.0]}],
+                        "warnings": ["ctr is a per-row rate: never sum it"]})
+
+
+class CleaningProposal(BaseModel):
+    action_id: str
+    kind: str
+    column: str | None
+    description: str
+    rows_affected: int
+
+
+class CleaningProposals(BaseModel):
+    dataset_id: str
+    proposals: list[CleaningProposal]
+    model_config = _ex({"dataset_id": "ds_ads_2026q3", "proposals": [
+        {"action_id": "a1", "kind": "normalise_case", "column": "utm_source",
+         "description": "'Google' and 'google' are one source", "rows_affected": 311}]})
+
+
+class ApproveActions(BaseModel):
+    approve: list[str] = Field(description="ids to apply")
+    reject: list[str] = []
+    model_config = _ex({"approve": ["a1"], "reject": []})
+
+
+class ApprovalResult(BaseModel):
+    applied: list[str]
+    rejected: list[str]
+    ledger_entries: int
+    model_config = _ex({"applied": ["a1"], "rejected": [], "ledger_entries": 1})
+
+
+class Evidence(BaseModel):
+    matched_columns: list[str]
+    score: float
+
+
+class DomainCandidate(BaseModel):
+    domain: str
+    evidence: Evidence
+
+
+class SourceCandidate(BaseModel):
+    source: Literal["paid_ads", "ga4", "search_console", "email", "social", "orders"]
+    evidence: Evidence
+
+
+class DomainDetection(BaseModel):
+    dataset_id: str
+    domains: list[DomainCandidate]
+    marketing_sources: list[SourceCandidate]
+    confirmed: list[str] = Field(description="Domains the person confirmed; a guess alone "
+                                             "never enables domain tools")
+    model_config = _ex({
+        "dataset_id": "ds_ads_2026q3",
+        "domains": [{"domain": "marketing", "evidence": {
+            "matched_columns": ["campaign", "impressions", "clicks", "cost"], "score": 0.92}}],
+        "marketing_sources": [{"source": "paid_ads", "evidence": {
+            "matched_columns": ["campaign", "ad_group", "impressions", "cost"],
+            "score": 0.88}}],
+        "confirmed": []})
+
+
+class DomainConfirm(BaseModel):
+    domains: list[str]
+    model_config = _ex({"domains": ["marketing"]})
+
+
+class ForkOption(BaseModel):
+    id: str
+    label: str
+
+
+class ForkQuestion(BaseModel):
+    fork_id: str
+    question: str = Field(description="Plain language")
+    options: list[ForkOption]
+    suggested: str | None = None
+    suggested_reason: str | None = None
+    model_config = _ex({
+        "fork_id": "roas_revenue_basis",
+        "question": "Which revenue should ROAS use?",
+        "options": [{"id": "platform", "label": "What the ad platform reports"},
+                    {"id": "gross_incl_gst", "label": "Order revenue including GST"},
+                    {"id": "net_excl_gst", "label": "Order revenue excluding GST"},
+                    {"id": "delivered_net", "label": "Net, after cancels/returns/RTO"}],
+        "suggested": "net_excl_gst",
+        "suggested_reason": "GST is not revenue you keep"})
+
+
+class MeasureProposal(BaseModel):
+    column: str
+    measure_type: str
+    agg: str
+
+
+class ContractProposal(BaseModel):
+    dataset_id: str
+    grain: str
+    key: list[str]
+    date: str | None
+    measures: list[MeasureProposal]
+    dimensions: list[str]
+    caveats: list[str]
+    forks: list[ForkQuestion]
+    model_config = _ex({
+        "dataset_id": "ds_ads_2026q3", "grain": "one row per campaign per day",
+        "key": ["date", "campaign"], "date": "date",
+        "measures": [{"column": "cost", "measure_type": "additive", "agg": "sum"},
+                     {"column": "ctr", "measure_type": "ratio_of_sums",
+                      "agg": "sum(clicks)/sum(impressions)"}],
+        "dimensions": ["campaign", "channel"], "caveats": [],
+        "forks": [ForkQuestion.model_config["json_schema_extra"]["examples"][0]]})
+
+
+class ContractConfirm(BaseModel):
+    contract: dict[str, Any] = Field(description="The proposal as edited by the person")
+    fork_choices: dict[str, str]
+    model_config = _ex({"contract": {"grain": "one row per campaign per day"},
+                        "fork_choices": {"roas_revenue_basis": "net_excl_gst"}})
+
+
+class Confirmed(BaseModel):
+    ok: bool
+    version: int
+    model_config = _ex({"ok": True, "version": 1})
+
+
+class MetricTemplate(BaseModel):
+    template_id: str
+    label: str
+    shape: str
+    required_concepts: list[str]
+    forks: list[str]
+    available: bool
+    model_config = _ex({"template_id": "marketing.roas", "label": "ROAS",
+                        "shape": "ratio_of_sums", "required_concepts": ["revenue", "spend"],
+                        "forks": ["roas_revenue_basis"], "available": True})
+
+
+class MetricTemplates(BaseModel):
+    templates: list[MetricTemplate]
+    model_config = _ex({"templates": [MetricTemplate.model_config["json_schema_extra"]["examples"][0]]})
+
+
+class MetricApprove(BaseModel):
+    template_id: str
+    bindings: dict[str, str] = Field(description="concept -> column")
+    fork_choices: dict[str, str] = {}
+    model_config = _ex({"template_id": "marketing.roas",
+                        "bindings": {"revenue": "net_revenue", "spend": "cost"},
+                        "fork_choices": {"roas_revenue_basis": "net_excl_gst"}})
+
+
+class ValidityRule(BaseModel):
+    rule_id: str
+    description: str
+    suggested: bool
+    approved: bool
+    rows_affected: int | None
+    model_config = _ex({"rule_id": "exclude_test_campaigns",
+                        "description": "Drop campaigns whose name contains 'test'",
+                        "suggested": True, "approved": False, "rows_affected": 42})
+
+
+class ValidityRules(BaseModel):
+    rules: list[ValidityRule]
+    model_config = _ex({"rules": [ValidityRule.model_config["json_schema_extra"]["examples"][0]]})
+
+
+class RuleApprove(BaseModel):
+    approve: list[str]
+    reject: list[str] = []
+    model_config = _ex({"approve": ["exclude_test_campaigns"], "reject": ["roas_spend_positive"]})
+
+
+class ToolStatus(BaseModel):
+    tool_id: str
+    ui_label: str
+    status: Literal["active", "needs_domain", "needs_data"]
+    needs_domain: str | None = None
+    missing_concepts: list[str] = []
+    model_config = _ex({"tool_id": "marketing.striking_distance",
+                        "ui_label": "Queries close to page one", "status": "needs_data",
+                        "missing_concepts": ["position", "query"]})
+
+
+class ToolList(BaseModel):
+    tools: list[ToolStatus]
+    model_config = _ex({"tools": [{"tool_id": "marketing.channel_efficiency", "ui_label": "Which channels pay back", "status": "active", "needs_domain": None, "missing_concepts": []}, {"tool_id": "logistics.otif", "ui_label": "On time, in full", "status": "needs_domain", "needs_domain": "logistics", "missing_concepts": []}, ToolStatus.model_config["json_schema_extra"]["examples"][0]]})
+
+
+class PackSummary(BaseModel):
+    pack_id: str
+    version: str
+    extends: list[str]
+    tools: int
+    model_config = _ex({"pack_id": "marketing", "version": "0.1.0", "extends": ["core"],
+                        "tools": 20})
+
+
+class PackList(BaseModel):
+    packs: list[PackSummary]
+    model_config = _ex({"packs": [{"pack_id": "core", "version": "0.1.0", "extends": [], "tools": 0}, PackSummary.model_config["json_schema_extra"]["examples"][0]]})
+
+
+class PackDetail(BaseModel):
+    pack_id: str
+    version: str
+    pack: dict[str, Any] = Field(description="The validated pack document")
+    model_config = _ex({"pack_id": "marketing", "version": "0.1.0", "pack": {"pack": {"id": "marketing", "extends": ["core"]}, "forks": [], "tools": []}})
+
+
+class KeywordGroup(BaseModel):
+    group_id: str
+    label: str
+    intent: Literal["informational", "commercial", "transactional", "navigational", "local"]
+    keywords: list[str]
+    facets: dict[str, str] = {}
+    approved: bool
+    model_config = _ex({"group_id": "g1", "label": "sushi delivery", "intent": "transactional",
+                        "keywords": ["sushi delivery pune", "sushi home delivery"],
+                        "facets": {"service": "delivery"}, "approved": False})
+
+
+class KeywordGroups(BaseModel):
+    dataset_id: str
+    groups: list[KeywordGroup]
+    model_config = _ex({"dataset_id": "ds_gsc_pune", "groups": [KeywordGroup.model_config["json_schema_extra"]["examples"][0]]})
+
+
+class KeywordGroupAction(BaseModel):
+    action: Literal["approve", "rename", "merge", "move_keyword", "split"]
+    group_ids: list[str]
+    label: str | None = None
+    keyword: str | None = None
+    target_group_id: str | None = None
+    model_config = _ex({"action": "move_keyword", "group_ids": ["g1"],
+                        "keyword": "sushi near me", "target_group_id": "g4"})
+
+
+class Health(BaseModel):
+    status: Literal["ok"]
+    model_config = _ex({"status": "ok"})
+
+
+class VersionInfo(BaseModel):
+    api_version: str
+    engine: str
+    model_config = _ex({"api_version": API_VERSION, "engine": "v1@0ba324b"})

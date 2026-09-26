@@ -45,3 +45,32 @@ imported by the engine — v1's rule, unchanged.
 (`budget.py`), figure checker (`verify.py`), agent loop (`agent.py`), and the Streamlit-facing
 `real_backend.py`. It was seeded unchanged as engine code; v2's `backend/llm/` and
 `backend/services/` will wrap or move these pieces, each move logged here.
+
+**D-B0-1 resolved (2026-09-26).** The user delegated the decision. Backend PRs use the session
+branch `claude/analytics-agent-v2-backend-6gcu1p`: it is the only branch this session can push.
+Milestones are separate commits (`B<n>: ...`) and the PR title lists them.
+
+## B1 — API contract v0.1 + sessions (2026-09-26)
+
+**D-B1-1. Contract-first = models first, YAML exported.** The contract is declared as Pydantic
+models with examples (`backend/api/schemas.py`) before any logic; `docs/api/openapi.yaml` is
+exported from them and `test_openapi_drift.py` fails on any difference. Hand-writing the YAML
+and matching FastAPI's output byte-for-byte would make the drift test fight the generator.
+
+**D-B1-2. Upload is spec'd without `python-multipart`.** FastAPI needs that package to parse
+forms; the upload route is 501 in B1, so its multipart body is declared in the spec only.
+B2 adds `python-multipart` (the user delegated dependency decisions; logged then).
+
+**D-B1-3. A turn runs once.** Worker threads run it; GET only reads the stored row. A turn
+`queued`/`running` at startup becomes `interrupted` — never re-run, never re-spending quota.
+B1's default runner records `error: agent_not_wired` (no fake answers) until B5.
+
+**D-B1-4. ui_state policy.** 413 above 256 KB; 422 for API-key-shaped strings (OpenAI,
+Anthropic, Gemini, Groq, GitHub, Slack prefixes), emails, phone numbers, or ≥20 same-shaped
+objects (data rows). Heuristic by design: it stops accidents, not a determined client.
+
+**C1. The ui_state PII scan was quadratic.** The first run took 63.21 s in one test: the email
+regex `[A-Za-z0-9._%+-]+@` rescans from every start position on a long string with no `@`.
+Every assertion passed, so only `--durations` showed it — and it was a request-time DoS on a
+public endpoint. Fixed with bounded quantifiers (RFC local part ≤64); the suite went 66.67 s →
+2.99 s; `test_ui_state_scan_is_linear_on_a_max_size_string` pins it under 1 s.
