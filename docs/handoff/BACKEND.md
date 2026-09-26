@@ -1,7 +1,7 @@
 ## Status (date, branch, last commit)
 
 2026-09-26 · branch `claude/analytics-agent-v2-backend-6gcu1p` (D-B0-1: protocol name
-`backend/B0-seed` pending the user's OK) · last commit: see the B0 PR.
+`backend/B0-seed` pending the user's OK) · last commit: `b3ae97d` (B0 seed) · PR: https://github.com/Akash708018/analytics-agentV2.0/pull/1
 Milestone **B0 — Seed and baseline: done.** v1 engine @ `0ba324b` seeded into `backend/engine`
 (package `backend.engine`), v1 tests/benches/eval into `backend/{tests,scripts,eval}`.
 
