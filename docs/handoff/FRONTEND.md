@@ -1,8 +1,10 @@
 ## Status (date, branch, last commit)
 
 2026-09-27 (Asia/Kolkata) · `frontend/F0-scaffold-measure`.
-F0 implementation, inventory, and measurements complete; publication in progress.
-Base commit: `7077562`. Milestone commit and PR will be recorded after publication.
+F0 complete; stopped for human review. Last implementation commit: `6248e34`
+(`F0: scaffold frontend and measure Streamlit state`); this follow-up updates the
+publication record only. Base commit: `7077562`.
+PR: https://github.com/Akash708018/analytics-agentV2.0/pull/2 (open, targets `main`).
 Own clone: `/tmp/analytics-agent-v2-frontend`; v1 read-only: `/tmp/av1-ui` at `0ba324b`.
 
 ## Screens: done | in progress | blocked (by which endpoint/issue)
@@ -46,6 +48,8 @@ $ frontend/.venv/bin/python -m pytest frontend/tests -q
 Python 3.12.14; Streamlit 1.64.0; httpx 0.28.1; pytest 9.1.1. Real Brave browser
 refresh/history and product landing observations are pasted in `docs/steps/F0.md`.
 AppTest evidence is not substituted for browser evidence. No Playwright used.
+Both temporary Streamlit servers (ports 8510 and 8511) were stopped; each printed
+`Stopping...` and exited 0. No frontend server is left running by this milestone.
 
 ## Next milestone
 
