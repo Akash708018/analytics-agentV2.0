@@ -13,7 +13,7 @@ Backend owns `backend/`, `packs/`, `bench/`, `docs/api/`, `docs/steps/B*`. Front
 Python 3.12 via `uv`; never `pip install`. The v1 suite runs FROM `backend/` (cwd-relative
 fixture paths; some tests skip, not fail, from elsewhere — always count skips):
 
-    cd backend && uv run pytest -q -rs        # B1: 2256 passed, 1 skipped (D-B0-2)
+    cd backend && uv run pytest -q -rs        # B2: 2273 passed, 1 skipped (D-B0-2)
     uv run uvicorn --factory backend.api.app:create_app   # API; spec: docs/api/openapi.yaml
     uv run python -m backend.api.export_openapi           # after any schema change
     cd backend && uv run python eval/run_eval.py     # SCORE: 76/76

@@ -3,7 +3,7 @@ info:
   title: analytics-agent v2
   description: Contract-first API. Figures carry provenance; chart series are computed by the backend.
     501 = spec'd, not live yet.
-  version: 0.1.0
+  version: 0.2.0
 paths:
   /health:
     get:
@@ -266,21 +266,21 @@ paths:
     post:
       tags:
       - datasets
-      summary: Post /Workspaces/{Ws}/Uploads
-      operationId: post__workspaces__ws__uploads_workspaces__ws__uploads_post
+      summary: Upload
+      operationId: upload_workspaces__ws__uploads_post
+      parameters:
+      - name: ws
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Ws
       requestBody:
+        required: true
         content:
           multipart/form-data:
             schema:
-              properties:
-                file:
-                  type: string
-                  format: binary
-                  description: CSV or Excel
-              type: object
-              required:
-              - file
-        required: true
+              $ref: '#/components/schemas/Body_upload_workspaces__ws__uploads_post'
       responses:
         '201':
           description: Successful Response
@@ -288,24 +288,75 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Dataset'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
         '404':
-          description: Not Found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}:
+    get:
+      tags:
+      - datasets
+      summary: Get Dataset
+      operationId: get_dataset_datasets__dataset_id__get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dataset'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
   /datasets/{dataset_id}/profile:
     get:
       tags:
       - datasets
-      summary: Get /Datasets/{Dataset Id}/Profile
-      operationId: get__datasets__dataset_id__profile_datasets__dataset_id__profile_get
+      summary: Profile
+      operationId: profile_datasets__dataset_id__profile_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
       responses:
         '200':
           description: Successful Response
@@ -313,24 +364,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Profile'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
         '404':
-          description: Not Found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
   /datasets/{dataset_id}/cleaning/proposals:
     get:
       tags:
       - cleaning
-      summary: Get /Datasets/{Dataset Id}/Cleaning/Proposals
-      operationId: get__datasets__dataset_id__cleaning_proposals_datasets__dataset_id__cleaning_proposals_get
+      summary: Cleaning Proposals
+      operationId: cleaning_proposals_datasets__dataset_id__cleaning_proposals_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
       responses:
         '200':
           description: Successful Response
@@ -338,30 +402,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CleaningProposals'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
         '404':
-          description: Not Found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
   /datasets/{dataset_id}/cleaning/approve:
     post:
       tags:
       - cleaning
-      summary: Post /Datasets/{Dataset Id}/Cleaning/Approve
-      operationId: post__datasets__dataset_id__cleaning_approve_datasets__dataset_id__cleaning_approve_post
+      summary: Cleaning Approve
+      operationId: cleaning_approve_datasets__dataset_id__cleaning_approve_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ApproveActions'
-        required: true
       responses:
         '200':
           description: Successful Response
@@ -369,24 +446,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApprovalResult'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
         '404':
-          description: Not Found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
   /datasets/{dataset_id}/domains/detect:
     get:
       tags:
       - domains
-      summary: Get /Datasets/{Dataset Id}/Domains/Detect
-      operationId: get__datasets__dataset_id__domains_detect_datasets__dataset_id__domains_detect_get
+      summary: Detect
+      operationId: detect_datasets__dataset_id__domains_detect_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
       responses:
         '200':
           description: Successful Response
@@ -394,30 +484,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DomainDetection'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
         '404':
-          description: Not Found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
   /datasets/{dataset_id}/domains/confirm:
     post:
       tags:
       - domains
-      summary: Post /Datasets/{Dataset Id}/Domains/Confirm
-      operationId: post__datasets__dataset_id__domains_confirm_datasets__dataset_id__domains_confirm_post
+      summary: Confirm Domains
+      operationId: confirm_domains_datasets__dataset_id__domains_confirm_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/DomainConfirm'
-        required: true
       responses:
         '200':
           description: Successful Response
@@ -425,24 +528,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Confirmed'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
         '404':
-          description: Not Found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
   /datasets/{dataset_id}/contract/proposal:
     get:
       tags:
       - contract
-      summary: Get /Datasets/{Dataset Id}/Contract/Proposal
-      operationId: get__datasets__dataset_id__contract_proposal_datasets__dataset_id__contract_proposal_get
+      summary: Contract Proposal
+      operationId: contract_proposal_datasets__dataset_id__contract_proposal_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
       responses:
         '200':
           description: Successful Response
@@ -450,30 +566,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContractProposal'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
         '404':
-          description: Not Found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
   /datasets/{dataset_id}/contract/confirm:
     post:
       tags:
       - contract
-      summary: Post /Datasets/{Dataset Id}/Contract/Confirm
-      operationId: post__datasets__dataset_id__contract_confirm_datasets__dataset_id__contract_confirm_post
+      summary: Contract Confirm
+      operationId: contract_confirm_datasets__dataset_id__contract_confirm_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/ContractConfirm'
-        required: true
       responses:
         '200':
           description: Successful Response
@@ -481,18 +610,113 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Confirmed'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
         '404':
-          description: Not Found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/tools:
+    get:
+      tags:
+      - tools
+      summary: Tools
+      operationId: tools_datasets__dataset_id__tools_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolList'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /packs:
+    get:
+      tags:
+      - packs
+      summary: Packs
+      operationId: packs_packs_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackList'
+  /packs/{pack_id}:
+    get:
+      tags:
+      - packs
+      summary: Pack
+      operationId: pack_packs__pack_id__get
+      parameters:
+      - name: pack_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Pack Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackDetail'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
   /datasets/{dataset_id}/metrics/templates:
     get:
       tags:
@@ -605,31 +829,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
-  /datasets/{dataset_id}/tools:
-    get:
-      tags:
-      - tools
-      summary: Get /Datasets/{Dataset Id}/Tools
-      operationId: get__datasets__dataset_id__tools_datasets__dataset_id__tools_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ToolList'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
   /tools/{tool_id}/run:
     post:
       tags:
@@ -649,56 +848,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ToolResult'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-  /packs:
-    get:
-      tags:
-      - packs
-      summary: Get /Packs
-      operationId: get__packs_packs_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PackList'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-  /packs/{pack_id}:
-    get:
-      tags:
-      - packs
-      summary: Get /Packs/{Pack Id}
-      operationId: get__packs__pack_id__packs__pack_id__get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PackDetail'
         '501':
           description: Not Implemented
           content:
@@ -796,27 +945,37 @@ components:
         ledger_entries: 1
         rejected: []
     ApproveActions:
+      properties:
+        approve:
+          items:
+            type: string
+          type: array
+          title: Approve
+          description: ids to apply
+        reject:
+          items:
+            type: string
+          type: array
+          title: Reject
+          default: []
+      type: object
+      required:
+      - approve
+      title: ApproveActions
       examples:
       - approve:
         - a1
         reject: []
+    Body_upload_workspaces__ws__uploads_post:
       properties:
-        approve:
-          description: ids to apply
-          items:
-            type: string
-          title: Approve
-          type: array
-        reject:
-          default: []
-          items:
-            type: string
-          title: Reject
-          type: array
-      required:
-      - approve
-      title: ApproveActions
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
       type: object
+      required:
+      - file
+      title: Body_upload_workspaces__ws__uploads_post
     ChartSeries:
       properties:
         chart:
@@ -881,6 +1040,16 @@ components:
         rows_affected:
           type: integer
           title: Rows Affected
+        lossy:
+          type: boolean
+          title: Lossy
+          default: false
+        suggested:
+          type: boolean
+          title: Suggested
+          description: 'Lossless and conflict-free: may be pre-ticked for the person; never applied without
+            approval'
+          default: false
       type: object
       required:
       - action_id
@@ -955,27 +1124,39 @@ components:
       - ok: true
         version: 1
     ContractConfirm:
-      examples:
-      - contract:
-          grain: one row per campaign per day
-        fork_choices:
-          roas_revenue_basis: net_excl_gst
       properties:
         contract:
           additionalProperties: true
-          description: The proposal as edited by the person
-          title: Contract
           type: object
+          title: Contract
+          description: The proposal as edited by the person
         fork_choices:
           additionalProperties:
             type: string
-          title: Fork Choices
           type: object
+          title: Fork Choices
+      type: object
       required:
       - contract
       - fork_choices
       title: ContractConfirm
-      type: object
+      examples:
+      - contract:
+          aggregations:
+            clicks: sum
+            cost: sum
+          date_column: date
+          dimensions:
+          - campaign
+          grain: one row per campaign per day
+          measures:
+          - cost
+          - clicks
+          primary_key:
+          - date
+          - campaign
+        fork_choices:
+          roas_revenue_basis: net_excl_gst
     ContractProposal:
       properties:
         dataset_id:
@@ -1009,6 +1190,19 @@ components:
             type: string
           type: array
           title: Caveats
+        provisional:
+          items:
+            type: string
+          type: array
+          title: Provisional
+          description: Fields that still need the person's answer; confirm is refused (422) while non-empty
+          default: []
+        questions:
+          items:
+            type: string
+          type: array
+          title: Questions
+          default: []
         forks:
           items:
             $ref: '#/components/schemas/ForkQuestion'
@@ -1077,6 +1271,14 @@ components:
         created_at:
           type: string
           title: Created At
+        assumptions:
+          items:
+            type: string
+          type: array
+          title: Assumptions
+          description: How the file was read (header row, types). Shown to the person; the upload is refused
+            with 422 ingest_needs_answers when the layout is ambiguous
+          default: []
       type: object
       required:
       - dataset_id
@@ -1087,10 +1289,12 @@ components:
       - created_at
       title: Dataset
       examples:
-      - columns: 14
+      - assumptions:
+        - row 1 is the header
+        columns: 14
         created_at: '2026-09-26T10:01:00Z'
         dataset_id: ds_ads_2026q3
-        name: google_ads_q3.csv
+        name: google_ads_q3
         rows: 18240
         workspace_id: ws_3f9a1c2b7d10
     DomainCandidate:
@@ -1106,19 +1310,19 @@ components:
       - evidence
       title: DomainCandidate
     DomainConfirm:
-      examples:
-      - domains:
-        - marketing
       properties:
         domains:
           items:
             type: string
-          title: Domains
           type: array
+          title: Domains
+      type: object
       required:
       - domains
       title: DomainConfirm
-      type: object
+      examples:
+      - domains:
+        - marketing
     DomainDetection:
       properties:
         dataset_id:
@@ -1482,9 +1686,27 @@ components:
         measure_type:
           type: string
           title: Measure Type
+          description: additive | ratio_of_sums | weighted_mean | distinct_count | percentile | semi_additive
+            | non_additive | unknown -- read from the suggestion, never applied
         agg:
           type: string
           title: Agg
+          description: The agreed aggregation; empty until the person answers
+        suggested_agg:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Suggested Agg
+        strength:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Strength
+          description: strong | likely | unsure
+        reason:
+          type: string
+          title: Reason
+          default: ''
       type: object
       required:
       - column
@@ -2349,5 +2571,5 @@ components:
       - engine
       title: VersionInfo
       examples:
-      - api_version: 0.1.0
+      - api_version: 0.2.0
         engine: v1@0ba324b

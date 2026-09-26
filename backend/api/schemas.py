@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-API_VERSION = "0.1.0"
+API_VERSION = "0.2.0"
 
 
 def _ex(*examples: dict) -> ConfigDict:
@@ -224,9 +224,13 @@ class Dataset(BaseModel):
     rows: int
     columns: int
     created_at: str
+    assumptions: list[str] = Field([], description="How the file was read (header row, "
+                                   "types). Shown to the person; the upload is refused with "
+                                   "422 ingest_needs_answers when the layout is ambiguous")
     model_config = _ex({"dataset_id": "ds_ads_2026q3", "workspace_id": "ws_3f9a1c2b7d10",
-                        "name": "google_ads_q3.csv", "rows": 18240, "columns": 14,
-                        "created_at": "2026-09-26T10:01:00Z"})
+                        "name": "google_ads_q3", "rows": 18240, "columns": 14,
+                        "created_at": "2026-09-26T10:01:00Z",
+                        "assumptions": ["row 1 is the header"]})
 
 
 class ColumnProfile(BaseModel):
@@ -254,6 +258,9 @@ class CleaningProposal(BaseModel):
     column: str | None
     description: str
     rows_affected: int
+    lossy: bool = False
+    suggested: bool = Field(False, description="Lossless and conflict-free: may be pre-ticked "
+                                               "for the person; never applied without approval")
 
 
 class CleaningProposals(BaseModel):
@@ -337,8 +344,13 @@ class ForkQuestion(BaseModel):
 
 class MeasureProposal(BaseModel):
     column: str
-    measure_type: str
-    agg: str
+    measure_type: str = Field(description="additive | ratio_of_sums | weighted_mean | "
+                              "distinct_count | percentile | semi_additive | non_additive | "
+                              "unknown -- read from the suggestion, never applied")
+    agg: str = Field(description="The agreed aggregation; empty until the person answers")
+    suggested_agg: str | None = None
+    strength: str | None = Field(None, description="strong | likely | unsure")
+    reason: str = ""
 
 
 class ContractProposal(BaseModel):
@@ -349,6 +361,9 @@ class ContractProposal(BaseModel):
     measures: list[MeasureProposal]
     dimensions: list[str]
     caveats: list[str]
+    provisional: list[str] = Field([], description="Fields that still need the person's "
+                                   "answer; confirm is refused (422) while non-empty")
+    questions: list[str] = []
     forks: list[ForkQuestion]
     model_config = _ex({
         "dataset_id": "ds_ads_2026q3", "grain": "one row per campaign per day",
@@ -363,7 +378,11 @@ class ContractProposal(BaseModel):
 class ContractConfirm(BaseModel):
     contract: dict[str, Any] = Field(description="The proposal as edited by the person")
     fork_choices: dict[str, str]
-    model_config = _ex({"contract": {"grain": "one row per campaign per day"},
+    model_config = _ex({"contract": {"grain": "one row per campaign per day",
+                                     "primary_key": ["date", "campaign"],
+                                     "date_column": "date", "measures": ["cost", "clicks"],
+                                     "dimensions": ["campaign"],
+                                     "aggregations": {"cost": "sum", "clicks": "sum"}},
                         "fork_choices": {"roas_revenue_basis": "net_excl_gst"}})
 
 

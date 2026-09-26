@@ -38,7 +38,8 @@ def _new(client) -> dict:
 
 def test_health_and_version(client):
     assert client.get("/health").json() == {"status": "ok"}
-    assert client.get("/version").json()["api_version"] == "0.1.0"
+    from backend.api.schemas import API_VERSION
+    assert client.get("/version").json()["api_version"] == API_VERSION
 
 
 def test_create_returns_uuid4_and_version_1(client):
@@ -221,14 +222,9 @@ def test_unknown_turn_is_404(client):
 
 # --- 501 stubs -----------------------------------------------------------------------------
 
-STUBS = [("post", "/workspaces/ws1/uploads"), ("get", "/datasets/d/profile"),
-         ("get", "/datasets/d/cleaning/proposals"), ("post", "/datasets/d/cleaning/approve"),
-         ("get", "/datasets/d/domains/detect"), ("post", "/datasets/d/domains/confirm"),
-         ("get", "/datasets/d/contract/proposal"), ("post", "/datasets/d/contract/confirm"),
-         ("get", "/datasets/d/metrics/templates"), ("post", "/datasets/d/metrics/approve"),
+STUBS = [("get", "/datasets/d/metrics/templates"), ("post", "/datasets/d/metrics/approve"),
          ("get", "/datasets/d/validity-rules"), ("post", "/datasets/d/validity-rules/approve"),
-         ("get", "/datasets/d/tools"), ("post", "/tools/marketing.x/run"), ("get", "/packs"),
-         ("get", "/packs/core"), ("get", "/datasets/d/keyword-groups"),
+         ("post", "/tools/marketing.x/run"), ("get", "/datasets/d/keyword-groups"),
          ("post", "/datasets/d/keyword-groups/actions")]
 
 
@@ -237,7 +233,7 @@ def test_stub_is_501_in_the_error_shape(client, method, path):
     r = getattr(client, method)(path)
     assert r.status_code == 501
     e = r.json()["error"]
-    assert e["code"] == "not_implemented" and e["milestone"] in {"B2", "B3", "B7"}
+    assert e["code"] == "not_implemented" and e["milestone"] in {"B3", "B7"}
 
 
 def test_ui_state_scan_is_linear_on_a_max_size_string():

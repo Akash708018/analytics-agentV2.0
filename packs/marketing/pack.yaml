@@ -1,0 +1,78 @@
+# marketing: digital marketing (paid ads, GA4, Search Console, email, social, orders).
+# B2: sources + vocabulary (detection). B3 adds templates, forks, rules, tools, changelog.
+pack:
+  id: marketing
+  version: 0.1.0
+  extends: [core]
+  title: Digital marketing
+
+vocabulary:
+  # paid ads
+  - {id: campaign, hints: [campaign, campaign_name, campaignname], weight: 1.0}
+  - {id: ad_group, hints: [ad_group, adgroup, ad_set, adset], weight: 1.0}
+  - {id: ad, hints: [ad, ad_name, ad_id, creative], weight: 0.7}
+  - {id: keyword, hints: [keyword, keywords], weight: 1.0}
+  - {id: search_term, hints: [search_term, searchterm, search_query], weight: 1.0}
+  - {id: impressions, hints: [impressions, impr, imps], weight: 1.0, measure_type: additive}
+  - {id: clicks, hints: [clicks, link_clicks], weight: 1.0, measure_type: additive}
+  - {id: spend, hints: [cost, spend, amount_spent, ad_spend], weight: 1.0, measure_type: additive}
+  - {id: conversions, hints: [conversions, conv, purchases, results], weight: 1.0, measure_type: additive}
+  - {id: conv_value, hints: [conv_value, conversion_value, purchase_value, conversions_value], weight: 1.0, measure_type: additive}
+  - {id: reach, hints: [reach], weight: 1.0, measure_type: distinct_count}
+  - {id: frequency, hints: [frequency], weight: 0.7}
+  - {id: quality_score, hints: [quality_score, qs], weight: 0.8}
+  - {id: impression_share, hints: [impression_share, search_impr_share, search_impression_share], weight: 0.8}
+  - {id: lost_is_budget, hints: [lost_is_budget, search_lost_is_budget, lost_budget], weight: 0.8}
+  - {id: lost_is_rank, hints: [lost_is_rank, search_lost_is_rank, lost_rank], weight: 0.8}
+  - {id: channel, hints: [channel, platform, network, source_platform], weight: 0.6}
+  # GA4
+  - {id: session_source, hints: [session_source, source, utm_source], weight: 1.0}
+  - {id: session_medium, hints: [session_medium, medium, utm_medium], weight: 1.0}
+  - {id: session_campaign, hints: [session_campaign, utm_campaign], weight: 0.8}
+  - {id: landing_page, hints: [landing_page, landing_page_path, landingpage], weight: 1.0}
+  - {id: sessions, hints: [sessions], weight: 1.0, measure_type: additive}
+  - {id: engaged_sessions, hints: [engaged_sessions], weight: 1.0, measure_type: additive}
+  - {id: users, hints: [users, total_users, active_users], weight: 0.8, measure_type: distinct_count}
+  - {id: new_users, hints: [new_users], weight: 0.8, measure_type: distinct_count}
+  - {id: key_events, hints: [key_events, keyevents], weight: 1.0, measure_type: additive}
+  - {id: event_name, hints: [event_name, eventname], weight: 1.0}
+  - {id: user_pseudo_id, hints: [user_pseudo_id, client_id], weight: 1.0}
+  # Search Console
+  - {id: query, hints: [query, queries, top_queries], weight: 1.0}
+  - {id: page, hints: [page, url, top_pages], weight: 0.7}
+  - {id: ctr, hints: [ctr], weight: 0.8}
+  - {id: position, hints: [position, avg_position, average_position], weight: 1.0, measure_type: weighted_mean}
+  - {id: country, hints: [country], weight: 0.4}
+  - {id: device, hints: [device, device_category], weight: 0.5}
+  # email
+  - {id: sent, hints: [sent, sends, emails_sent], weight: 1.0, measure_type: additive}
+  - {id: delivered, hints: [delivered, delivers], weight: 1.0, measure_type: additive}
+  - {id: opens, hints: [opens, unique_opens, opened], weight: 1.0, measure_type: additive}
+  - {id: unsubscribes, hints: [unsubscribes, unsubscribed, unsubs], weight: 1.0, measure_type: additive}
+  - {id: bounces, hints: [bounces, bounced, hard_bounces, soft_bounces], weight: 1.0, measure_type: additive}
+  - {id: complaints, hints: [complaints, spam_reports], weight: 1.0, measure_type: additive}
+  # social
+  - {id: post_id, hints: [post_id, postid, post], weight: 1.0}
+  - {id: post_type, hints: [post_type, media_type, format], weight: 0.8}
+  - {id: engagements, hints: [engagements, engagement, interactions], weight: 1.0, measure_type: additive}
+  - {id: followers, hints: [followers, follower_count, fans], weight: 1.0, measure_type: semi_additive}
+  # orders
+  - {id: order_id, hints: [order_id, orderid, order_no, order_number], weight: 1.0}
+  - {id: order_revenue, hints: [revenue, order_value, total_amount, gmv, net_revenue], weight: 0.8, measure_type: additive}
+  - {id: gst, hints: [gst, tax, igst, cgst, sgst], weight: 0.8, measure_type: additive}
+  - {id: order_status, hints: [order_status, status], weight: 0.5}
+  - {id: cancelled, hints: [cancelled, canceled, is_cancelled], weight: 0.8}
+  - {id: rto, hints: [rto, is_rto, returned_to_origin], weight: 1.0}
+  - {id: payment_method, hints: [payment_method, payment_mode, cod, prepaid], weight: 0.8}
+
+sources:
+  - {id: paid_ads, title: Paid ads (Google/Meta), concepts: [campaign, ad_group, ad, keyword, search_term, impressions, clicks, spend, conversions, conv_value, reach, frequency, quality_score, impression_share], required: [spend], min_score: 0.25}
+  - {id: ga4, title: Google Analytics 4, concepts: [session_source, session_medium, session_campaign, landing_page, sessions, engaged_sessions, users, new_users, key_events, event_name, user_pseudo_id], min_score: 0.25}
+  - {id: search_console, title: Google Search Console, concepts: [query, page, clicks, impressions, ctr, position, country, device], required: [position], min_score: 0.4}
+  - {id: email, title: Email campaigns, concepts: [campaign, sent, delivered, opens, clicks, unsubscribes, bounces, complaints], required: [sent], min_score: 0.4}
+  - {id: social, title: Organic social, concepts: [post_id, post_type, reach, engagements, followers, impressions], min_score: 0.4}
+  - {id: orders, title: Backend orders, concepts: [order_id, order_revenue, gst, order_status, cancelled, rto, payment_method], required: [order_id], min_score: 0.3, signals_domain: false}
+
+privacy:
+  pii_classes: {}
+  min_group_size: 5

@@ -69,60 +69,27 @@ RATIO_MIN_ROWS = 50
 #: A text column with more values than this may be a unit a measure repeats within.
 UNIT_MIN_DISTINCT = 20
 
-_CODE = {"zip", "zipcode", "postcode", "postal", "pincode", "pin", "year", "yr", "month", "quarter",
-         "week", "weekday", "dow", "hour", "code", "phone", "fips", "isbn", "ean", "upc"}
-_PER_ROW = {"ctr", "cvr", "cpc", "cpm", "cpa", "cpl", "cpv", "cpi", "cpo", "roas", "roi", "aov",
-            "arpu", "arppu", "frequency", "bid",
-            "price", "rate", "pct", "percent", "percentage", "ratio", "share", "avg", "average",
-            "mean", "median", "score", "rating", "age", "temperature", "temp", "index", "prob",
-            "probability", "lat", "latitude", "lng", "lon", "long", "longitude", "yield", "margin",
-            "tariff", "fare", "salary", "wage", "nps", "grade"}
-_LAT = {"lat", "latitude"}
-_LNG = {"lng", "lon", "long", "longitude"}
-_DISTANCE = {"distance", "dist", "km", "kms", "kilometres", "kilometers", "miles", "mi", "metres",
-             "meters", "mtrs", "mileage", "odometer"}
-#: A distance that measures how far off something is, not how far anything went.
-_DISCREPANCY = {"gps", "drift", "error", "err", "offset", "deviation", "accuracy", "precision",
-                "jitter", "gap", "drop", "diff", "delta", "variance", "radius"}
-#: A duration that measures how long something took, not time spent on it.
-_TAKEN = {"delivery", "delay", "delayed", "latency", "wait", "waiting", "response", "lead",
-          "leadtime", "turnaround", "resolution", "transit", "processing", "handling", "eta", "sla",
-          "recorded", "cycle", "prep", "preparation", "dispatch"}
-_SNAPSHOT = {"balance", "stock", "inventory", "onhand", "headcount", "level", "snapshot",
-             "outstanding", "backlog", "mrr", "arr", "capacity", "population", "open", "position",
-             "followers", "subscribers", "fans", "members", "listsize", "seats", "licenses",
-             "licences"}
-#: A level's movement: new, expansion and churned MRR are flows, and add (v2 bench, 25/09/2026).
-_FLOW = {"new", "expansion", "expand", "contraction", "churned", "churn", "lost", "gained",
-         "added", "removed", "net", "change", "delta", "growth", "increase", "decrease",
-         "inflow", "outflow", "movement", "reactivation", "upgrade", "downgrade"}
-#: Money words, and the currency codes that mark money converted to one currency.
-_MONEY = {"revenue", "amount", "amt", "sales", "cost", "price", "spend", "fee", "fees", "value",
-          "income", "payment", "paid", "profit", "gmv", "discount", "refund", "tax", "charge"}
-_CONVERTED = {"usd", "eur", "gbp", "inr", "aed", "jpy", "cad", "aud", "sgd", "chf", "cny",
-              "base", "reporting", "converted", "fx", "normalised", "normalized"}
-#: Words that make a name per-row whatever else it says: a bid_amount is a price, a
-#: conversion_rate a rate (marketing bench, 25/09/2026: "amount" had made a bid additive).
-_RATIO_WORDS = {"price", "rate", "pct", "percent", "percentage", "ratio", "share", "avg",
-                "average", "mean", "median", "ctr", "cvr", "cpc", "cpm", "cpa", "cpl", "cpv", "cpi",
-                "cpo", "roas", "roi", "aov", "arpu", "arppu", "frequency", "bid"}
-#: Counts of distinct people: each row counts its own; rows share people.
-_DISTINCT_PEOPLE = {"reach", "unique", "uniques", "distinct", "dau", "wau", "mau", "audience"}
-#: Names that say a fraction is a share of credit, which adds up to events.
-_CREDIT = {"credit", "attribution", "attributed", "allocation", "allocated"}
-_DURATION = {"days", "day", "hours", "hrs", "minutes", "mins", "seconds", "secs", "duration",
-             "latency", "delay", "tenure", "leadtime", "elapsed"}
-_ADDITIVE = {"amount", "amt", "revenue", "sales", "cost", "fee", "fees", "charge", "tax", "total",
-             "value", "spend", "profit", "gmv", "payment", "paid", "income", "expense", "freight",
-             "shipping", "qty", "quantity", "units", "count", "clicks", "views", "viewed",
-             "visits", "sessions", "pages", "items", "orders", "impressions", "volume", "weight",
-             "commission", "refund", "net", "gross", "subtotal", "turnover",
-             # marketing counts: each row's own, and they add (marketing bench, 25/09/2026)
-             "conversions", "conversion", "leads", "signups", "installs", "downloads", "bookings",
-             "purchases", "transactions", "sends", "sent", "delivered", "opens", "bounces",
-             "replies", "likes", "comments", "shares", "reactions", "posts", "calls",
-             "registrations", "applications", "unsubscribes", "complaints", "spend", "budget",
-             "discount", "usd", "eur", "gbp", "inr", "aed", "jpy"}
+# The name-token classes live in the core pack (packs/core/pack.yaml: word_classes), moved
+# verbatim from here in v2 B2; test_packs.py pins them equal to v1's sets.
+from backend.packs.loader import core_word_classes as _core_word_classes  # noqa: E402
+
+_W = _core_word_classes()
+_CODE = frozenset(_W["code"])
+_PER_ROW = frozenset(_W["per_row"])
+_LAT = frozenset(_W["lat"])
+_LNG = frozenset(_W["lng"])
+_DISTANCE = frozenset(_W["distance"])
+_DISCREPANCY = frozenset(_W["discrepancy"])
+_TAKEN = frozenset(_W["taken"])
+_SNAPSHOT = frozenset(_W["snapshot"])
+_FLOW = frozenset(_W["flow"])
+_MONEY = frozenset(_W["money"])
+_CONVERTED = frozenset(_W["converted"])
+_RATIO_WORDS = frozenset(_W["ratio_words"])
+_DISTINCT_PEOPLE = frozenset(_W["distinct_people"])
+_CREDIT = frozenset(_W["credit"])
+_DURATION = frozenset(_W["duration"])
+_ADDITIVE = frozenset(_W["additive"])
 
 
 @dataclass(frozen=True)

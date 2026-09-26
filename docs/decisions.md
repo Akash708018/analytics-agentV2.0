@@ -74,3 +74,36 @@ regex `[A-Za-z0-9._%+-]+@` rescans from every start position on a long string wi
 Every assertion passed, so only `--durations` showed it — and it was a request-time DoS on a
 public endpoint. Fixed with bounded quantifiers (RFC local part ≤64); the suite went 66.67 s →
 2.99 s; `test_ui_state_scan_is_linear_on_a_max_size_string` pins it under 1 s.
+
+## B2 — Pack framework + tool registry + core pack (2026-09-26)
+
+**D-B2-1. suggest.py's keyword sets moved into `packs/core/pack.yaml: word_classes`.** They
+classify measure types, which is core's job; marketing words among them (ctr, roas) stay in
+core because v1's tests pin their behaviour for every dataset. Moved by a script that asserted
+equality with v1's sets first; `test_packs.py` pins five of them literally; suggest_bench
+verdicts identical to v1.
+
+**D-B2-2. Upload auto-confirms the ingest spec only when nothing is unresolved.** Reading a
+file is not an interpretive choice when the engine has no open question; its `assumptions` are
+returned for the person to see. Any unresolved layout question → 422 `ingest_needs_answers`.
+
+**D-B2-3. A source can support a domain without signalling it.** `orders` (order_id, status)
+appears in marketing and logistics files alike; the SLA fixture scored marketing 0.544 on
+orders alone. `signals_domain: false` keeps orders listed as a source but out of the domain
+score.
+
+**D-B2-4. The LLM sees core analyses as ONE schema (`core_analyze`, enum of 27).** v1 did the
+same with `compute_analysis`; 27 schemas would cost every call. Domain tools get one small
+schema each, only when active. Core-only ≈194 tokens (estimate).
+
+**D-B2-5. Workspaces live 30 days idle, like sessions** (v1's web TTL was 72 h). `V2Backend`
+overrides `ttl_seconds`; `ANALYTICS_WORKSPACE_TTL_HOURS` no longer applies to the v2 API.
+
+**D-B2-6. `python-multipart` added** (FastAPI's form parser; user delegated dependency
+choices). Token counts are estimates (no tokenizer dependency) and labelled so.
+
+**O-B2-1 IS OPEN. Claude Desktop and `tools/list_changed`.** Measured: FastMCP 3.4.7 emits
+`ToolListChangedNotification` per session and a re-list shows the enabled tool
+(`bench/mcp_list_changed.py`). Not measurable here: whether Claude Desktop re-lists on it.
+Until someone runs the probe in Desktop, the MCP server follows the spec's fallback — expose
+all tools; a gated tool answers with a plain message naming the domain or data it needs.
