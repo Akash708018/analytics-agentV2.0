@@ -1,0 +1,141 @@
+# core: always on. Measure-type knowledge, money/time forks, privacy, and the India calendar.
+# Knowledge only -- no SQL, no expressions. Every fork is a QUESTION; a suggestion carries a reason
+# and is never applied until a person picks it.
+pack:
+  id: core
+  version: 0.1.0
+  title: Core rules for any dataset
+  locale: {currency: INR, fiscal_year_start: "04-01", timezone: Asia/Kolkata}
+
+measure_types:
+  additive: Sums across rows and time (spend, clicks, orders).
+  ratio_of_sums: A rate. Always sum(numerator)/sum(denominator); never sum or average the rate.
+  weighted_mean: An average weighted by another measure (position by impressions).
+  distinct_count: People or things counted once; never summed across days or groups.
+  percentile: An order statistic; recomputed from rows, never averaged.
+  semi_additive: A snapshot (balance, followers). Needs an as_of column and an explicit time rollup (last/avg); never summed over time.
+  derived: Computed from other approved metrics (MER, POAS).
+
+vocabulary:
+  - {id: money, hints: [revenue, amount, amt, sales, cost, spend, price, value, payment, gmv, profit], weight: 1.0}
+  - {id: tax, hints: [gst, tax, vat, igst, cgst, sgst], weight: 1.0}
+  - {id: date, hints: [date, day, dt, timestamp, time, created, month, week], weight: 1.0}
+  - {id: status, hints: [status, state, stage], weight: 0.5}
+  - {id: rate, hints: [ctr, cvr, rate, pct, percent, ratio, share, roas, cpc, cpm, cpa], weight: 0.5}
+
+forks:
+  - id: tax_basis
+    question: Are money columns before or after GST, and which should figures use?
+    options:
+      - {id: gross_incl_gst, label: Including GST (what the customer paid)}
+      - {id: net_excl_gst, label: Excluding GST (what the business keeps)}
+    suggested: net_excl_gst
+    suggested_reason: GST is collected for the government, not earned; comparisons across tax changes stay fair.
+    applies_when: [money]
+  - id: fiscal_year
+    question: When does your year start for yearly and quarterly figures?
+    options:
+      - {id: april, label: 1 April (Indian financial year)}
+      - {id: january, label: 1 January (calendar year)}
+    suggested: april
+    suggested_reason: The locale's currency is INR, and the Indian financial year starts on 1 April.
+    applies_when: [date]
+  - id: timezone
+    question: Which clock do the dates use -- the ad account's time zone or India time?
+    options:
+      - {id: account_tz, label: "The account's own time zone, as exported"}
+      - {id: ist, label: India Standard Time (UTC+5:30)}
+    applies_when: [date]
+
+validity_rules:
+  - id: open_records
+    description: Rows whose status is still open (pending, processing, in transit) can change; results on them are flagged as provisional, not dropped.
+    kind: flag_rows
+    concept: status
+    pattern: "pending|processing|in[ _-]?transit|open"
+
+interpretation_rules:
+  - id: no_sum_of_rate
+    description: A rate column (CTR, CVR, ROAS, a percentage) is never summed or plainly averaged across rows; the answer uses the ratio of sums.
+  - id: bounds
+    description: Rates lie in 0-100%; spend and counts are >= 0.
+
+dq_checks:
+  - {id: pii_columns, description: "Columns that look like names, emails, phones or addresses are named before any analysis."}
+  - {id: small_groups, description: Groups smaller than privacy.min_group_size are suppressed or flagged.}
+
+privacy:
+  pii_classes:
+    email: [email, e_mail, mail_id]
+    phone: [phone, mobile, contact_no, whatsapp]
+    name: [customer_name, full_name, first_name, last_name]
+    address: [address, street, landmark]
+    government_id: [aadhaar, pan, gstin]
+  min_group_size: 5
+
+festivals:
+  # Stored as data. Lunar-calendar dates move every year: the person confirms each year's dates
+  # before a festival comparison uses them (confirm_yearly). Sale-event dates are the retailers'.
+  - id: diwali
+    name: Diwali (Lakshmi Puja)
+    dates: {"2024": ["2024-11-01", "2024-11-01"], "2025": ["2025-10-20", "2025-10-21"], "2026": ["2026-11-08", "2026-11-08"]}
+  - id: navratri_dussehra
+    name: Navratri to Dussehra
+    dates: {"2024": ["2024-10-03", "2024-10-12"], "2025": ["2025-09-22", "2025-10-02"], "2026": ["2026-10-11", "2026-10-20"]}
+  - id: holi
+    name: Holi
+    dates: {"2024": ["2024-03-25", "2024-03-25"], "2025": ["2025-03-14", "2025-03-14"], "2026": ["2026-03-04", "2026-03-04"]}
+  - id: eid_ul_fitr
+    name: Eid ul-Fitr (moon-sighting dependent)
+    dates: {"2024": ["2024-04-11", "2024-04-11"], "2025": ["2025-03-31", "2025-03-31"], "2026": ["2026-03-20", "2026-03-21"]}
+  - id: big_billion_days
+    name: Flipkart Big Billion Days
+    dates: {"2024": ["2024-09-27", "2024-10-06"], "2025": ["2025-09-23", "2025-10-02"]}
+  - id: great_indian_festival
+    name: Amazon Great Indian Festival
+    dates: {"2024": ["2024-09-27", "2024-10-29"], "2025": ["2025-09-23", "2025-10-22"]}
+
+sources_cited:
+  - {id: dbt_metricflow, title: dbt MetricFlow measure types, url: "https://docs.getdbt.com/docs/build/measures"}
+  - {id: in_fy, title: "Income-tax Act 1961, s.2(34): the previous year begins 1 April", url: "https://incometaxindia.gov.in"}
+
+changelog: []
+
+# The measure suggester's name-token classes, moved verbatim from v1 contract/suggest.py (B2).
+word_classes:
+  code: [code, dow, ean, fips, hour, isbn, month, phone, pin, pincode, postal, postcode, quarter, upc,
+    week, weekday, year, yr, zip, zipcode]
+  per_row: [age, aov, arppu, arpu, average, avg, bid, cpa, cpc, cpi, cpl, cpm, cpo, cpv, ctr, cvr, fare,
+    frequency, grade, index, lat, latitude, lng, lon, long, longitude, margin, mean, median, nps, pct,
+    percent, percentage, price, prob, probability, rate, rating, ratio, roas, roi, salary, score, share,
+    tariff, temp, temperature, wage, yield]
+  lat: [lat, latitude]
+  lng: [lng, lon, long, longitude]
+  distance: [dist, distance, kilometers, kilometres, km, kms, meters, metres, mi, mileage, miles, mtrs,
+    odometer]
+  discrepancy: [accuracy, delta, deviation, diff, drift, drop, err, error, gap, gps, jitter, offset, precision,
+    radius, variance]
+  taken: [cycle, delay, delayed, delivery, dispatch, eta, handling, latency, lead, leadtime, prep, preparation,
+    processing, recorded, resolution, response, sla, transit, turnaround, wait, waiting]
+  snapshot: [arr, backlog, balance, capacity, fans, followers, headcount, inventory, level, licences,
+    licenses, listsize, members, mrr, onhand, open, outstanding, population, position, seats, snapshot,
+    stock, subscribers]
+  flow: [added, change, churn, churned, contraction, decrease, delta, downgrade, expand, expansion, gained,
+    growth, increase, inflow, lost, movement, net, new, outflow, reactivation, removed, upgrade]
+  money: [amount, amt, charge, cost, discount, fee, fees, gmv, income, paid, payment, price, profit, refund,
+    revenue, sales, spend, tax, value]
+  converted: [aed, aud, base, cad, chf, cny, converted, eur, fx, gbp, inr, jpy, normalised, normalized,
+    reporting, sgd, usd]
+  ratio_words: [aov, arppu, arpu, average, avg, bid, cpa, cpc, cpi, cpl, cpm, cpo, cpv, ctr, cvr, frequency,
+    mean, median, pct, percent, percentage, price, rate, ratio, roas, roi, share]
+  distinct_people: [audience, dau, distinct, mau, reach, unique, uniques, wau]
+  credit: [allocated, allocation, attributed, attribution, credit]
+  duration: [day, days, delay, duration, elapsed, hours, hrs, latency, leadtime, mins, minutes, seconds,
+    secs, tenure]
+  additive: [aed, amount, amt, applications, bookings, bounces, budget, calls, charge, clicks, comments,
+    commission, complaints, conversion, conversions, cost, count, delivered, discount, downloads, eur,
+    expense, fee, fees, freight, gbp, gmv, gross, impressions, income, inr, installs, items, jpy, leads,
+    likes, net, opens, orders, pages, paid, payment, posts, profit, purchases, qty, quantity, reactions,
+    refund, registrations, replies, revenue, sales, sends, sent, sessions, shares, shipping, signups,
+    spend, subtotal, tax, total, transactions, turnover, units, unsubscribes, usd, value, viewed, views,
+    visits, volume, weight]

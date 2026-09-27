@@ -16,6 +16,7 @@ dependencies = [
     "openpyxl>=3.1.5",
     "psycopg[binary]>=3.3.4",
     "pydantic>=2.13.4",
+    "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",
     "scipy>=1.18.1",
     "statsmodels>=0.15.0",

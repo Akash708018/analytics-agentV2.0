@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-API_VERSION = "0.1.0"
+API_VERSION = "0.3.0"
 
 
 def _ex(*examples: dict) -> ConfigDict:
@@ -211,8 +211,15 @@ class ToolResult(BaseModel):
 
 class ToolRunRequest(BaseModel):
     dataset_id: str
-    params: dict[str, Any] = {}
-    model_config = _ex({"dataset_id": "ds_ads_2026q3", "params": {"by": "channel"}})
+    params: dict[str, Any] = Field({}, description=(
+        "Slot overrides (a column name, e.g. by), period/baseline 'YYYY-MM-DD/YYYY-MM-DD', "
+        "bindings {concept: column} when a concept is ambiguous, brand_terms, festival + year "
+        "+ dates_confirmed. 409 needs_domain/needs_data; 422 forks_unanswered, "
+        "ambiguous_binding, param_required, festival_dates_unconfirmed, engine_refused"))
+    model_config = _ex({"dataset_id": "ds_ads_2026q3", "params": {"by": "channel"}},
+                       {"dataset_id": "ds_ads_2026q3", "params": {
+                           "period": "2026-09-16/2026-09-30",
+                           "baseline": "2026-09-01/2026-09-15"}})
 
 
 # --- datasets ----------------------------------------------------------------------------------
@@ -224,9 +231,13 @@ class Dataset(BaseModel):
     rows: int
     columns: int
     created_at: str
+    assumptions: list[str] = Field([], description="How the file was read (header row, "
+                                   "types). Shown to the person; the upload is refused with "
+                                   "422 ingest_needs_answers when the layout is ambiguous")
     model_config = _ex({"dataset_id": "ds_ads_2026q3", "workspace_id": "ws_3f9a1c2b7d10",
-                        "name": "google_ads_q3.csv", "rows": 18240, "columns": 14,
-                        "created_at": "2026-09-26T10:01:00Z"})
+                        "name": "google_ads_q3", "rows": 18240, "columns": 14,
+                        "created_at": "2026-09-26T10:01:00Z",
+                        "assumptions": ["row 1 is the header"]})
 
 
 class ColumnProfile(BaseModel):
@@ -254,6 +265,9 @@ class CleaningProposal(BaseModel):
     column: str | None
     description: str
     rows_affected: int
+    lossy: bool = False
+    suggested: bool = Field(False, description="Lossless and conflict-free: may be pre-ticked "
+                                               "for the person; never applied without approval")
 
 
 class CleaningProposals(BaseModel):
@@ -337,8 +351,13 @@ class ForkQuestion(BaseModel):
 
 class MeasureProposal(BaseModel):
     column: str
-    measure_type: str
-    agg: str
+    measure_type: str = Field(description="additive | ratio_of_sums | weighted_mean | "
+                              "distinct_count | percentile | semi_additive | non_additive | "
+                              "unknown -- read from the suggestion, never applied")
+    agg: str = Field(description="The agreed aggregation; empty until the person answers")
+    suggested_agg: str | None = None
+    strength: str | None = Field(None, description="strong | likely | unsure")
+    reason: str = ""
 
 
 class ContractProposal(BaseModel):
@@ -349,6 +368,9 @@ class ContractProposal(BaseModel):
     measures: list[MeasureProposal]
     dimensions: list[str]
     caveats: list[str]
+    provisional: list[str] = Field([], description="Fields that still need the person's "
+                                   "answer; confirm is refused (422) while non-empty")
+    questions: list[str] = []
     forks: list[ForkQuestion]
     model_config = _ex({
         "dataset_id": "ds_ads_2026q3", "grain": "one row per campaign per day",
@@ -363,14 +385,25 @@ class ContractProposal(BaseModel):
 class ContractConfirm(BaseModel):
     contract: dict[str, Any] = Field(description="The proposal as edited by the person")
     fork_choices: dict[str, str]
-    model_config = _ex({"contract": {"grain": "one row per campaign per day"},
+    model_config = _ex({"contract": {"grain": "one row per campaign per day",
+                                     "primary_key": ["date", "campaign"],
+                                     "date_column": "date", "measures": ["cost", "clicks"],
+                                     "dimensions": ["campaign"],
+                                     "aggregations": {"cost": "sum", "clicks": "sum"}},
                         "fork_choices": {"roas_revenue_basis": "net_excl_gst"}})
 
 
 class Confirmed(BaseModel):
     ok: bool
     version: int
-    model_config = _ex({"ok": True, "version": 1})
+    measure: str | None = Field(None, description="metrics/approve: the measure added")
+    model_config = _ex({"ok": True, "version": 1}, {"ok": True, "version": 2, "measure": "roas"})
+
+
+class ForkAnswers(BaseModel):
+    fork_choices: dict[str, str]
+    model_config = _ex({"fork_choices": {"conversion_source": "backend_orders",
+                                         "roas_revenue_basis": "net_excl_gst"}})
 
 
 class MetricTemplate(BaseModel):
@@ -379,10 +412,14 @@ class MetricTemplate(BaseModel):
     shape: str
     required_concepts: list[str]
     forks: list[str]
-    available: bool
-    model_config = _ex({"template_id": "marketing.roas", "label": "ROAS",
-                        "shape": "ratio_of_sums", "required_concepts": ["revenue", "spend"],
-                        "forks": ["roas_revenue_basis"], "available": True})
+    available: bool = Field(description="Its concepts are in the data and the engine can "
+                                        "compute its shape")
+    approved: bool = False
+    measure: str | None = Field(None, description="The contract measure it became")
+    model_config = _ex({"template_id": "roas", "label": "ROAS",
+                        "shape": "ratio_of_sums", "required_concepts": ["spend"],
+                        "forks": ["roas_revenue_basis"], "available": True,
+                        "approved": True, "measure": "roas"})
 
 
 class MetricTemplates(BaseModel):
@@ -394,8 +431,8 @@ class MetricApprove(BaseModel):
     template_id: str
     bindings: dict[str, str] = Field(description="concept -> column")
     fork_choices: dict[str, str] = {}
-    model_config = _ex({"template_id": "marketing.roas",
-                        "bindings": {"revenue": "net_revenue", "spend": "cost"},
+    model_config = _ex({"template_id": "roas",
+                        "bindings": {"order_revenue": "net_revenue", "spend": "cost"},
                         "fork_choices": {"roas_revenue_basis": "net_excl_gst"}})
 
 

@@ -74,3 +74,64 @@ regex `[A-Za-z0-9._%+-]+@` rescans from every start position on a long string wi
 Every assertion passed, so only `--durations` showed it — and it was a request-time DoS on a
 public endpoint. Fixed with bounded quantifiers (RFC local part ≤64); the suite went 66.67 s →
 2.99 s; `test_ui_state_scan_is_linear_on_a_max_size_string` pins it under 1 s.
+
+## B2 — Pack framework + tool registry + core pack (2026-09-26)
+
+**D-B2-1. suggest.py's keyword sets moved into `packs/core/pack.yaml: word_classes`.** They
+classify measure types, which is core's job; marketing words among them (ctr, roas) stay in
+core because v1's tests pin their behaviour for every dataset. Moved by a script that asserted
+equality with v1's sets first; `test_packs.py` pins five of them literally; suggest_bench
+verdicts identical to v1.
+
+**D-B2-2. Upload auto-confirms the ingest spec only when nothing is unresolved.** Reading a
+file is not an interpretive choice when the engine has no open question; its `assumptions` are
+returned for the person to see. Any unresolved layout question → 422 `ingest_needs_answers`.
+
+**D-B2-3. A source can support a domain without signalling it.** `orders` (order_id, status)
+appears in marketing and logistics files alike; the SLA fixture scored marketing 0.544 on
+orders alone. `signals_domain: false` keeps orders listed as a source but out of the domain
+score.
+
+**D-B2-4. The LLM sees core analyses as ONE schema (`core_analyze`, enum of 27).** v1 did the
+same with `compute_analysis`; 27 schemas would cost every call. Domain tools get one small
+schema each, only when active. Core-only ≈194 tokens (estimate).
+
+**D-B2-5. Workspaces live 30 days idle, like sessions** (v1's web TTL was 72 h). `V2Backend`
+overrides `ttl_seconds`; `ANALYTICS_WORKSPACE_TTL_HOURS` no longer applies to the v2 API.
+
+**D-B2-6. `python-multipart` added** (FastAPI's form parser; user delegated dependency
+choices). Token counts are estimates (no tokenizer dependency) and labelled so.
+
+**O-B2-1 IS OPEN. Claude Desktop and `tools/list_changed`.** Measured: FastMCP 3.4.7 emits
+`ToolListChangedNotification` per session and a re-list shows the enabled tool
+(`bench/mcp_list_changed.py`). Not measurable here: whether Claude Desktop re-lists on it.
+Until someone runs the probe in Desktop, the MCP server follows the spec's fallback — expose
+all tools; a gated tool answers with a plain message naming the domain or data it needs.
+
+## B3 — marketing pack + Tier-1 tools (2026-09-27)
+
+**D-B3-1. A tool is a list of engine steps with bindings, run through the engine's `_produce`.**
+The contract gate, scoping and every v1 refusal apply unchanged to domain tools. No new maths.
+
+**D-B3-2. A metric template becomes a contract ratio measure; approval = a new contract
+version.** v1's ratio measures (signed numerator/denominator lists, scale) already compute
+ratio-of-sums correctly; ROAS net of GST is numerator [order_revenue, -gst]. A name clash with
+a file column (the file's per-row `ctr`) gets `_ratio`.
+
+**D-B3-3. Ambiguity is a question, never a pick.** A concept bound to >1 column (Google + Meta
+conversions) answers 422 `ambiguous_binding`; the person names one via `params.bindings`.
+
+**D-B3-4. Shapes the engine cannot compute are listed but refused.** distinct_count,
+weighted_mean (GSC position), semi_additive (followers), derived (MER, POAS):
+`engine_ready: false` → 422 with the reason, never a wrong number. delivered_net ROAS → B4.
+
+**D-B3-5. Changelog sources are secondary** (vendor/trade pages found by search); the four
+dates agree across several; official platform pages were not reachable by search. Recorded
+per entry.
+
+**D-B3-6. Festival dates must be confirmed per run** (`dates_confirmed`), since lunar dates move.
+
+**C2. My measurement-change prediction was wrong, the code right.** I expected the Meta
+2026-01-12 caveat on the ROAS explainer; ROAS there uses backend order revenue, which Meta's
+attribution windows do not touch. The caveat correctly fires only where platform conversions
+are used. Test now asserts both.

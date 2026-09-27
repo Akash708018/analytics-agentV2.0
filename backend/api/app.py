@@ -5,10 +5,11 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
 from backend.api import schemas as S
+from backend.services import datasets as D
 from backend.services.sessions import Runner, ServiceError, SessionService, TurnService
 from backend.sessions.store import Store
 
@@ -26,7 +27,8 @@ def create_app(state_dir: Path | str | None = None, runner: Runner | None = None
     app = FastAPI(title="analytics-agent v2", version=S.API_VERSION,
                   description="Contract-first API. Figures carry provenance; chart series are "
                               "computed by the backend. 501 = spec'd, not live yet.")
-    app.state.sessions, app.state.turns = sessions, turns
+    ds = D.DatasetService(store)
+    app.state.sessions, app.state.turns, app.state.datasets = sessions, turns, ds
 
     @app.exception_handler(ServiceError)
     async def _service_error(_: Request, e: ServiceError) -> JSONResponse:
@@ -98,34 +100,100 @@ def create_app(state_dir: Path | str | None = None, runner: Runner | None = None
                           responses={501: ERR, 404: ERR}, name=f"{method.lower()}_{path}")
 
     extra_models: list[type] = []
-    upload = {"requestBody": {"required": True, "content": {"multipart/form-data": {
-        "schema": {"type": "object", "required": ["file"], "properties": {
-            "file": {"type": "string", "format": "binary",
-                     "description": "CSV or Excel"}}}}}}}
-    stub("POST", "/workspaces/{ws}/uploads", S.Dataset, "B2", "datasets", status=201,
-         extra=upload)
-    stub("GET", "/datasets/{dataset_id}/profile", S.Profile, "B2", "datasets")
-    stub("GET", "/datasets/{dataset_id}/cleaning/proposals", S.CleaningProposals, "B2",
-         "cleaning")
-    stub("POST", "/datasets/{dataset_id}/cleaning/approve", S.ApprovalResult, "B2",
-         "cleaning", body=S.ApproveActions)
-    stub("GET", "/datasets/{dataset_id}/domains/detect", S.DomainDetection, "B2", "domains")
-    stub("POST", "/datasets/{dataset_id}/domains/confirm", S.Confirmed, "B2", "domains",
-         body=S.DomainConfirm)
-    stub("GET", "/datasets/{dataset_id}/contract/proposal", S.ContractProposal, "B2",
-         "contract")
-    stub("POST", "/datasets/{dataset_id}/contract/confirm", S.Confirmed, "B2", "contract",
-         body=S.ContractConfirm)
-    stub("GET", "/datasets/{dataset_id}/metrics/templates", S.MetricTemplates, "B3", "metrics")
-    stub("POST", "/datasets/{dataset_id}/metrics/approve", S.Confirmed, "B3", "metrics",
-         body=S.MetricApprove)
-    stub("GET", "/datasets/{dataset_id}/validity-rules", S.ValidityRules, "B3", "rules")
-    stub("POST", "/datasets/{dataset_id}/validity-rules/approve", S.Confirmed, "B3", "rules",
-         body=S.RuleApprove)
-    stub("GET", "/datasets/{dataset_id}/tools", S.ToolList, "B2", "tools")
-    stub("POST", "/tools/{tool_id}/run", S.ToolResult, "B3", "tools", body=S.ToolRunRequest)
-    stub("GET", "/packs", S.PackList, "B2", "packs")
-    stub("GET", "/packs/{pack_id}", S.PackDetail, "B2", "packs")
+    # --- live since B2: datasets, cleaning, domains, contract ------------------------------
+    R = {404: ERR, 413: ERR, 422: ERR}
+
+    @app.post("/workspaces/{ws}/uploads", response_model=S.Dataset, status_code=201,
+              responses=R, tags=["datasets"])
+    async def upload(ws: str, file: UploadFile = File(...)) -> S.Dataset:
+        return S.Dataset(**ds.upload(ws, file.filename or "upload.csv", await file.read()))
+
+    @app.get("/datasets/{dataset_id}", response_model=S.Dataset, responses=R, tags=["datasets"])
+    def get_dataset(dataset_id: str) -> S.Dataset:
+        return S.Dataset(**ds.summary(dataset_id))
+
+    @app.get("/datasets/{dataset_id}/profile", response_model=S.Profile, responses=R,
+             tags=["datasets"])
+    def profile(dataset_id: str) -> S.Profile:
+        return S.Profile(**ds.profile(dataset_id))
+
+    @app.get("/datasets/{dataset_id}/cleaning/proposals", response_model=S.CleaningProposals,
+             responses=R, tags=["cleaning"])
+    def cleaning_proposals(dataset_id: str) -> S.CleaningProposals:
+        return S.CleaningProposals(**ds.cleaning_proposals(dataset_id))
+
+    @app.post("/datasets/{dataset_id}/cleaning/approve", response_model=S.ApprovalResult,
+              responses=R, tags=["cleaning"])
+    def cleaning_approve(dataset_id: str, body: S.ApproveActions) -> S.ApprovalResult:
+        return S.ApprovalResult(**ds.cleaning_approve(dataset_id, body.approve, body.reject))
+
+    @app.get("/datasets/{dataset_id}/domains/detect", response_model=S.DomainDetection,
+             responses=R, tags=["domains"])
+    def detect(dataset_id: str) -> S.DomainDetection:
+        return S.DomainDetection(**ds.detect(dataset_id))
+
+    @app.post("/datasets/{dataset_id}/domains/confirm", response_model=S.Confirmed,
+              responses=R, tags=["domains"])
+    def confirm_domains(dataset_id: str, body: S.DomainConfirm) -> S.Confirmed:
+        r = ds.confirm_domains(dataset_id, body.domains)
+        return S.Confirmed(ok=r["ok"], version=r["version"])
+
+    @app.get("/datasets/{dataset_id}/contract/proposal", response_model=S.ContractProposal,
+             responses=R, tags=["contract"])
+    def contract_proposal(dataset_id: str) -> S.ContractProposal:
+        return S.ContractProposal(**ds.contract_proposal(dataset_id))
+
+    @app.post("/datasets/{dataset_id}/contract/confirm", response_model=S.Confirmed,
+              responses=R, tags=["contract"])
+    def contract_confirm(dataset_id: str, body: S.ContractConfirm) -> S.Confirmed:
+        return S.Confirmed(**ds.contract_confirm(dataset_id, body.contract, body.fork_choices))
+
+    @app.get("/datasets/{dataset_id}/tools", response_model=S.ToolList, responses=R,
+             tags=["tools"])
+    def tools(dataset_id: str) -> S.ToolList:
+        return S.ToolList(**ds.tools(dataset_id))
+
+    @app.post("/datasets/{dataset_id}/forks", response_model=S.Confirmed, responses=R,
+              tags=["contract"])
+    def answer_forks(dataset_id: str, body: S.ForkAnswers) -> S.Confirmed:
+        r = ds.answer_forks(dataset_id, body.fork_choices)
+        return S.Confirmed(ok=r["ok"], version=r["version"])
+
+    @app.get("/datasets/{dataset_id}/metrics/templates", response_model=S.MetricTemplates,
+             responses=R, tags=["metrics"])
+    def metric_templates(dataset_id: str) -> S.MetricTemplates:
+        return S.MetricTemplates(**ds.metric_templates(dataset_id))
+
+    @app.post("/datasets/{dataset_id}/metrics/approve", response_model=S.Confirmed,
+              responses={**R, 409: ERR}, tags=["metrics"])
+    def approve_metric(dataset_id: str, body: S.MetricApprove) -> S.Confirmed:
+        return S.Confirmed(**ds.approve_metric(dataset_id, body.template_id, body.bindings,
+                                               body.fork_choices))
+
+    @app.get("/datasets/{dataset_id}/validity-rules", response_model=S.ValidityRules,
+             responses=R, tags=["rules"])
+    def validity_rules(dataset_id: str) -> S.ValidityRules:
+        return S.ValidityRules(**ds.validity_rules(dataset_id))
+
+    @app.post("/datasets/{dataset_id}/validity-rules/approve", response_model=S.Confirmed,
+              responses=R, tags=["rules"])
+    def approve_rules(dataset_id: str, body: S.RuleApprove) -> S.Confirmed:
+        r = ds.approve_rules(dataset_id, body.approve, body.reject)
+        return S.Confirmed(ok=r["ok"], version=r["version"])
+
+    @app.post("/tools/{tool_id}/run", response_model=S.ToolResult,
+              responses={**R, 409: ERR}, tags=["tools"])
+    def run_tool(tool_id: str, body: S.ToolRunRequest) -> S.ToolResult:
+        return S.ToolResult(**ds.run_tool(tool_id, body.dataset_id, body.params))
+
+    @app.get("/packs", response_model=S.PackList, tags=["packs"])
+    def packs() -> S.PackList:
+        return S.PackList(**D.packs_list())
+
+    @app.get("/packs/{pack_id}", response_model=S.PackDetail, responses=R, tags=["packs"])
+    def pack(pack_id: str) -> S.PackDetail:
+        return S.PackDetail(**D.pack_detail(pack_id))
+
     stub("GET", "/datasets/{dataset_id}/keyword-groups", S.KeywordGroups, "B7", "keywords")
     stub("POST", "/datasets/{dataset_id}/keyword-groups/actions", S.KeywordGroups, "B7",
          "keywords", body=S.KeywordGroupAction)
