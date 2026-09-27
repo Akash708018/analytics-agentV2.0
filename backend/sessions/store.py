@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS datasets (
     created_at TEXT NOT NULL,
     domains TEXT NOT NULL DEFAULT '[]',
     fork_choices TEXT NOT NULL DEFAULT '{}',
+    validity TEXT NOT NULL DEFAULT '[]',
+    metrics TEXT NOT NULL DEFAULT '{}',
     UNIQUE (workspace_id, name)
 );
 """
@@ -49,6 +51,11 @@ class Store:
         with self._lock:
             self._con.execute("PRAGMA journal_mode=WAL")
             self._con.executescript(SCHEMA)
+            cols = {r[1] for r in self._con.execute("PRAGMA table_info(datasets)")}
+            for col, default in (("validity", "'[]'"), ("metrics", "'{}'")):
+                if col not in cols:   # a B2 database: add B3's columns in place
+                    self._con.execute(f"ALTER TABLE datasets ADD COLUMN {col} TEXT NOT NULL "
+                                      f"DEFAULT {default}")
             self._con.commit()
 
     def _q(self, sql: str, args: tuple = ()) -> list[sqlite3.Row]:
@@ -143,11 +150,17 @@ class Store:
         if not rows:
             return None
         d = dict(rows[0])
-        d["domains"], d["fork_choices"] = json.loads(d["domains"]), json.loads(d["fork_choices"])
+        for k in ("domains", "fork_choices", "validity", "metrics"):
+            d[k] = json.loads(d[k])
         return d
 
     def set_dataset_choices(self, dataset_id: str, *, domains: list | None = None,
-                            fork_choices: dict | None = None) -> None:
+                            fork_choices: dict | None = None, validity: list | None = None,
+                            metrics: dict | None = None) -> None:
+        for col, val in (("validity", validity), ("metrics", metrics)):
+            if val is not None:
+                self._q(f"UPDATE datasets SET {col}=? WHERE dataset_id=?",
+                        (json.dumps(val), dataset_id))
         if domains is not None:
             self._q("UPDATE datasets SET domains=? WHERE dataset_id=?",
                     (json.dumps(domains), dataset_id))

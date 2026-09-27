@@ -17,7 +17,8 @@ from backend.packs.detector import bind, detect, normalise
 from backend.packs.loader import load_all, merge
 from backend.services.sessions import ServiceError
 from backend.sessions.store import Store
-from backend.tools import registry
+from backend.engine.contract import store as contract_store
+from backend.tools import registry, runner
 
 SESSION_DAYS = 30
 
@@ -221,8 +222,9 @@ class DatasetService:
         r = self.be.confirm_contract(d["workspace_id"], draft)
         if not r.ok:
             raise _refusal(r)
-        self.store.set_dataset_choices(dataset_id, fork_choices=fork_choices)
-        return {"ok": True, "version": 1}
+        self.store.set_dataset_choices(dataset_id, fork_choices={**d["fork_choices"],
+                                                                 **fork_choices})
+        return {"ok": True, "version": self._contract(d).version}
 
     # --- tools ---------------------------------------------------------------------------------
     def tools(self, dataset_id: str) -> dict:
@@ -232,6 +234,216 @@ class DatasetService:
         return {"tools": [{"tool_id": s.tool_id, "ui_label": s.ui_label, "status": s.status,
                            "needs_domain": s.needs_domain,
                            "missing_concepts": s.missing_concepts} for s in states]}
+
+
+    # --- forks answered after the contract (a domain confirmed later brings new ones) --------
+    def answer_forks(self, dataset_id: str, fork_choices: dict) -> dict:
+        d = self._get(dataset_id)
+        m = merge(load_all(), d["domains"])
+        bad = [f"{k}={v}" for k, v in fork_choices.items()
+               if k not in m.forks or v not in {o.id for o in m.forks[k].options}]
+        if bad:
+            raise ServiceError(422, "invalid_fork_choice", f"invalid: {bad}", {"invalid": bad})
+        merged = {**d["fork_choices"], **fork_choices}
+        self.store.set_dataset_choices(dataset_id, fork_choices=merged)
+        return {"ok": True, "version": 1, "fork_choices": merged}
+
+    # --- contract helpers --------------------------------------------------------------------
+    def _contract(self, d: dict):
+        with self.be._workspace(d["workspace_id"]):   # the engine's per-workspace lock
+            con = db.connect(d["workspace_id"])
+            try:
+                sc = contract_store.current(con, d["name"])
+            finally:
+                con.close()
+        if sc is None:
+            raise ServiceError(409, "contract_required",
+                               "Confirm the dataset contract first (POST .../contract/confirm).")
+        return sc
+
+    @staticmethod
+    def _contract_kwargs(c) -> dict:
+        ms = c.measures
+        kw = {"grain": c.grain, "primary_key": list(c.primary_key),
+              "date_column": c.date_column, "measures": [m.name for m in ms],
+              "dimensions": list(c.dimensions),
+              "aggregations": {m.name: m.agg for m in ms if m.agg},
+              "measure_definitions": {m.name: m.definition for m in ms},
+              "caveats": list(c.caveats),
+              "measure_per": {m.name: list(m.per) for m in ms if m.per},
+              "ratios": {m.name: {"numerator": list(m.numerator),
+                                  "denominator": list(m.denominator), "scale": m.scale}
+                         for m in ms if m.agg == "ratio"},
+              "measure_columns": {m.name: m.column for m in ms if m.column}}
+        if c.analysis_window:
+            kw["analysis_window_start"] = c.analysis_window.start.isoformat()
+            kw["analysis_window_end"] = c.analysis_window.end.isoformat()
+        return kw
+
+    # --- metric templates --------------------------------------------------------------------
+    def metric_templates(self, dataset_id: str) -> dict:
+        d = self._get(dataset_id)
+        bound, _ = self._bound(d)
+        m = merge(load_all(), d["domains"])
+        out = []
+        for t in m.templates.values():
+            out.append({"template_id": t.id, "label": t.label, "shape": t.shape,
+                        "required_concepts": t.required_concepts, "forks": t.forks,
+                        "available": t.engine_ready and all(c in bound
+                                                            for c in t.required_concepts),
+                        "approved": t.id in d["metrics"],
+                        "measure": d["metrics"].get(t.id)})
+        return {"templates": out}
+
+    def approve_metric(self, dataset_id: str, template_id: str, bindings: dict,
+                       fork_choices: dict) -> dict:
+        d = self._get(dataset_id)
+        m = merge(load_all(), d["domains"])
+        t = m.templates.get(template_id)
+        if t is None:
+            raise ServiceError(404, "not_found", f"metric template {template_id} not found")
+        if not t.engine_ready:
+            raise ServiceError(422, "engine_not_ready",
+                               f"{t.label} is a {t.shape} metric; the engine cannot compute that "
+                               f"shape yet, so it is not offered as a number.")
+        forks = {**d["fork_choices"], **fork_choices}
+        spec = {"numerator": t.numerator, "denominator": t.denominator}
+        if t.variants_by:
+            choice = forks.get(t.variants_by)
+            if choice is None:
+                f = m.forks[t.variants_by]
+                raise ServiceError(422, "forks_unanswered", f.question,
+                                   {"missing": [f.id], "options": [o.id for o in f.options]})
+            v = t.variants.get(choice, {})
+            if "unsupported" in v:
+                raise ServiceError(422, "variant_unsupported", v["unsupported"])
+            spec.update(v)
+        bound, _ = self._bound(d)
+        ctx = runner.Ctx(con=None, workspace_id=d["workspace_id"], table=d["name"], merged=m,
+                         bound=bound, measures=set(), metrics={}, fork_choices=forks,
+                         validity=[], window=None, festivals={}, params={"bindings": bindings})
+
+        def cols(side) -> list[str]:
+            out = []
+            for ref in [side] if isinstance(side, str) else side:
+                sign = "-" if ref.startswith("-") else ""
+                try:
+                    out.append(sign + runner.column_for(ctx, ref.lstrip("-")))
+                except runner.Skip as e:
+                    raise ServiceError(422, "needs_data", f"{t.label}: {e}") from None
+            return out
+
+        num_cols, den_cols = cols(spec["numerator"]), cols(spec["denominator"])
+        sc = self._contract(d)
+        kw = self._contract_kwargs(sc.contract)
+        taken = set(kw["measures"]) | {c.name for c in self._evidence(d).columns}
+        name = t.id if t.id not in taken else f"{t.id}_ratio"
+        if template_id in d["metrics"]:
+            name = d["metrics"][template_id]
+            kw["measures"].remove(name)
+        kw["measures"].append(name)
+        kw["aggregations"][name] = "ratio"
+        kw["ratios"][name] = {"numerator": num_cols, "denominator": den_cols, "scale": t.scale}
+        kw["measure_definitions"][name] = (f"{t.label}: sum({' '.join(num_cols)}) / "
+                                           f"sum({' '.join(den_cols)}) x {t.scale:g}, approved "
+                                           f"from template {t.id}")
+        draft = self.be.draft_contract(d["workspace_id"], d["name"], **kw)
+        if draft.provisional or draft.refusal is not None:
+            raise ServiceError(422, "metric_refused", draft.refusal.what if draft.refusal else
+                               f"still provisional: {draft.provisional}")
+        r = self.be.confirm_contract(d["workspace_id"], draft)
+        if not r.ok:
+            raise _refusal(r)
+        self.store.set_dataset_choices(dataset_id, metrics={**d["metrics"], template_id: name},
+                                       fork_choices=forks)
+        return {"ok": True, "version": self._contract(d).version, "measure": name}
+
+    # --- validity rules ----------------------------------------------------------------------
+    def validity_rules(self, dataset_id: str) -> dict:
+        d = self._get(dataset_id)
+        m = merge(load_all(), d["domains"])
+        bound, _ = self._bound(d)
+        con = db.connect_read_only(d["workspace_id"])
+        out = []
+        try:
+            for r in m.validity_rules.values():
+                cols = bound.get(r.concept, [])
+                n = None
+                if len(cols) == 1:
+                    c = runner.q(cols[0])
+                    where = {"exclude_matching": f"regexp_matches(lower(CAST({c} AS VARCHAR)), "
+                                                 f"'{r.pattern}')",
+                             "flag_rows": f"regexp_matches(lower(CAST({c} AS VARCHAR)), "
+                                          f"'{r.pattern}')",
+                             "require_positive": f"NOT coalesce({c} > 0, false)"}.get(r.kind)
+                    if r.kind == "flag_zero" and len(bound.get(r.other or "", [])) == 1:
+                        where = f"{c} > 0 AND coalesce({runner.q(bound[r.other][0])}, 0) = 0"
+                    if where:
+                        n = con.execute(f"SELECT count(*) FROM {runner.q(d['name'])} "
+                                        f"WHERE {where}").fetchone()[0]
+                out.append({"rule_id": r.id, "description": r.description,
+                            "suggested": True, "approved": r.id in d["validity"],
+                            "rows_affected": n})
+        finally:
+            con.close()
+        return {"rules": out}
+
+    def approve_rules(self, dataset_id: str, approve: list[str], reject: list[str]) -> dict:
+        d = self._get(dataset_id)
+        known = set(merge(load_all(), d["domains"]).validity_rules)
+        unknown = [r for r in approve + reject if r not in known]
+        if unknown:
+            raise ServiceError(422, "unknown_rule", f"unknown rule(s): {unknown}")
+        keep = [r for r in d["validity"] if r not in reject]
+        keep += [r for r in approve if r not in keep]
+        self.store.set_dataset_choices(dataset_id, validity=keep)
+        return {"ok": True, "version": 1, "approved": keep}
+
+    # --- tool runs -----------------------------------------------------------------------------
+    def run_tool(self, tool_id: str, dataset_id: str, params: dict) -> dict:
+        d = self._get(dataset_id)
+        packs = load_all()
+        m = merge(packs, d["domains"])
+        states = {s.tool_id: s for s in self.tools_states(d)}
+        st = states.get(tool_id)
+        if st is None:
+            raise ServiceError(404, "not_found", f"tool {tool_id} not found")
+        if st.status != "active":
+            raise ServiceError(409, st.status,
+                               f"{tool_id} needs the {st.needs_domain} domain confirmed"
+                               if st.status == "needs_domain" else
+                               f"{tool_id} needs data for: {st.missing_concepts}",
+                               {"needs_domain": st.needs_domain,
+                                "missing_concepts": st.missing_concepts})
+        if st.pack == "core":
+            raise ServiceError(422, "not_a_domain_tool",
+                               "core steps run through their own endpoints (profile, cleaning, "
+                               "contract); core analyses run through a turn")
+        sc = self._contract(d)
+        c = sc.contract
+        bound, _ = self._bound(d)
+        with self.be._workspace(d["workspace_id"]):
+            con = db.connect(d["workspace_id"])
+            try:
+                result = self._run(con, d, m, c, bound, tool_id, params)
+            finally:
+                con.close()
+        result["dataset_id"] = dataset_id
+        return result
+
+    def _run(self, con, d, m, c, bound, tool_id, params) -> dict:
+        ctx = runner.Ctx(
+            con=con, workspace_id=d["workspace_id"], table=d["name"], merged=m,
+            bound=bound, measures={x.name for x in c.measures}, metrics=d["metrics"],
+            fork_choices=d["fork_choices"], validity=d["validity"],
+            window=(c.analysis_window.start, c.analysis_window.end)
+            if c.analysis_window else None,
+            festivals=m.festivals, params=dict(params))
+        return runner.run(ctx, m.tools[tool_id], m.min_group_size)
+
+    def tools_states(self, d: dict):
+        bound, sources = self._bound(d)
+        return registry.statuses(d["domains"], set(bound), sources)
 
 
 def _measure_type(c, m: str) -> str:

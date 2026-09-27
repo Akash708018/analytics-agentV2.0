@@ -3,7 +3,7 @@ info:
   title: analytics-agent v2
   description: Contract-first API. Figures carry provenance; chart series are computed by the backend.
     501 = spec'd, not live yet.
-  version: 0.2.0
+  version: 0.3.0
 paths:
   /health:
     get:
@@ -666,6 +666,270 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
           description: Unprocessable Entity
+  /datasets/{dataset_id}/forks:
+    post:
+      tags:
+      - contract
+      summary: Answer Forks
+      operationId: answer_forks_datasets__dataset_id__forks_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForkAnswers'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Confirmed'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/metrics/templates:
+    get:
+      tags:
+      - metrics
+      summary: Metric Templates
+      operationId: metric_templates_datasets__dataset_id__metrics_templates_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricTemplates'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/metrics/approve:
+    post:
+      tags:
+      - metrics
+      summary: Approve Metric
+      operationId: approve_metric_datasets__dataset_id__metrics_approve_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetricApprove'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Confirmed'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Conflict
+  /datasets/{dataset_id}/validity-rules:
+    get:
+      tags:
+      - rules
+      summary: Validity Rules
+      operationId: validity_rules_datasets__dataset_id__validity_rules_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidityRules'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/validity-rules/approve:
+    post:
+      tags:
+      - rules
+      summary: Approve Rules
+      operationId: approve_rules_datasets__dataset_id__validity_rules_approve_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleApprove'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Confirmed'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /tools/{tool_id}/run:
+    post:
+      tags:
+      - tools
+      summary: Run Tool
+      operationId: run_tool_tools__tool_id__run_post
+      parameters:
+      - name: tool_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tool Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolRunRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResult'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Conflict
   /packs:
     get:
       tags:
@@ -717,149 +981,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
           description: Unprocessable Entity
-  /datasets/{dataset_id}/metrics/templates:
-    get:
-      tags:
-      - metrics
-      summary: Get /Datasets/{Dataset Id}/Metrics/Templates
-      operationId: get__datasets__dataset_id__metrics_templates_datasets__dataset_id__metrics_templates_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MetricTemplates'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-  /datasets/{dataset_id}/metrics/approve:
-    post:
-      tags:
-      - metrics
-      summary: Post /Datasets/{Dataset Id}/Metrics/Approve
-      operationId: post__datasets__dataset_id__metrics_approve_datasets__dataset_id__metrics_approve_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MetricApprove'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Confirmed'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-  /datasets/{dataset_id}/validity-rules:
-    get:
-      tags:
-      - rules
-      summary: Get /Datasets/{Dataset Id}/Validity-Rules
-      operationId: get__datasets__dataset_id__validity_rules_datasets__dataset_id__validity_rules_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ValidityRules'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-  /datasets/{dataset_id}/validity-rules/approve:
-    post:
-      tags:
-      - rules
-      summary: Post /Datasets/{Dataset Id}/Validity-Rules/Approve
-      operationId: post__datasets__dataset_id__validity_rules_approve_datasets__dataset_id__validity_rules_approve_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RuleApprove'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Confirmed'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-  /tools/{tool_id}/run:
-    post:
-      tags:
-      - tools
-      summary: Post /Tools/{Tool Id}/Run
-      operationId: post__tools__tool_id__run_tools__tool_id__run_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ToolRunRequest'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ToolResult'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
   /datasets/{dataset_id}/keyword-groups:
     get:
       tags:
@@ -1115,6 +1236,12 @@ components:
         version:
           type: integer
           title: Version
+        measure:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Measure
+          description: 'metrics/approve: the measure added'
       type: object
       required:
       - ok
@@ -1123,6 +1250,9 @@ components:
       examples:
       - ok: true
         version: 1
+      - measure: roas
+        ok: true
+        version: 2
     ContractConfirm:
       properties:
         contract:
@@ -1479,6 +1609,21 @@ components:
       required:
       - status
       title: FigureCheck
+    ForkAnswers:
+      properties:
+        fork_choices:
+          additionalProperties:
+            type: string
+          type: object
+          title: Fork Choices
+      type: object
+      required:
+      - fork_choices
+      title: ForkAnswers
+      examples:
+      - fork_choices:
+          conversion_source: backend_orders
+          roas_revenue_basis: net_excl_gst
     ForkOption:
       properties:
         id:
@@ -1714,34 +1859,34 @@ components:
       - agg
       title: MeasureProposal
     MetricApprove:
-      examples:
-      - bindings:
-          revenue: net_revenue
-          spend: cost
-        fork_choices:
-          roas_revenue_basis: net_excl_gst
-        template_id: marketing.roas
       properties:
         template_id:
-          title: Template Id
           type: string
+          title: Template Id
         bindings:
           additionalProperties:
             type: string
-          description: concept -> column
-          title: Bindings
           type: object
+          title: Bindings
+          description: concept -> column
         fork_choices:
           additionalProperties:
             type: string
-          default: {}
-          title: Fork Choices
           type: object
+          title: Fork Choices
+          default: {}
+      type: object
       required:
       - template_id
       - bindings
       title: MetricApprove
-      type: object
+      examples:
+      - bindings:
+          order_revenue: net_revenue
+          spend: cost
+        fork_choices:
+          roas_revenue_basis: net_excl_gst
+        template_id: roas
     MetricTemplate:
       properties:
         template_id:
@@ -1766,6 +1911,17 @@ components:
         available:
           type: boolean
           title: Available
+          description: Its concepts are in the data and the engine can compute its shape
+        approved:
+          type: boolean
+          title: Approved
+          default: false
+        measure:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Measure
+          description: The contract measure it became
       type: object
       required:
       - template_id
@@ -1776,15 +1932,16 @@ components:
       - available
       title: MetricTemplate
       examples:
-      - available: true
+      - approved: true
+        available: true
         forks:
         - roas_revenue_basis
         label: ROAS
+        measure: roas
         required_concepts:
-        - revenue
         - spend
         shape: ratio_of_sums
-        template_id: marketing.roas
+        template_id: roas
     MetricTemplates:
       properties:
         templates:
@@ -1798,15 +1955,16 @@ components:
       title: MetricTemplates
       examples:
       - templates:
-        - available: true
+        - approved: true
+          available: true
           forks:
           - roas_revenue_basis
           label: ROAS
+          measure: roas
           required_concepts:
-          - revenue
           - spend
           shape: ratio_of_sums
-          template_id: marketing.roas
+          template_id: roas
     PackDetail:
       properties:
         pack_id:
@@ -1926,27 +2084,27 @@ components:
         warnings:
         - 'ctr is a per-row rate: never sum it'
     RuleApprove:
+      properties:
+        approve:
+          items:
+            type: string
+          type: array
+          title: Approve
+        reject:
+          items:
+            type: string
+          type: array
+          title: Reject
+          default: []
+      type: object
+      required:
+      - approve
+      title: RuleApprove
       examples:
       - approve:
         - exclude_test_campaigns
         reject:
         - roas_spend_positive
-      properties:
-        approve:
-          items:
-            type: string
-          title: Approve
-          type: array
-        reject:
-          default: []
-          items:
-            type: string
-          title: Reject
-          type: array
-      required:
-      - approve
-      title: RuleApprove
-      type: object
     SeriesPoint:
       properties:
         x:
@@ -2181,23 +2339,31 @@ components:
         - exclude_test_campaigns
         - roas_spend_positive
     ToolRunRequest:
+      properties:
+        dataset_id:
+          type: string
+          title: Dataset Id
+        params:
+          additionalProperties: true
+          type: object
+          title: Params
+          description: 'Slot overrides (a column name, e.g. by), period/baseline ''YYYY-MM-DD/YYYY-MM-DD'',
+            bindings {concept: column} when a concept is ambiguous, brand_terms, festival + year + dates_confirmed.
+            409 needs_domain/needs_data; 422 forks_unanswered, ambiguous_binding, param_required, festival_dates_unconfirmed,
+            engine_refused'
+          default: {}
+      type: object
+      required:
+      - dataset_id
+      title: ToolRunRequest
       examples:
       - dataset_id: ds_ads_2026q3
         params:
           by: channel
-      properties:
-        dataset_id:
-          title: Dataset Id
-          type: string
+      - dataset_id: ds_ads_2026q3
         params:
-          additionalProperties: true
-          default: {}
-          title: Params
-          type: object
-      required:
-      - dataset_id
-      title: ToolRunRequest
-      type: object
+          baseline: 2026-09-01/2026-09-15
+          period: 2026-09-16/2026-09-30
     ToolStatus:
       properties:
         tool_id:
@@ -2571,5 +2737,5 @@ components:
       - engine
       title: VersionInfo
       examples:
-      - api_version: 0.2.0
+      - api_version: 0.3.0
         engine: v1@0ba324b

@@ -107,3 +107,31 @@ choices). Token counts are estimates (no tokenizer dependency) and labelled so.
 (`bench/mcp_list_changed.py`). Not measurable here: whether Claude Desktop re-lists on it.
 Until someone runs the probe in Desktop, the MCP server follows the spec's fallback — expose
 all tools; a gated tool answers with a plain message naming the domain or data it needs.
+
+## B3 — marketing pack + Tier-1 tools (2026-09-27)
+
+**D-B3-1. A tool is a list of engine steps with bindings, run through the engine's `_produce`.**
+The contract gate, scoping and every v1 refusal apply unchanged to domain tools. No new maths.
+
+**D-B3-2. A metric template becomes a contract ratio measure; approval = a new contract
+version.** v1's ratio measures (signed numerator/denominator lists, scale) already compute
+ratio-of-sums correctly; ROAS net of GST is numerator [order_revenue, -gst]. A name clash with
+a file column (the file's per-row `ctr`) gets `_ratio`.
+
+**D-B3-3. Ambiguity is a question, never a pick.** A concept bound to >1 column (Google + Meta
+conversions) answers 422 `ambiguous_binding`; the person names one via `params.bindings`.
+
+**D-B3-4. Shapes the engine cannot compute are listed but refused.** distinct_count,
+weighted_mean (GSC position), semi_additive (followers), derived (MER, POAS):
+`engine_ready: false` → 422 with the reason, never a wrong number. delivered_net ROAS → B4.
+
+**D-B3-5. Changelog sources are secondary** (vendor/trade pages found by search); the four
+dates agree across several; official platform pages were not reachable by search. Recorded
+per entry.
+
+**D-B3-6. Festival dates must be confirmed per run** (`dates_confirmed`), since lunar dates move.
+
+**C2. My measurement-change prediction was wrong, the code right.** I expected the Meta
+2026-01-12 caveat on the ROAS explainer; ROAS there uses backend order revenue, which Meta's
+attribution windows do not touch. The caveat correctly fires only where platform conversions
+are used. Test now asserts both.

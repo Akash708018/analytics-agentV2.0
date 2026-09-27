@@ -85,8 +85,8 @@ class MetricTemplate(Strict):
     id: str
     label: str
     shape: TemplateShape
-    numerator: str | None = None
-    denominator: str | None = None
+    numerator: str | list[str] | None = Field(None, description="Concept ids; '-gst' subtracts")
+    denominator: str | list[str] | None = None
     weight: str | None = None
     concept: str | None = None
     as_of: str | None = None
@@ -95,6 +95,11 @@ class MetricTemplate(Strict):
     authority: str = ""
     source_type: Literal["standard", "platform_doc", "vendor_blog"] = "standard"
     scale: float = 1.0
+    variants_by: str | None = Field(None, description="A fork whose answer picks a variant")
+    variants: dict[str, dict] = Field({}, description="fork option -> {numerator, "
+                                      "denominator} overrides, or {unsupported: reason}")
+    engine_ready: bool = Field(True, description="False: the engine cannot compute this shape "
+                               "yet; approval is refused with the reason")
 
     @model_validator(mode="after")
     def _shape_fields(self):
@@ -112,13 +117,22 @@ class MetricTemplate(Strict):
 class ValidityRule(Strict):
     id: str
     description: str
-    kind: Literal["exclude_matching", "flag_rows", "require_positive"]
+    kind: Literal["exclude_matching", "flag_rows", "require_positive", "flag_zero"]
     concept: str
-    pattern: str | None = None
-    when_zero: str | None = None
-    applies_to: list[str] = []
+    pattern: str | None = Field(None, description="Lower-case words joined by |; no regex "
+                                "syntax beyond alternation")
+    other: str | None = Field(None, description="flag_zero: the concept that is zero")
+    applies_to: list[str] = Field([], description="Metric templates this rule guards; empty "
+                                  "= every tool run on the dataset")
 
     _chk = field_validator("description")(lambda cls, v: _no_sql(v))
+
+    @field_validator("pattern")
+    @classmethod
+    def _plain_pattern(cls, v):
+        if v is not None and not re.fullmatch(r"[a-z0-9 _|\[\]?-]+", v):
+            raise ValueError(f"pattern {v!r}: plain words joined by | only")
+        return v
 
 
 class InterpretationRule(Strict):
@@ -134,12 +148,25 @@ class Playbook(Strict):
     max_tool_calls: int = 6
 
 
+class Step(Strict):
+    analysis: str
+    params: dict = {}
+    optional: bool = Field(False, description="Skipped (and said so) when a binding is missing")
+    filter: dict | None = Field(None, description="Structured row filter: {concept, between: "
+                                "[lo, hi]} | {concept, terms_param, negate}")
+    title: str = ""
+
+
 class Tool(Strict):
     id: str
     description: str = Field(max_length=200)
     ui_label: str
     base_analysis: str
     preset: dict = {}
+    steps: list[Step] = []
+    slots: dict[str, list[str]] = Field({}, description="slot -> candidate concepts, first "
+                                        "bound wins; the person may override per run")
+    params_required: list[str] = []
     required_concepts: list[str] = []
     required_sources: list[str] = []
     forks: list[str] = []

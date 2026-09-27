@@ -58,6 +58,8 @@ class Merged:
     word_classes: dict[str, set[str]] = field(default_factory=dict)
     min_group_size: int = 5
     pii_classes: dict[str, list[str]] = field(default_factory=dict)
+    changelog: list = field(default_factory=list)
+    festivals: dict = field(default_factory=dict)
 
 
 def _order(packs: dict[str, Pack], ids: list[str]) -> list[str]:
@@ -95,6 +97,8 @@ def merge(packs: dict[str, Pack], ids: list[str]) -> Merged:
         m.tools.update({t.id: t for t in p.tools})
         for k, words in p.word_classes.items():
             m.word_classes.setdefault(k, set()).update(words)
+        m.changelog.extend(p.changelog)
+        m.festivals.update({f.id: f for f in p.festivals})
         m.min_group_size = max(m.min_group_size, p.privacy.min_group_size)
         for k, v in p.privacy.pii_classes.items():
             m.pii_classes.setdefault(k, []).extend(v)

@@ -1,8 +1,8 @@
 # marketing: digital marketing (paid ads, GA4, Search Console, email, social, orders).
-# B2: sources + vocabulary (detection). B3 adds templates, forks, rules, tools, changelog.
+# B2: sources + vocabulary. B3: templates, forks, validity/interpretation rules, changelog, tools.
 pack:
   id: marketing
-  version: 0.1.0
+  version: 0.2.0
   extends: [core]
   title: Digital marketing
 
@@ -64,6 +64,10 @@ vocabulary:
   - {id: cancelled, hints: [cancelled, canceled, is_cancelled], weight: 0.8}
   - {id: rto, hints: [rto, is_rto, returned_to_origin], weight: 1.0}
   - {id: payment_method, hints: [payment_method, payment_mode, cod, prepaid], weight: 0.8}
+  # time and place splits
+  - {id: hour, hints: [hour, hour_of_day], weight: 0.3}
+  - {id: day_of_week, hints: [day_of_week, weekday, dow, day_name], weight: 0.3}
+  - {id: city, hints: [city, town, location, region, state], weight: 0.4}
 
 sources:
   - {id: paid_ads, title: Paid ads (Google/Meta), concepts: [campaign, ad_group, ad, keyword, search_term, impressions, clicks, spend, conversions, conv_value, reach, frequency, quality_score, impression_share], required: [spend], min_score: 0.25}
@@ -76,3 +80,365 @@ sources:
 privacy:
   pii_classes: {}
   min_group_size: 5
+
+metric_templates:
+  # rates: always a ratio of sums, never a sum or plain average of a per-row rate
+  - {id: ctr, label: CTR (%), shape: ratio_of_sums, numerator: clicks, denominator: impressions, scale: 100, required_concepts: [clicks, impressions], authority: IAB / Google Ads definition}
+  - {id: cpc, label: CPC, shape: ratio_of_sums, numerator: spend, denominator: clicks, required_concepts: [spend, clicks], authority: Google Ads definition}
+  - {id: cpm, label: CPM, shape: ratio_of_sums, numerator: spend, denominator: impressions, scale: 1000, required_concepts: [spend, impressions], authority: IAB definition}
+  - {id: cvr, label: Conversion rate (%), shape: ratio_of_sums, numerator: conversions, denominator: clicks, scale: 100, required_concepts: [conversions, clicks], forks: [conversion_source], authority: Google Ads definition}
+  - {id: cpa, label: CPA, shape: ratio_of_sums, numerator: spend, denominator: conversions, required_concepts: [spend, conversions], forks: [conversion_source], authority: Google Ads definition}
+  - id: roas
+    label: ROAS
+    shape: ratio_of_sums
+    numerator: conv_value
+    denominator: spend
+    required_concepts: [spend]
+    forks: [roas_revenue_basis]
+    variants_by: roas_revenue_basis
+    variants:
+      platform: {numerator: conv_value}
+      gross_incl_gst: {numerator: order_revenue}
+      net_excl_gst: {numerator: [order_revenue, -gst]}
+      delivered_net: {unsupported: "needs cancels, returns and RTO removed from revenue: marketing.delivered_roas (B4)"}
+    authority: Google Ads / Meta definition; basis is the person's choice
+  - {id: ctor, label: Click-to-open rate (%), shape: ratio_of_sums, numerator: clicks, denominator: opens, scale: 100, required_concepts: [clicks, opens], authority: Mailchimp / industry standard, source_type: vendor_blog}
+  - id: email_click_rate
+    label: Email click rate (%)
+    shape: ratio_of_sums
+    numerator: clicks
+    denominator: delivered
+    scale: 100
+    required_concepts: [clicks, sent]
+    forks: [email_rate_denominator]
+    variants_by: email_rate_denominator
+    variants: {sent: {denominator: sent}, delivered: {denominator: delivered}}
+  - {id: bounce_rate, label: Bounce rate (%), shape: ratio_of_sums, numerator: bounces, denominator: sent, scale: 100, required_concepts: [bounces, sent]}
+  - {id: unsubscribe_rate, label: Unsubscribe rate (%), shape: ratio_of_sums, numerator: unsubscribes, denominator: delivered, scale: 100, required_concepts: [unsubscribes, delivered]}
+  - {id: complaint_rate, label: Complaint rate (%), shape: ratio_of_sums, numerator: complaints, denominator: delivered, scale: 100, required_concepts: [complaints, delivered]}
+  - {id: engagement_rate, label: Engagement rate (%), shape: ratio_of_sums, numerator: engagements, denominator: reach, scale: 100, required_concepts: [engagements, reach]}
+  - {id: ga4_engagement_rate, label: GA4 engagement rate (%), shape: ratio_of_sums, numerator: engaged_sessions, denominator: sessions, scale: 100, required_concepts: [engaged_sessions, sessions], authority: GA4 definition}
+  - {id: session_cvr, label: Session conversion rate (%), shape: ratio_of_sums, numerator: key_events, denominator: sessions, scale: 100, required_concepts: [key_events, sessions]}
+  # counts of people: never summed across days or groups
+  - {id: reach_distinct, label: Reach, shape: distinct_count, concept: reach, required_concepts: [reach], engine_ready: false}
+  - {id: users_distinct, label: Users, shape: distinct_count, concept: users, required_concepts: [users], engine_ready: false}
+  - {id: gsc_position, label: Average position (impression-weighted), shape: weighted_mean, concept: position, weight: impressions, required_concepts: [position, impressions], engine_ready: false, authority: Google Search Console Help -- position is impression-weighted}
+  - {id: followers_level, label: Followers, shape: semi_additive, concept: followers, as_of: date, required_concepts: [followers, date], engine_ready: false}
+  - {id: mer, label: MER (backend revenue / total spend), shape: derived, numerator: order_revenue, denominator: spend, required_concepts: [order_revenue, spend], forks: [tax_basis], engine_ready: false}
+  - {id: poas, label: POAS (profit / spend), shape: derived, numerator: order_revenue, denominator: spend, required_concepts: [order_revenue, spend], engine_ready: false}
+
+forks:
+  - id: conversion_source
+    question: Which conversions count -- the ad platforms' own, GA4 key events, or your backend orders?
+    options:
+      - {id: platform, label: "What each ad platform reports (Google, Meta): overlapping, never add them up"}
+      - {id: ga4, label: GA4 key events}
+      - {id: backend_orders, label: Orders in your own system}
+    suggested: backend_orders
+    suggested_reason: Backend orders are counted once; platforms each claim the same sale, so their totals overlap.
+    applies_when: [conversions, key_events, order_id]
+  - id: roas_revenue_basis
+    question: Which revenue should ROAS use?
+    options:
+      - {id: platform, label: Conversion value the ad platform reports}
+      - {id: gross_incl_gst, label: Order revenue including GST}
+      - {id: net_excl_gst, label: Order revenue excluding GST}
+      - {id: delivered_net, label: "Net of GST, after cancellations, returns and RTO"}
+    applies_when: [conv_value, order_revenue]
+  - id: attribution_window
+    question: Which attribution window are these platform conversions reported under? Windows are recorded, never mixed.
+    options:
+      - {id: 7d_click_1d_view, label: 7-day click / 1-day view (Meta default)}
+      - {id: 7d_click, label: 7-day click only}
+      - {id: 1d_click, label: 1-day click}
+      - {id: google_ads_default, label: Google Ads conversion window as set in the account}
+      - {id: mixed_unknown, label: "Not sure / several: results will say so"}
+    applies_when: [conversions, conv_value]
+  - id: email_rate_denominator
+    question: Should email rates be out of emails sent or emails delivered?
+    options:
+      - {id: sent, label: Sent}
+      - {id: delivered, label: Delivered (excludes bounces)}
+    suggested: delivered
+    suggested_reason: A bounced email could not be opened or clicked; delivered is the fair base.
+    applies_when: [sent, delivered]
+  - id: cac_scope
+    question: What should customer acquisition cost include?
+    options:
+      - {id: paid_media_only, label: Paid media spend only}
+      - {id: blended_media, label: All marketing spend over all new customers}
+      - {id: fully_loaded, label: Media plus salaries and tools}
+    applies_when: [spend, order_id]
+  - id: gsc_aggregation
+    question: Search Console counts differ by view -- use property-level or page-level numbers?
+    options:
+      - {id: by_property, label: By property (matches the Performance report total)}
+      - {id: by_page, label: By page (each page's own count; totals can exceed the property)}
+    applies_when: [query, position]
+
+validity_rules:
+  - id: exclude_test_campaigns
+    description: Leave out campaigns whose name says test, dummy or do not use.
+    kind: exclude_matching
+    concept: campaign
+    pattern: "test|dummy|donotuse|do not use"
+  - id: zero_impression_spend
+    description: Spend on rows with 0 impressions is flagged (often a billing adjustment), not dropped.
+    kind: flag_zero
+    concept: spend
+    other: impressions
+  - id: roas_spend_positive
+    description: ROAS is computed only on rows with spend above 0.
+    kind: require_positive
+    concept: spend
+    applies_to: [roas, cpa, cpc, cpm]
+
+interpretation_rules:
+  - {id: no_cross_source_conversion_sum, description: "Conversions from different sources (Google, Meta, GA4, orders) overlap and are never added together."}
+  - {id: consequence_not_cause, description: "Frequency and fatigue are symptoms of delivery, not causes of performance.", params: {symptoms: [frequency, fatigue, cpm]}}
+  - {id: correlational_only, description: "Spend-revenue and campaign-sales links are associations unless the person marks a holdout."}
+  - {id: required_stratifier, description: "A channel comparison checks mix (channel_mix_shift) before naming a winner."}
+  - {id: opens_unreliable, description: "Email opens are inflated by Apple Mail Privacy Protection (since 2021-09); click-based rates lead."}
+  - {id: followers_snapshot, description: "Followers is a level at a date; it is never summed over time."}
+
+changelog:
+  - date: "2023-11-01"
+    title: GA4 rules-based attribution models retired
+    detail: First click, linear, time decay and position-based were removed; properties on them moved to data-driven attribution.
+    source: "https://searchengineland.com/google-when-retire-attribution-models-ads-analytics-428541"
+    affects: [key_events, conversions]
+  - date: "2024-03-21"
+    title: GA4 "conversions" renamed "key events"
+    detail: GA4 reports key events; "conversion" now means an event imported into Google Ads. Column names change across the date.
+    source: "https://searchengineland.com/ga4-conversions-key-events-game-changer-439671"
+    affects: [key_events, conversions]
+  - date: "2026-01-12"
+    title: Meta removed 7-day and 28-day view attribution windows
+    detail: Conversions that relied on those windows stop being reported; period-over-period drops across this date can be measurement, not performance.
+    source: "https://docs.supermetrics.com/docs/facebook-ads-new-historical-limitations-attribution-window-and-metric-removals-january-12-2026"
+    affects: [conversions, conv_value]
+  - date: "2026-03-03"
+    title: Meta click-through attribution counts link clicks only
+    detail: Likes, comments, shares and saves moved to a new engage-through bucket; click-through conversions fall with no change in delivery.
+    source: "https://www.jonloomer.com/click-through-attribution-link-click/"
+    affects: [conversions, conv_value, clicks]
+
+tools:
+  - id: marketing.channel_efficiency
+    description: CTR, CPC, CPA and ROAS by channel or campaign (ratio of sums), ranked by spend.
+    ui_label: Which channels pay back
+    base_analysis: top_n + group_compare
+    slots: {by: [channel, campaign]}
+    required_concepts: [spend]
+    steps:
+      - {analysis: top_n, params: {dimension: "@by", measure: "@spend", n: 20}, title: Spend by group}
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@metric:ctr"}, optional: true, title: CTR}
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@metric:cpc"}, optional: true, title: CPC}
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@metric:cpa"}, optional: true, title: CPA}
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@metric:roas"}, optional: true, title: ROAS}
+    forks: [conversion_source, roas_revenue_basis]
+    rules: [exclude_test_campaigns, zero_impression_spend, roas_spend_positive, no_sum_of_rate, required_stratifier]
+    output: {shape: groups, chart: bar}
+  - id: marketing.roas_change_explainer
+    description: Why ROAS moved between two periods, split into revenue change and spend change by channel.
+    ui_label: Why ROAS changed
+    base_analysis: period_compare + growth_decomposition
+    slots: {by: [channel, campaign]}
+    params_required: [period, baseline]
+    required_concepts: [spend]
+    steps:
+      - {analysis: period_compare, params: {measure: "@metric:roas", period: "@param:period", baseline: "@param:baseline", grain: "@param:grain=month"}, title: ROAS then vs now}
+      - {analysis: growth_decomposition, params: {measure: "@revenue", dimension: "@by", period: "@param:period", baseline: "@param:baseline", grain: "@param:grain=month"}, title: Revenue change by group}
+      - {analysis: growth_decomposition, params: {measure: "@spend", dimension: "@by", period: "@param:period", baseline: "@param:baseline", grain: "@param:grain=month"}, title: Spend change by group}
+    forks: [roas_revenue_basis, attribution_window]
+    rules: [exclude_test_campaigns, roas_spend_positive, no_sum_of_rate]
+    output: {shape: decomposition, chart: bar}
+  - id: marketing.spend_waste
+    description: Campaigns, keywords or search terms taking spend with few or no conversions.
+    ui_label: Where spend is wasted
+    base_analysis: pareto + group_compare
+    slots: {by: [search_term, keyword, campaign]}
+    required_concepts: [spend, conversions]
+    steps:
+      - {analysis: pareto, params: {dimension: "@by", measure: "@spend"}, title: Where the spend goes}
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@conversions"}, title: Conversions per group}
+    forks: [conversion_source]
+    rules: [exclude_test_campaigns, zero_impression_spend]
+    output: {shape: groups, chart: bar}
+  - id: marketing.channel_mix_shift
+    description: Whether blended conversion rate moved because the channel mix changed (Simpson check).
+    ui_label: Did the mix change
+    base_analysis: mix_shift
+    slots: {by: [channel, campaign]}
+    params_required: [period, baseline]
+    required_concepts: [conversions, clicks]
+    steps:
+      - {analysis: mix_shift, params: {measure: "@metric:cvr", dimension: "@by", period: "@param:period", baseline: "@param:baseline", grain: "@param:grain=month"}, title: Rate change vs mix change}
+    forks: [conversion_source]
+    rules: [exclude_test_campaigns, no_sum_of_rate]
+    output: {shape: decomposition, chart: bar}
+  - id: marketing.day_hour_performance
+    description: Spend and conversions by weekday and hour, best and worst cells.
+    ui_label: Best days and hours
+    base_analysis: cross_tab
+    required_concepts: [day_of_week, hour, spend]
+    steps:
+      - {analysis: cross_tab, params: {rows: "@day_of_week", columns: "@hour", measure: "@spend"}}
+    rules: [exclude_test_campaigns]
+    output: {shape: grid, chart: table}
+  - id: marketing.device_geo_split
+    description: Performance by device or city, with small groups flagged and suppressed.
+    ui_label: Devices and cities
+    base_analysis: group_compare + sample_adequacy
+    slots: {by: [device, city, country]}
+    required_concepts: [clicks]
+    steps:
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@clicks"}, title: Clicks by group}
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@metric:cvr"}, optional: true, title: Conversion rate}
+      - {analysis: sample_adequacy, params: {dimension: "@by", measure: "@clicks"}, title: Is each group big enough}
+    rules: [exclude_test_campaigns, no_sum_of_rate]
+    output: {shape: groups, chart: bar}
+  - id: marketing.creative_fatigue
+    description: CTR against frequency and CTR's weekly trend per ad; frequency is a symptom, not a cause.
+    ui_label: Are ads wearing out
+    base_analysis: bivariate + trend
+    required_concepts: [frequency, clicks, impressions]
+    steps:
+      - {analysis: bivariate, params: {measure: "@metric:ctr", against: "@frequency"}, title: CTR as frequency rises}
+      - {analysis: trend, params: {measure: "@metric:ctr", grain: week}, title: CTR by week}
+    rules: [consequence_not_cause, no_sum_of_rate]
+    output: {shape: relationship, chart: scatter}
+  - id: marketing.landing_page_performance
+    description: Sessions, engagement rate and conversion rate by landing page.
+    ui_label: Landing pages
+    base_analysis: top_n + group_compare
+    required_concepts: [landing_page, sessions]
+    steps:
+      - {analysis: top_n, params: {dimension: "@landing_page", measure: "@sessions", n: 25}, title: Sessions}
+      - {analysis: group_compare, params: {dimension: "@landing_page", measure: "@metric:ga4_engagement_rate"}, optional: true, title: Engagement rate}
+      - {analysis: group_compare, params: {dimension: "@landing_page", measure: "@metric:session_cvr"}, optional: true, title: Conversion rate}
+    rules: [no_sum_of_rate]
+    output: {shape: groups, chart: bar}
+  - id: marketing.new_vs_returning
+    description: How many users come back and how often, from user-level event rows.
+    ui_label: New vs returning
+    base_analysis: repeat_behaviour
+    required_concepts: [user_pseudo_id, date]
+    steps:
+      - {analysis: repeat_behaviour, params: {entity: "@user_pseudo_id", event: "@date"}}
+    output: {shape: groups, chart: bar}
+  - id: marketing.festive_compare
+    description: This year's festival period against the same festival last year, on the festival's own dates.
+    ui_label: This festival vs last year
+    base_analysis: group_compare
+    params_required: [festival, year]
+    slots: {measure: [order_revenue, conv_value, conversions, spend, sessions, clicks], by: [channel, campaign, session_source]}
+    required_concepts: [date]
+    steps:
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@measure"}, filter: {concept: date, date_range: "@festival:this"}, title: This year}
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@measure"}, filter: {concept: date, date_range: "@festival:last"}, optional: true, title: Last year}
+    rules: [correlational_only]
+    output: {shape: comparison, chart: bar}
+  - id: marketing.seo_change_explainer
+    description: Search clicks change split into impressions (demand, rank) and CTR, by page.
+    ui_label: Why search traffic changed
+    base_analysis: growth_decomposition + period_compare
+    slots: {by: [page, query]}
+    params_required: [period, baseline]
+    required_concepts: [clicks, impressions, position]
+    steps:
+      - {analysis: growth_decomposition, params: {measure: "@clicks", dimension: "@by", period: "@param:period", baseline: "@param:baseline", grain: "@param:grain=month"}, title: Clicks change by group}
+      - {analysis: period_compare, params: {measure: "@impressions", period: "@param:period", baseline: "@param:baseline", grain: "@param:grain=month"}, title: Impressions}
+      - {analysis: period_compare, params: {measure: "@metric:ctr", period: "@param:period", baseline: "@param:baseline", grain: "@param:grain=month"}, optional: true, title: CTR}
+    forks: [gsc_aggregation]
+    rules: [no_sum_of_rate]
+    output: {shape: decomposition, chart: bar}
+  - id: marketing.striking_distance
+    description: Queries ranking 4 to 15 with many impressions -- closest wins for page one.
+    ui_label: Queries close to page one
+    base_analysis: top_n
+    required_concepts: [query, position, impressions]
+    steps:
+      - {analysis: top_n, params: {dimension: "@query", measure: "@impressions", n: 50}, filter: {concept: position, between: [4, 15]}}
+    forks: [gsc_aggregation]
+    output: {shape: groups, chart: bar}
+  - id: marketing.brand_vs_nonbrand
+    description: Brand vs non-brand search clicks by week, split by a brand-term list the person supplies.
+    ui_label: Brand vs non-brand
+    base_analysis: trend
+    params_required: [brand_terms]
+    slots: {text: [query, search_term, keyword]}
+    required_concepts: [clicks]
+    steps:
+      - {analysis: trend, params: {measure: "@clicks", grain: week}, filter: {concept: "@text", terms_param: brand_terms}, title: Brand}
+      - {analysis: trend, params: {measure: "@clicks", grain: week}, filter: {concept: "@text", terms_param: brand_terms, negate: true}, title: Non-brand}
+    output: {shape: series, chart: line}
+  - id: marketing.content_decay
+    description: Pages whose search clicks declined over weeks, with the week the decline began.
+    ui_label: Pages losing traffic
+    base_analysis: trend + changepoint
+    required_concepts: [page, clicks, date]
+    steps:
+      - {analysis: trend, params: {measure: "@clicks", grain: week, dimension: "@page"}, title: Weekly clicks by page}
+      - {analysis: changepoint, params: {measure: "@clicks", grain: week}, title: When it changed}
+    output: {shape: series, chart: line}
+  - id: marketing.email_performance
+    description: Email click rate, click-to-open and unsubscribe rate by campaign; opens flagged unreliable.
+    ui_label: Email campaigns
+    base_analysis: group_compare
+    required_concepts: [campaign, sent, clicks]
+    steps:
+      - {analysis: group_compare, params: {dimension: "@campaign", measure: "@metric:email_click_rate"}, title: Click rate}
+      - {analysis: group_compare, params: {dimension: "@campaign", measure: "@metric:ctor"}, optional: true, title: Click-to-open}
+      - {analysis: group_compare, params: {dimension: "@campaign", measure: "@metric:unsubscribe_rate"}, optional: true, title: Unsubscribe rate}
+    forks: [email_rate_denominator]
+    rules: [opens_unreliable, no_sum_of_rate]
+    output: {shape: groups, chart: bar}
+  - id: marketing.list_health
+    description: Bounce, unsubscribe and complaint rates by week.
+    ui_label: Email list health
+    base_analysis: trend
+    required_concepts: [sent, bounces, date]
+    steps:
+      - {analysis: trend, params: {measure: "@metric:bounce_rate", grain: week}, title: Bounce rate}
+      - {analysis: trend, params: {measure: "@metric:unsubscribe_rate", grain: week}, optional: true, title: Unsubscribe rate}
+      - {analysis: trend, params: {measure: "@metric:complaint_rate", grain: week}, optional: true, title: Complaint rate}
+    rules: [no_sum_of_rate]
+    output: {shape: series, chart: line}
+  - id: marketing.social_post_performance
+    description: Engagement rate by post type and posting hour; followers read as a level, never summed.
+    ui_label: Social posts
+    base_analysis: group_compare + cross_tab
+    required_concepts: [post_type, engagements, reach]
+    steps:
+      - {analysis: group_compare, params: {dimension: "@post_type", measure: "@metric:engagement_rate"}, title: Engagement rate by type}
+      - {analysis: cross_tab, params: {rows: "@post_type", columns: "@hour", measure: "@engagements"}, optional: true, title: By hour}
+    rules: [followers_snapshot, no_sum_of_rate]
+    output: {shape: groups, chart: bar}
+  - id: marketing.impression_share_loss
+    description: Search impression share lost to budget vs to rank, by campaign.
+    ui_label: Lost impression share
+    base_analysis: top_n
+    required_concepts: [campaign, lost_is_budget, lost_is_rank]
+    steps:
+      - {analysis: top_n, params: {dimension: "@campaign", measure: "@lost_is_budget", n: 20}, title: Lost to budget}
+      - {analysis: top_n, params: {dimension: "@campaign", measure: "@lost_is_rank", n: 20}, title: Lost to rank}
+    output: {shape: groups, chart: bar}
+  - id: marketing.quality_score_vs_cpc
+    description: How cost per click moves with quality score.
+    ui_label: Quality score vs CPC
+    base_analysis: bivariate
+    required_concepts: [quality_score, spend, clicks]
+    steps:
+      - {analysis: bivariate, params: {measure: "@metric:cpc", against: "@quality_score"}}
+    rules: [correlational_only]
+    output: {shape: relationship, chart: scatter}
+  - id: marketing.utm_hygiene
+    description: UTM source/medium values with case variants, (not set) or missing medium.
+    ui_label: UTM tagging problems
+    base_analysis: frequency
+    required_concepts: [session_source]
+    steps:
+      - {analysis: frequency, params: {column: "@session_source", limit: 50}, title: Sources}
+      - {analysis: frequency, params: {column: "@session_medium", limit: 50}, optional: true, title: Mediums}
+    output: {shape: groups, chart: bar, checks: [case_variants, not_set, missing_medium]}

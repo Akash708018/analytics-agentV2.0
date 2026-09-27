@@ -106,6 +106,30 @@ def compile_errors(merged: Merged) -> list[str]:
     for t in merged.tools.values():
         parts = [p.strip() for p in t.base_analysis.split("+")]
         bad += [f"{t.id}: {p!r} is not an engine analysis" for p in parts if p not in known]
+        if t.steps and {s.analysis for s in t.steps} != set(parts):
+            bad.append(f"{t.id}: base_analysis {parts} != its steps "
+                       f"{sorted({s.analysis for s in t.steps})}")
+        for s in t.steps:
+            refs = [v for v in s.params.values() if isinstance(v, str) and v.startswith("@")]
+            if s.filter and s.filter.get("date_range"):
+                refs.append(s.filter["date_range"])
+            if s.filter and str(s.filter.get("concept", "")).startswith("@"):
+                refs.append(s.filter["concept"])
+            elif s.filter:
+                refs.append("@" + s.filter["concept"])
+            for r in refs:
+                ref = r[1:]
+                kind, _, rest = ref.partition(":")
+                ok = (ref in merged.concepts or ref in t.slots or ref == "revenue"
+                      or (kind == "metric" and rest in merged.templates)
+                      or (kind == "param" and (rest.split("=")[0] in t.params_required
+                                               or "=" in rest))
+                      or (kind == "festival" and rest in ("this", "last")))
+                if not ok:
+                    bad.append(f"{t.id}: {r!r} names nothing (concept, slot, metric, param)")
+        for slot, concepts in t.slots.items():
+            bad += [f"{t.id}: slot {slot} names unknown concept {c}" for c in concepts
+                    if c not in merged.concepts]
     for tpl in merged.templates.values():
         if tpl.shape not in {"comparison", "ratio_of_sums", "weighted_mean", "distinct_count",
                              "percentile", "semi_additive", "derived"}:

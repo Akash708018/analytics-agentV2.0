@@ -153,6 +153,39 @@ def create_app(state_dir: Path | str | None = None, runner: Runner | None = None
     def tools(dataset_id: str) -> S.ToolList:
         return S.ToolList(**ds.tools(dataset_id))
 
+    @app.post("/datasets/{dataset_id}/forks", response_model=S.Confirmed, responses=R,
+              tags=["contract"])
+    def answer_forks(dataset_id: str, body: S.ForkAnswers) -> S.Confirmed:
+        r = ds.answer_forks(dataset_id, body.fork_choices)
+        return S.Confirmed(ok=r["ok"], version=r["version"])
+
+    @app.get("/datasets/{dataset_id}/metrics/templates", response_model=S.MetricTemplates,
+             responses=R, tags=["metrics"])
+    def metric_templates(dataset_id: str) -> S.MetricTemplates:
+        return S.MetricTemplates(**ds.metric_templates(dataset_id))
+
+    @app.post("/datasets/{dataset_id}/metrics/approve", response_model=S.Confirmed,
+              responses={**R, 409: ERR}, tags=["metrics"])
+    def approve_metric(dataset_id: str, body: S.MetricApprove) -> S.Confirmed:
+        return S.Confirmed(**ds.approve_metric(dataset_id, body.template_id, body.bindings,
+                                               body.fork_choices))
+
+    @app.get("/datasets/{dataset_id}/validity-rules", response_model=S.ValidityRules,
+             responses=R, tags=["rules"])
+    def validity_rules(dataset_id: str) -> S.ValidityRules:
+        return S.ValidityRules(**ds.validity_rules(dataset_id))
+
+    @app.post("/datasets/{dataset_id}/validity-rules/approve", response_model=S.Confirmed,
+              responses=R, tags=["rules"])
+    def approve_rules(dataset_id: str, body: S.RuleApprove) -> S.Confirmed:
+        r = ds.approve_rules(dataset_id, body.approve, body.reject)
+        return S.Confirmed(ok=r["ok"], version=r["version"])
+
+    @app.post("/tools/{tool_id}/run", response_model=S.ToolResult,
+              responses={**R, 409: ERR}, tags=["tools"])
+    def run_tool(tool_id: str, body: S.ToolRunRequest) -> S.ToolResult:
+        return S.ToolResult(**ds.run_tool(tool_id, body.dataset_id, body.params))
+
     @app.get("/packs", response_model=S.PackList, tags=["packs"])
     def packs() -> S.PackList:
         return S.PackList(**D.packs_list())
@@ -161,13 +194,6 @@ def create_app(state_dir: Path | str | None = None, runner: Runner | None = None
     def pack(pack_id: str) -> S.PackDetail:
         return S.PackDetail(**D.pack_detail(pack_id))
 
-    stub("GET", "/datasets/{dataset_id}/metrics/templates", S.MetricTemplates, "B3", "metrics")
-    stub("POST", "/datasets/{dataset_id}/metrics/approve", S.Confirmed, "B3", "metrics",
-         body=S.MetricApprove)
-    stub("GET", "/datasets/{dataset_id}/validity-rules", S.ValidityRules, "B3", "rules")
-    stub("POST", "/datasets/{dataset_id}/validity-rules/approve", S.Confirmed, "B3", "rules",
-         body=S.RuleApprove)
-    stub("POST", "/tools/{tool_id}/run", S.ToolResult, "B3", "tools", body=S.ToolRunRequest)
     stub("GET", "/datasets/{dataset_id}/keyword-groups", S.KeywordGroups, "B7", "keywords")
     stub("POST", "/datasets/{dataset_id}/keyword-groups/actions", S.KeywordGroups, "B7",
          "keywords", body=S.KeywordGroupAction)

@@ -2,6 +2,20 @@
 
 Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry here.
 
+## 0.3.0 — 2026-09-27 (B3)
+
+Now live: `GET /datasets/{id}/metrics/templates` (+ `approved`, `measure`),
+`POST /datasets/{id}/metrics/approve` (adds a ratio-of-sums measure to the contract as a new
+version; returns `Confirmed.measure`; 422 `engine_not_ready`, `variant_unsupported`,
+`forks_unanswered`, `ambiguous_binding`, `needs_data`), `GET /datasets/{id}/validity-rules`,
+`POST /datasets/{id}/validity-rules/approve`, **`POST /tools/{tool_id}/run`** (ToolResult with
+figures + provenance, chart-ready series, validity filters and pack rules applied, forks,
+caveats; 409 `needs_domain` / `needs_data`; 422 `forks_unanswered`, `ambiguous_binding`,
+`param_required`, `festival_dates_unconfirmed`, `engine_refused`). New:
+`POST /datasets/{id}/forks` answers forks after the contract (a domain confirmed later brings
+its forks). Contract confirm now returns the stored contract version. Still 501: keyword
+groups (B7). No breaking changes.
+
 ## 0.2.0 — 2026-09-26 (B2)
 
 Now live: `POST /workspaces/{ws}/uploads` (multipart; 201 Dataset, 413/422 with
