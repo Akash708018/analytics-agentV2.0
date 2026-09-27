@@ -91,6 +91,8 @@ def _wanted() -> dict[str, list[str]]:
 
     wanted: dict[str, list[str]] = {}
     for name, analysis in REGISTRY.items():
+        if analysis.surface != "v1":   # v2 B4 (D-B4-2): reached through v2 domain tools only
+            continue
         for param, spec in inspect.signature(analysis.run).parameters.items():
             if param in ("con", "gate", "scope") or spec.kind is spec.VAR_KEYWORD:
                 continue

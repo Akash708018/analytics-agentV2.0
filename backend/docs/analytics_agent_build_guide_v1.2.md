@@ -629,6 +629,12 @@ If repeat rate \< 5%, `cohort_retention` warns and recommends `repeat_behaviour`
 
 Port SARIMAX/Prophet from Mandi. Out of scope for the main build.
 
+### **Tier 9 — v2 shared analyses (v2 B4)**
+
+`funnel` · `source_reconciliation` · `ab_test` · `pacing` · `text_ngrams` · `key_overlap` · `expected_rate_by_bucket` · `before_after_baseline` · `unit_economics`
+
+Added in analytics-agent v2 (B4), in SQL; domain tools are presets over them. See v2 docs/steps/B4.md.
+
 ---
 
 ## **10\. Repository layout**

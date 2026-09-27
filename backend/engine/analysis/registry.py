@@ -71,28 +71,34 @@ class Analysis:
     narrows: bool = False
     #: Takes `groups` -- members of its `dimension` to keep -- applied to the scope likewise.
     selects: bool = False
+    #: "v1": on the v1 MCP surface (compute_analysis / render_chart declare its parameters).
+    #: "v2": reached through v2 domain tools only (D-B4-2), so the MCP schema stays small.
+    surface: str = "v1"
 
 
 REGISTRY: dict[str, Analysis] = {}
 
 
-def register(name: str, tier: int, summary: str, narrows: bool = False, selects: bool = False):
+def register(name: str, tier: int, summary: str, narrows: bool = False, selects: bool = False,
+             surface: str = "v1"):
     """Decorator. The name is the `analysis_type` a caller asks for."""
 
     def wrap(fn: Callable[..., Output]) -> Callable[..., Output]:
         if name in REGISTRY:
             raise ValueError(f"{name!r} is registered twice.")
         REGISTRY[name] = Analysis(name=name, tier=tier, run=fn, summary=summary,
-                                  narrows=narrows, selects=selects)
+                                  narrows=narrows, selects=selects, surface=surface)
         return fn
 
     return wrap
 
 
-def catalogue() -> list[tuple[str, int, str]]:
-    """Every analysis, by tier then name -- what an unknown type gets told."""
+def catalogue(surface: str | None = "v1") -> list[tuple[str, int, str]]:
+    """Every analysis on a surface (None: all), by tier then name -- what an unknown type gets
+    told."""
     return sorted(
-        ((a.name, a.tier, a.summary) for a in REGISTRY.values()),
+        ((a.name, a.tier, a.summary) for a in REGISTRY.values()
+         if surface is None or a.surface == surface),
         key=lambda t: (t[1], t[0]),
     )
 

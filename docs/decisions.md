@@ -135,3 +135,29 @@ per entry.
 2026-01-12 caveat on the ROAS explainer; ROAS there uses backend order revenue, which Meta's
 attribution windows do not touch. The caveat correctly fires only where platform conversions
 are used. Test now asserts both.
+
+## B4 — Tier-2 tools on shared engine analyses (2026-09-27)
+
+**D-B4-1. Nine shared analyses in one engine module, tier 9.** Generic names; the guide's own
+Tier 8 (forecasting) stays reserved. Added to the backend copy of the build guide, which v1's
+roster test reads.
+
+**D-B4-2. v2 analyses are off the v1 MCP surface (`surface="v2"`).** v1 asserts every analysis
+is callable through `compute_analysis` / `render_chart`, whose signatures would grow by 20
+parameters — tokens on every call, the cost v2 exists to cut. They are reached through domain
+tools. Three v1 tests now check the v1 surface only (each edit marked `D-B4-2`); `catalogue()`
+defaults to v1, so v1's own messages and menus are unchanged.
+
+**D-B4-3. Marketing-mix modelling and regression forecasting are out of scope for v2.0.** They
+need numpy/statsmodels model fitting in the engine, against the no-numpy rule. A later
+decision, if the user wants them.
+
+**D-B4-4. Person-entered inputs stay inputs.** Budget (pacing), spend per cohort (CAC, under
+the cac_scope fork) and funnel steps are params the person gives, never guessed from data.
+
+**C3. Two engine bugs caught by hand-worked numbers.** DuckDB's RE2 rejected `\u` escapes; and
+`unit_economics` joined cohort customers to month rows, doubling revenue per customer (1800 vs
+900). Both fixed before any figure left the engine.
+
+**C4. The runner reported only the first numeric column.** A cohort row's CAC was lost behind
+its size. Every numeric cell is now a figure, named `step: row [column]`.

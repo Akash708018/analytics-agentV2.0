@@ -152,8 +152,10 @@ class Step(Strict):
     analysis: str
     params: dict = {}
     optional: bool = Field(False, description="Skipped (and said so) when a binding is missing")
-    filter: dict | None = Field(None, description="Structured row filter: {concept, between: "
-                                "[lo, hi]} | {concept, terms_param, negate}")
+    filter: dict | list[dict] | None = Field(None, description="Structured row filter(s): "
+                                             "{concept, between: [lo, hi]} | {concept, "
+                                             "terms_param, negate} | {concept, date_range} | "
+                                             "{concept, exclude_truthy: true}")
     title: str = ""
 
 
