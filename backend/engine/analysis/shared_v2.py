@@ -482,3 +482,75 @@ def unit_economics(con, gate, scope, entity: str, measure: str, spend: dict,
     return Output(headers=["cohort", "new customers", "CAC", "revenue per customer to date",
                            "payback month", "LTV:CAC to date", "months observed", "maturity"],
                   rows=rows, summary=summary, label="unit_economics")
+
+
+# --- rate_mix_shift ----------------------------------------------------------------------------
+
+def _span(label_: str) -> tuple[date, date]:
+    """'YYYY-MM' (a month), 'YYYY-MM-DD' (a day) or 'a/b' (a range) as its first and last day."""
+    try:
+        if "/" in label_:
+            a, b = label_.split("/")
+            return date.fromisoformat(a), date.fromisoformat(b)
+        if len(label_) == 7:
+            y, m = int(label_[:4]), int(label_[5:])
+            return date(y, m, 1), date(y, m, calendar.monthrange(y, m)[1])
+        d = date.fromisoformat(label_)
+        return d, d
+    except (ValueError, TypeError):
+        raise ParamsInvalid(f"period {label_!r}: give YYYY-MM, YYYY-MM-DD or start/end.") from None
+
+
+@register("rate_mix_shift", tier=TIER, surface="v2", summary="A change in a ratio-of-sums "
+          "rate split per group into rate, mix (share of the denominator) and interaction; "
+          "the Simpson check for blended rates.")
+def rate_mix_shift(con, gate, scope, measure: str, dimension: str, period: str,
+                   baseline: str, grain: str | None = None, **params) -> Output:
+    if params:
+        raise TypeError(f"rate_mix_shift takes measure, dimension, period, baseline; got "
+                        f"{', '.join(sorted(params))}.")
+    m = require_measure(gate.contract, measure)
+    if agg_of(m) != "ratio":
+        raise ValueError(f"{measure!r} is agg={agg_of(m)}; rate_mix_shift is for ratio measures "
+                         f"(mix_shift handles means).")
+    require_dimension(gate.contract, dimension)
+    (a0, b0), (a1, b1) = _span(baseline), _span(period)
+    col, dim, dt = qi(measure), qi(dimension), qi(_date_col(gate))
+    rows_ = con.execute(
+        f"SELECT {dim}, "
+        f"sum({col}.n) FILTER (WHERE CAST({dt} AS DATE) BETWEEN DATE '{a0}' AND DATE '{b0}'), "
+        f"sum({col}.d) FILTER (WHERE CAST({dt} AS DATE) BETWEEN DATE '{a0}' AND DATE '{b0}'), "
+        f"sum({col}.n) FILTER (WHERE CAST({dt} AS DATE) BETWEEN DATE '{a1}' AND DATE '{b1}'), "
+        f"sum({col}.d) FILTER (WHERE CAST({dt} AS DATE) BETWEEN DATE '{a1}' AND DATE '{b1}') "
+        f"FROM {scope.source} WHERE {scope.where} GROUP BY 1 ORDER BY 1").fetchall()
+    D0 = sum(float(r[2] or 0) for r in rows_)
+    D1 = sum(float(r[4] or 0) for r in rows_)
+    if not D0 or not D1:
+        raise ValueError(f"{measure}'s denominator is 0 in {'the baseline' if not D0 else 'the period'}.")
+    out, tot = [], [0.0, 0.0, 0.0]
+    for g, n0, d0, n1, d1 in rows_:
+        n0, d0, n1, d1 = (float(x or 0) for x in (n0, d0, n1, d1))
+        w0, w1 = d0 / D0, d1 / D1
+        if d0 and d1:
+            r0, r1 = n0 / d0, n1 / d1
+            parts = [w0 * (r1 - r0), r0 * (w1 - w0), (w1 - w0) * (r1 - r0)]
+            for i in range(3):
+                tot[i] += parts[i]
+            out.append([label(g), number(r0), number(r1), _pct(w0), _pct(w1)]
+                       + [number(p) for p in parts])
+        else:
+            out.append([label(g), number(n0 / d0) if d0 else None,
+                        number(n1 / d1) if d1 else None, _pct(w0), _pct(w1), None, None, None])
+    o0 = sum(float(r[1] or 0) for r in rows_) / D0
+    o1 = sum(float(r[3] or 0) for r in rows_) / D1
+    out.append(["(all)", number(o0), number(o1), "100.0%", "100.0%"] + [number(x) for x in tot])
+    summary = _head(scope, gate) + [
+        f"{measure} went from {number(o0)} in {baseline} to {number(o1)} in {period}. Per group: "
+        f"rate = the group's own {measure} moved; mix = its share of the denominator moved; "
+        f"interaction = both. Rate {number(tot[0])}, mix {number(tot[1])}, interaction "
+        f"{number(tot[2])}; they sum to the change"
+        + (" -- every group improved while the blend fell: a mix shift (Simpson)." if
+           tot[0] > 0 and o1 < o0 else ".")]
+    return Output(headers=[dimension, f"rate {baseline}", f"rate {period}",
+                           f"share {baseline}", f"share {period}", "rate effect", "mix effect",
+                           "interaction"], rows=out, summary=summary, label="rate_mix_shift")

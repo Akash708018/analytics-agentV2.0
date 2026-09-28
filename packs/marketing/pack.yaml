@@ -2,7 +2,7 @@
 # B2: sources + vocabulary. B3: templates, forks, validity/interpretation rules, changelog, tools.
 pack:
   id: marketing
-  version: 0.3.0
+  version: 0.4.0
   extends: [core]
   title: Digital marketing
 
@@ -226,6 +226,60 @@ changelog:
     source: "https://www.jonloomer.com/click-through-attribution-link-click/"
     affects: [conversions, conv_value, clicks]
 
+playbooks:
+  - id: why_roas_dropped
+    description: Why ROAS moved between two periods -- revenue vs spend, mix, then the channels behind it.
+    patterns: [roas, return on ad spend, dropped, fell, declined, down]
+    slots: {period: "the later month, YYYY-MM", baseline: "the earlier month, YYYY-MM"}
+    steps:
+      - {tool: marketing.roas_change_explainer, params: {period: "@slot:period", baseline: "@slot:baseline", by: channel}}
+      - {tool: marketing.channel_mix_shift, params: {period: "@slot:period", baseline: "@slot:baseline", by: channel}, optional: true}
+      - {tool: marketing.channel_efficiency, params: {by: campaign}, optional: true}
+    rules: [required_stratifier, correlational_only]
+    max_tool_calls: 3
+  - id: where_is_spend_wasted
+    description: Which campaigns, search terms or places take spend without conversions.
+    patterns: [waste, wasted, wasting, spend, no conversions, inefficient]
+    steps:
+      - {tool: marketing.spend_waste}
+      - {tool: marketing.device_geo_split, params: {by: city}, optional: true}
+      - {tool: marketing.keyword_ngrams, optional: true}
+    max_tool_calls: 3
+  - id: why_organic_traffic_dropped
+    description: Why search clicks moved -- demand and rank vs CTR, decaying pages, near-misses, cannibalization.
+    patterns: [organic, seo, search console, traffic, clicks, dropped]
+    slots: {period: "the later month, YYYY-MM", baseline: "the earlier month, YYYY-MM"}
+    steps:
+      - {tool: marketing.seo_change_explainer, params: {period: "@slot:period", baseline: "@slot:baseline"}}
+      - {tool: marketing.content_decay, optional: true}
+      - {tool: marketing.striking_distance, optional: true}
+      - {tool: marketing.cannibalization, optional: true}
+    max_tool_calls: 4
+  - id: did_the_campaign_work
+    description: Whether a measure moved after a launch, against its trend and last year; worded as association.
+    patterns: [campaign, launch, work, worked, impact, effect, lift]
+    slots: {start: "the launch date, YYYY-MM-DD"}
+    steps:
+      - {tool: marketing.campaign_impact, params: {start: "@slot:start"}}
+      - {tool: marketing.conversion_reconciliation, optional: true}
+    rules: [correlational_only]
+    max_tool_calls: 2
+  - id: funnel_leak
+    description: Where users drop out between viewing and buying, and on which devices or pages.
+    patterns: [funnel, drop off, drop-off, checkout, cart, abandon, leak]
+    steps:
+      - {tool: marketing.funnel}
+      - {tool: marketing.device_geo_split, params: {by: device}, optional: true}
+      - {tool: marketing.landing_page_performance, optional: true}
+    max_tool_calls: 3
+  - id: email_health
+    description: Email campaign rates and list health -- bounces, unsubscribes, complaints.
+    patterns: [email, newsletter, unsubscribe, bounce, open rate, list]
+    steps:
+      - {tool: marketing.email_performance}
+      - {tool: marketing.list_health, optional: true}
+    max_tool_calls: 2
+
 tools:
   - id: marketing.channel_efficiency
     description: CTR, CPC, CPA and ROAS by channel or campaign (ratio of sums), ranked by spend.
@@ -271,12 +325,12 @@ tools:
   - id: marketing.channel_mix_shift
     description: Whether blended conversion rate moved because the channel mix changed (Simpson check).
     ui_label: Did the mix change
-    base_analysis: mix_shift
+    base_analysis: rate_mix_shift
     slots: {by: [channel, campaign]}
     params_required: [period, baseline]
     required_concepts: [conversions, clicks]
     steps:
-      - {analysis: mix_shift, params: {measure: "@metric:cvr", dimension: "@by", period: "@param:period", baseline: "@param:baseline", grain: "@param:grain=month"}, title: Rate change vs mix change}
+      - {analysis: rate_mix_shift, params: {measure: "@metric:cvr", dimension: "@by", period: "@param:period", baseline: "@param:baseline"}, title: Rate change vs mix change}
     forks: [conversion_source]
     rules: [exclude_test_campaigns, no_sum_of_rate]
     output: {shape: decomposition, chart: bar}

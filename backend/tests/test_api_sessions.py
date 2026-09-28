@@ -192,7 +192,9 @@ def test_a_turn_running_at_restart_is_interrupted_not_rerun(tmp_path, clock):
     assert runs == [1]
 
 
-def test_default_runner_is_honest_about_no_agent(client):
+def test_default_runner_is_honest_about_no_agent(tmp_path, clock, monkeypatch):
+    monkeypatch.setenv("AA_NO_LLM", "1")      # no model, whatever keys this machine has
+    client = TestClient(create_app(state_dir=tmp_path, now=clock))
     sid = _new(client)["sid"]
     tid = client.post("/turns", json={"sid": sid, "dataset_id": "d", "question": "q"}).json()[
         "turn_id"]

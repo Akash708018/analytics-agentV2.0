@@ -18,16 +18,26 @@ ERR = {"model": S.ErrorBody}
 
 
 def create_app(state_dir: Path | str | None = None, runner: Runner | None = None,
-               now=None) -> FastAPI:
+               now=None, llm=None) -> FastAPI:
+    """`runner` overrides everything (tests); else `llm` (or v1's configured providers) answers
+    turns through the playbook agent; with no model at all, turns say so (agent_not_wired)."""
     state = Path(state_dir or os.environ.get("AA_STATE_DIR", REPO / "state"))
     store = Store(state / "sessions.db")
     sessions = SessionService(store, now=now)
+    ds = D.DatasetService(store)
+    if runner is None:
+        from backend.llm.provider import EngineLLM
+        from backend.playbooks.agent import runner as agent_runner
+        if llm is None and os.environ.get("AA_NO_LLM") != "1":
+            engine = EngineLLM()
+            llm = engine if engine.available() else None
+        if llm is not None:
+            runner = agent_runner(ds, llm)
     turns = TurnService(store, sessions, runner=runner)
 
     app = FastAPI(title="analytics-agent v2", version=S.API_VERSION,
                   description="Contract-first API. Figures carry provenance; chart series are "
                               "computed by the backend. 501 = spec'd, not live yet.")
-    ds = D.DatasetService(store)
     app.state.sessions, app.state.turns, app.state.datasets = sessions, turns, ds
 
     @app.exception_handler(ServiceError)

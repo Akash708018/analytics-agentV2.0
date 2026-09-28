@@ -141,10 +141,19 @@ class InterpretationRule(Strict):
     params: dict = {}
 
 
+class PlaybookStep(Strict):
+    tool: str
+    params: dict = Field({}, description="Literals, or '@slot:<name>' filled by the planner")
+    optional: bool = Field(False, description="Skipped (and said) when it cannot run")
+
+
 class Playbook(Strict):
     id: str
-    patterns: list[str]
-    steps: list[str]
+    description: str = Field(max_length=200)
+    patterns: list[str] = Field(description="Question words that suggest it (planner hint)")
+    slots: dict[str, str] = Field({}, description="slot -> what the planner must fill")
+    steps: list[PlaybookStep]
+    rules: list[str] = Field([], description="Interpretation rules always enforced")
     max_tool_calls: int = 6
 
 

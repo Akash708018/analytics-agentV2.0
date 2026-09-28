@@ -1,12 +1,13 @@
 ## Status (date, branch, last commit)
 
 2026-09-27 · branch `claude/analytics-agent-v2-backend-6gcu1p` · B2 in PR #3 (open), B3 on top.
-Done: B0–B3, **B4** (9 shared SQL analyses + 11 Tier-2 marketing tools; 31 marketing tools).
+Done: B0–B4, **B5** (interpretation filter, 6 playbooks, turns answered; API 0.4.0).
 
 ## API: spec version — live | stubbed (501) | changed since last handoff
 
-**0.3.0** (additive; `docs/api/CHANGELOG.md`). Newly live: metrics templates/approve,
-validity-rules list/approve, `POST /datasets/{id}/forks`, **`POST /tools/{tool_id}/run`**.
+**0.4.0** (additive; `docs/api/CHANGELOG.md`). Turns are now answered by the playbook agent
+when a model is configured (env keys as in v1); events: plan, tool_call, figure_check,
+interpretation_check, answer. Earlier: metrics, validity rules, forks, tool run (0.3.0).
 Only keyword groups are still 501 (B7).
 
 ## Tools: active tool ids per domain; tool-schema tokens (core vs core+marketing)
@@ -31,6 +32,9 @@ ltv_to_cac. Tokens (estimate): core-only 194; core+marketing (all 31 active) 188
   `params.bindings.{concept}`), `param_required` (`missing`), `festival_dates_unconfirmed`
   (`dates` → confirm → `dates_confirmed: true`). Plot `series[].points` as given; show
   `caveats` and `validity_filters_applied` with every result; `value: null` = suppressed.
+- Turn screen: render `plan` (playbook + steps), each `tool_call` (ok/skipped + reason),
+  then `answer.text`; show `answer.flags` under it (unresolved checks); link
+  `answer.results[]` (ToolResults) as the evidence; `usage` for a cost line.
 - Period params are calendar labels at `grain` (default month): `2026-01`.
 - B4 figures: every numeric cell is a figure; extra columns are named `step: row [column]`.
   Tier-2 inputs the person types: budget + month (pacing), spend per cohort month (CAC),
@@ -44,9 +48,10 @@ None (checked 2026-09-26).
 
     cd backend && uv run pytest -q -rs
     SKIPPED [1] tests/test_agent.py:580: v2 B0 (D-B0-2): the v1 Streamlit app ui/app.py is not seeded; v2 screens belong to the frontend
-    2306 passed, 1 skipped, 1 warning in 180.22s (0:03:00)
+    2327 passed, 1 skipped, 1 warning in 222.84s (0:03:42)
     eval: SCORE: 76/76 (100%)
 
 ## Next milestone
 
-B5 — interpretation filter + marketing playbooks (planner → engine steps → explainer).
+B6 — v1-vs-v2 bench (checks, LLM calls, tool calls, tokens incl. schema tokens, violations,
+wall time) on v1's marketing benches, the trap files, retail and SLA.

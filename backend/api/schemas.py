@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-API_VERSION = "0.3.0"
+API_VERSION = "0.4.0"
 
 
 def _ex(*examples: dict) -> ConfigDict:
@@ -134,7 +134,10 @@ class Turn(BaseModel):
     question: str
     status: TurnStatus
     events: list[TurnEvent]
-    answer: dict[str, Any] | None = Field(None, description="{text, results[]} when done")
+    answer: dict[str, Any] | None = Field(None, description=(
+        "When done: {text, flags[] (unresolved checks, shown under the answer), playbook "
+        "(id or null), results[] (ToolResult), skipped[] {tool_id, code, reason}, usage "
+        "{llm_calls, tool_calls, tokens_in_est, tokens_out_est, per_call[], model}}"))
     created_at: str
     model_config = _ex({
         "turn_id": "t_7c1d9e0a4b2f4e59", "sid": "0b8e0c64-5b0e-4c55-9c1e-2f1c2b9d7a11",
@@ -142,7 +145,10 @@ class Turn(BaseModel):
         "status": "done",
         "events": [{"seq": 0, "type": "answer", "at": "2026-09-26T10:06:20Z",
                     "data": {"text": "ROAS fell from 4.1 to 3.2 ..."}}],
-        "answer": {"text": "ROAS fell from 4.1 to 3.2 ...", "results": []},
+        "answer": {"text": "ROAS fell from 4.1 to 3.2 ...", "flags": [],
+                   "playbook": "why_roas_dropped", "results": [], "skipped": [],
+                   "usage": {"llm_calls": 2, "tool_calls": 3, "tokens_in_est": 2348,
+                             "tokens_out_est": 164}},
         "created_at": "2026-09-26T10:06:00Z"})
 
 

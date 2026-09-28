@@ -260,10 +260,26 @@ def test_unit_economics_payback_and_immature(make):
     assert feb[7] == "IMMATURE"            # 2 months observed < 3
 
 
+def test_rate_mix_shift_simpson(make):
+    rows = [["2026-01-15", "A", 100, 10], ["2026-01-15", "B", 100, 2],
+            ["2026-02-15", "A", 100, 12], ["2026-02-15", "B", 300, 9]]
+    ds = make("mix", ["date", "channel", "clicks", "conversions"], rows,
+              key=["date", "channel"], measures=["clicks", "conversions"], dims=["channel"],
+              ratios={"cvr": {"numerator": ["conversions"], "denominator": ["clicks"],
+                              "scale": 100}}, window=["2026-01-01", "2026-02-28"])
+    out = ds.run("rate_mix_shift", measure="cvr", dimension="channel", period="2026-02",
+                 baseline="2026-01")
+    total = out.rows[-1]
+    assert total[0] == "(all)" and n(total[1]) == 6 and n(total[2]) == 5.25
+    assert [n(x) for x in total[5:]] == [pytest.approx(1.5), pytest.approx(-2.0),
+                                         pytest.approx(-0.25)]
+    assert "Simpson" in out.summary[-1]
+
+
 def test_v2_analyses_stay_off_the_v1_mcp_surface():
     from backend.engine.analysis.registry import REGISTRY, catalogue
     v2 = {a.name for a in REGISTRY.values() if a.surface == "v2"}
-    assert len(v2) == 9 and not v2 & {x for x, _, _ in catalogue()}
+    assert len(v2) == 10 and not v2 & {x for x, _, _ in catalogue()}
     assert v2 <= {x for x, _, _ in catalogue(surface=None)}
 
 

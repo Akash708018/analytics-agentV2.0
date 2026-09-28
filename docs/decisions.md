@@ -161,3 +161,20 @@ the cac_scope fork) and funnel steps are params the person gives, never guessed 
 
 **C4. The runner reported only the first numeric column.** A cohort row's CAC was lost behind
 its size. Every numeric cell is now a figure, named `step: row [column]`.
+
+## B5 — interpretation filter + playbooks (2026-09-28)
+
+**D-B5-1. Two LLM calls per playbook answer (+1 correction at most).** The planner picks and
+fills slots; the engine runs steps; the explainer only words results. The explainer sees
+figures (≤30 per tool) and caveats — no rows, no SQL.
+
+**D-B5-2. Interpretation rules are regexes over the answer plus the trace, by design.**
+Deterministic, cheap, testable; each has a violating and a passing fixture. They catch the
+wordings listed, not every paraphrase — the flag list says what they checked.
+
+**D-B5-3. `rate_mix_shift` added (tier 9)** because v1's `mix_shift` is for means and refuses
+ratios; a blended rate's mix weight is its denominator share.
+
+**C5. `correlational_only` read "no holdout was marked" as a holdout.** A substring match on
+"holdout was marked". Now only the engine's "(a holdout was marked)" wording counts; a test
+pins the negative.

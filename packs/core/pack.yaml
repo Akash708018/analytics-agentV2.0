@@ -59,6 +59,9 @@ interpretation_rules:
     description: A rate column (CTR, CVR, ROAS, a percentage) is never summed or plainly averaged across rows; the answer uses the ratio of sums.
   - id: bounds
     description: Rates lie in 0-100%; spend and counts are >= 0.
+  - {id: measurement_change, description: "A period spanning a dated measurement change names it."}
+  - {id: small_sample, description: "Groups too small to judge are named as such."}
+  - {id: festival_confound, description: "A period containing a festival names the festival."}
 
 dq_checks:
   - {id: pii_columns, description: "Columns that look like names, emails, phones or addresses are named before any analysis."}

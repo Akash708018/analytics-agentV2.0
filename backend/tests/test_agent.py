@@ -630,7 +630,10 @@ def test_the_tool_specs_fit_their_budget():
 def test_the_analysis_roster_is_derived_from_the_registry():
     from backend.engine.analysis.registry import REGISTRY
     desc = next(s.description for s in agent.tool_specs() if s.name == "compute_analysis")
-    for name in REGISTRY:
+    for name, a in REGISTRY.items():
+        if a.surface != "v1":   # v2 B4 (D-B4-2): v2 analyses run through domain tools
+            assert f"{name}(" not in desc, name
+            continue
         assert f"{name}(" in desc, name
     assert "top_n(dimension, measure, n, period, grain)" in desc
 
