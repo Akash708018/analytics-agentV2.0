@@ -170,6 +170,8 @@ class Step(Strict):
 
 class Tool(Strict):
     id: str
+    kind: Literal["preset", "pipeline"] = Field("preset", description="pipeline: a service "
+                                                "run (keyword grouping), not engine steps")
     description: str = Field(max_length=200)
     ui_label: str
     base_analysis: str

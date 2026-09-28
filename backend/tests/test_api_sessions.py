@@ -224,15 +224,15 @@ def test_unknown_turn_is_404(client):
 
 # --- 501 stubs -----------------------------------------------------------------------------
 
-STUBS = [("get", "/datasets/d/keyword-groups"), ("post", "/datasets/d/keyword-groups/actions")]
+STUBS: list = []     # every spec'd endpoint is live as of B7
 
 
-@pytest.mark.parametrize("method,path", STUBS)
-def test_stub_is_501_in_the_error_shape(client, method, path):
-    r = getattr(client, method)(path)
-    assert r.status_code == 501
-    e = r.json()["error"]
-    assert e["code"] == "not_implemented" and e["milestone"] == "B7"
+def test_no_endpoint_is_a_501_stub_any_more(client):
+    """B7 made the last spec'd endpoints live: every operation in the spec has a handler that
+    is not the 501 stub."""
+    stubs = [r.path for r in client.app.routes if getattr(r, "name", "").startswith(
+        ("get_/", "post_/", "put_/", "delete_/"))]
+    assert STUBS == [] and stubs == []
 
 
 def test_ui_state_scan_is_linear_on_a_max_size_string():

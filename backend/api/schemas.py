@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-API_VERSION = "0.4.0"
+API_VERSION = "0.5.0"
 
 
 def _ex(*examples: dict) -> ConfigDict:
@@ -506,17 +506,27 @@ class KeywordGroup(BaseModel):
     label: str
     intent: Literal["informational", "commercial", "transactional", "navigational", "local"]
     keywords: list[str]
-    facets: dict[str, str] = {}
+    facets: dict[str, Any] = {}
     approved: bool
+    proposed_by: str = Field("rules", description="rules | llm | person")
     model_config = _ex({"group_id": "g1", "label": "sushi delivery", "intent": "transactional",
                         "keywords": ["sushi delivery pune", "sushi home delivery"],
-                        "facets": {"service": "delivery"}, "approved": False})
+                        "facets": {"delivery": ["delivery"], "area": ["baner"]},
+                        "approved": False, "proposed_by": "rules"})
 
 
 class KeywordGroups(BaseModel):
     dataset_id: str
     groups: list[KeywordGroup]
+    run: dict[str, Any] | None = Field(None, description="The last run: column, embedding "
+                                       "backend, threshold, typos merged, counts")
     model_config = _ex({"dataset_id": "ds_gsc_pune", "groups": [KeywordGroup.model_config["json_schema_extra"]["examples"][0]]})
+
+
+class KeywordRun(BaseModel):
+    column: str | None = Field(None, description="Text column; default: the search term / "
+                                                 "query / keyword column")
+    model_config = _ex({"column": "search_term"})
 
 
 class KeywordGroupAction(BaseModel):
@@ -524,6 +534,7 @@ class KeywordGroupAction(BaseModel):
     group_ids: list[str]
     label: str | None = None
     keyword: str | None = None
+    keywords: list[str] | None = Field(None, description="split: the keywords to move out")
     target_group_id: str | None = None
     model_config = _ex({"action": "move_keyword", "group_ids": ["g1"],
                         "keyword": "sushi near me", "target_group_id": "g4"})

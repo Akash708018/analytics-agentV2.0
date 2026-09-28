@@ -196,3 +196,26 @@ column names; `where` is dropped (the LLM writes no SQL).
 **C6. Three bench bugs, found by the first run's numbers.** A stale v1 baseline (above); a
 figure filter that matched `line_revenue` inside the COST result's caveats (0/4 → 4/4); a regex
 for a summary line the marketing scripts do not print (replaced by a v1-vs-v2 output diff).
+
+## B7 — keyword grouping (2026-09-28)
+
+**D-B7-1. numpy + scikit-learn, in `backend/text/` only (the logged exception).** Approved under
+the user's standing delegation ("full access to decide"). Clustering keywords is vector maths
+that SQL does not do. Enforced by a test: nothing under `backend/engine/` imports numpy,
+pandas or sklearn.
+
+**D-B7-2. Embeddings: local Ollama (bge-m3) when reachable, else character n-grams.** Measured:
+no Ollama server in this container (`curl localhost:11434` fails). The fallback is TF-IDF over
+character 2-4-grams of the keyword's topic words (facet words removed first): deterministic,
+offline, tolerant of typos and Hinglish spellings, no model download. Vectors are cached by
+text hash. Which backend ran is recorded on every grouping.
+
+**D-B7-3. The gold grouping is drafted by the backend agent and is NOT independent.** It is
+marked `status: pending_user_approval`; every purity/completeness figure says "against the
+author's draft gold" until the user approves (or edits) the file. Self-written labels flatter
+the method that wrote them.
+
+**D-B7-4. Groups are proposals until a person approves them.** Only approved groups reach the
+engine (a `_kw_groups` table in the workspace, written by the approve/rename/merge/move/split
+actions). The LLM may propose a label and intent; without a model, rules propose them, and
+`proposed_by` says which.

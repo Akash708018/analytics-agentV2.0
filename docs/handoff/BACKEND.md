@@ -1,15 +1,15 @@
 ## Status (date, branch, last commit)
 
 2026-09-27 · branch `claude/analytics-agent-v2-backend-6gcu1p` · B2 in PR #3 (open), B3 on top.
-Done: B0–B5, **B6** (v1-vs-v2 bench: 2 LLM calls vs 7, 3.9k vs 33k tokens; v1 checks
-identical). Results: `bench/RESULTS.md`.
+Done: B0–B6, **B7** (keyword grouping: pipeline, approvals, 3 tools; API 0.5.0). Bench:
+`bench/RESULTS.md`. Open for the user: approve the draft keyword gold (D-B7-3).
 
 ## API: spec version — live | stubbed (501) | changed since last handoff
 
 **0.4.0** (additive; `docs/api/CHANGELOG.md`). Turns are now answered by the playbook agent
 when a model is configured (env keys as in v1); events: plan, tool_call, figure_check,
 interpretation_check, answer. Earlier: metrics, validity rules, forks, tool run (0.3.0).
-Only keyword groups are still 501 (B7).
+0.5.0: keyword groups live (run, list, actions). No endpoint answers 501.
 
 ## Tools: active tool ids per domain; tool-schema tokens (core vs core+marketing)
 
@@ -36,6 +36,9 @@ ltv_to_cac. Tokens (estimate): core-only 194; core+marketing (all 31 active) 188
 - Turn screen: render `plan` (playbook + steps), each `tool_call` (ok/skipped + reason),
   then `answer.text`; show `answer.flags` under it (unresolved checks); link
   `answer.results[]` (ToolResults) as the evidence; `usage` for a cost line.
+- Keyword groups screen: `POST .../keyword-groups/run`, list with `approved`, `intent`,
+  `facets`, `proposed_by`; actions approve / rename / merge / move_keyword / split. Only
+  approved groups feed `marketing.keyword_group_performance` and `marketing.page_targeting`.
 - Period params are calendar labels at `grain` (default month): `2026-01`.
 - B4 figures: every numeric cell is a figure; extra columns are named `step: row [column]`.
   Tier-2 inputs the person types: budget + month (pacing), spend per cohort month (CAC),
@@ -49,10 +52,10 @@ None (checked 2026-09-26).
 
     cd backend && uv run pytest -q -rs
     SKIPPED [1] tests/test_agent.py:580: v2 B0 (D-B0-2): the v1 Streamlit app ui/app.py is not seeded; v2 screens belong to the frontend
-    2327 passed, 1 skipped, 1 warning in 222.84s (0:03:42)
+    2338 passed, 1 skipped, 1 warning in 204.31s (0:03:24)
     eval: SCORE: 76/76 (100%)
 
 ## Next milestone
 
-B7 — keyword grouping (ASK FIRST: the text module is the logged numpy exception; needs a local
-Ollama for embeddings and a user-approved gold file).
+B8 — logistics pack (ask first per the plan): SLA/OTIF/courier/stuck/RTO tools and the
+`sla_where_and_why` playbook reproducing the 19/19 SLA checks.

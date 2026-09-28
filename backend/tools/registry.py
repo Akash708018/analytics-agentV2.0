@@ -106,6 +106,8 @@ def compile_errors(merged: Merged) -> list[str]:
     known = {name for name, _, _ in analyses.catalogue(surface=None)}
     bad = []
     for t in merged.tools.values():
+        if t.kind == "pipeline":
+            continue                    # a service run, compiled nowhere near the engine
         parts = [p.strip() for p in t.base_analysis.split("+")]
         bad += [f"{t.id}: {p!r} is not an engine analysis" for p in parts if p not in known]
         if t.steps and {s.analysis for s in t.steps} != set(parts):

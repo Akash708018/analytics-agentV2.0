@@ -554,3 +554,64 @@ def rate_mix_shift(con, gate, scope, measure: str, dimension: str, period: str,
     return Output(headers=[dimension, f"rate {baseline}", f"rate {period}",
                            f"share {baseline}", f"share {period}", "rate effect", "mix effect",
                            "interaction"], rows=out, summary=summary, label="rate_mix_shift")
+
+
+# --- group_map_totals --------------------------------------------------------------------------
+
+GROUP_MAP = "_kw_groups"       # written only by the approve/rename/merge/move/split actions
+
+
+@register("group_map_totals", tier=TIER, surface="v2", summary="A measure by the APPROVED "
+          "group of a text key (keyword groups), with pareto shares; by period with grain; "
+          "with member, each group's top member share (one target page per group).")
+def group_map_totals(con, gate, scope, key: str, measure: str, grain: str | None = None,
+                     member: str | None = None, **params) -> Output:
+    if params:
+        raise TypeError(f"group_map_totals takes key, measure, grain, member; got "
+                        f"{', '.join(sorted(params))}.")
+    require_dimension(gate.contract, key)
+    msum = _additive(gate, measure)
+    exists = con.execute("SELECT count(*) FROM information_schema.tables WHERE table_name = ?",
+                         [GROUP_MAP]).fetchone()[0]
+    if not exists:
+        raise ValueError("no keyword groups are approved yet: run and approve keyword grouping "
+                         "first.")
+    k = qi(key)
+    grp = (f"coalesce((SELECT g.group_label FROM {GROUP_MAP} g WHERE g.dataset = "
+           f"{_lit(gate.contract.dataset_name)} AND g.keyword = lower(trim(CAST({k} AS VARCHAR)))"
+           f"), '(ungrouped)')")
+    summary = _head(scope, gate)
+    if member:
+        require_dimension(gate.contract, member)
+        mem = qi(member)
+        q = (f"WITH m AS (SELECT {grp} AS g, {mem} AS p, {msum} AS v FROM {scope.source} "
+             f"WHERE {scope.where} GROUP BY 1, 2) SELECT g, count(*), sum(v), "
+             f"max(v) / nullif(sum(v), 0), arg_max(p, v) FROM m GROUP BY g ORDER BY 3 DESC, 1")
+        out = con.execute(q).fetchall()
+        rows = [[g, number(v), number(n), _pct(s), label(p)] for g, n, v, s, p in out]
+        split = [r[0] for r in out if r[1] > 1 and r[0] != "(ungrouped)"]
+        summary.append(f"One target page per group: {len(split)} group(s) spread their {measure} "
+                       f"over more than one {member}" + (f" ({', '.join(split[:8])})." if split
+                                                         else "."))
+        return Output(headers=["group", measure, f"{member}s", "top share", f"top {member}"],
+                      rows=rows, summary=summary, label="group_map_totals")
+    if grain:
+        dt = qi(_date_col(gate))
+        q = (f"SELECT {grp} AS g, CAST(date_trunc({_lit(grain)}, CAST({dt} AS DATE)) AS DATE), "
+             f"{msum} FROM {scope.source} WHERE {scope.where} GROUP BY 1, 2 ORDER BY 1, 2")
+        rows = [[g, str(p), number(v)] for g, p, v in con.execute(q).fetchall()]
+        return Output(headers=["group", "period", measure], rows=rows, summary=summary,
+                      label="group_map_totals")
+    q = (f"SELECT {grp} AS g, count(DISTINCT lower(trim(CAST({k} AS VARCHAR)))), {msum} "
+         f"FROM {scope.source} WHERE {scope.where} GROUP BY 1 ORDER BY 3 DESC, 1")
+    out = con.execute(q).fetchall()
+    total = sum(float(v or 0) for _, _, v in out) or None
+    run, rows = 0.0, []
+    for g, n, v in out:
+        run += float(v or 0)
+        rows.append([g, number(v), number(n), _pct(float(v or 0) / total) if total else None,
+                     _pct(run / total) if total else None])
+    summary.append(f"Only approved groups count; keywords in no approved group are "
+                   f"'(ungrouped)'. Shares are of {number(total)}.")
+    return Output(headers=["group", measure, "keywords", "share", "running share"], rows=rows,
+                  summary=summary, label="group_map_totals")

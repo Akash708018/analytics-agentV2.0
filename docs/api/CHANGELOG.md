@@ -2,6 +2,15 @@
 
 Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry here.
 
+## 0.5.0 — 2026-09-28 (B7)
+
+Keyword groups are live: `POST /datasets/{id}/keyword-groups/run` (new; body `{column?}`),
+`GET /datasets/{id}/keyword-groups`, `POST /datasets/{id}/keyword-groups/actions` (approve |
+rename | merge | move_keyword | split; `keywords[]` added for split). `KeywordGroup.facets` is
+now `{facet: [values]}`; new `KeywordGroup.proposed_by` (rules | llm | person) and
+`KeywordGroups.run` (column, embedding backend, threshold, typos merged, counts). No endpoint
+answers 501 any more. Additive except `facets` value type (was never live).
+
 ## 0.4.0 — 2026-09-28 (B5)
 
 Turns are answered (when a model is configured): `plan` (playbook + slots, or
