@@ -39,3 +39,4 @@ from . import effect_size as _effect_size  # noqa: F401
 from . import sample_adequacy as _sample_adequacy  # noqa: F401
 from . import repeat_behaviour as _repeat_behaviour  # noqa: F401
 from . import cohort_retention as _cohort_retention  # noqa: F401
+from . import shared_v2 as _shared_v2  # noqa: F401  -- v2 B4: tier 8 shared analyses

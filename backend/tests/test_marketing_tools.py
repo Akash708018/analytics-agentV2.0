@@ -91,7 +91,7 @@ def live_rows():
 def test_marketing_pack_has_20_tools_that_compile():
     m = merge(load_all(), ["marketing"])
     tools = [t for t in m.tools if t.startswith("marketing.")]
-    assert len(tools) == 20
+    assert len(tools) == 31      # 20 Tier-1 (B3) + 11 Tier-2 (B4)
     assert registry.compile_errors(m) == []
     assert all(len(m.tools[t].description) <= 200 for t in tools)
 
@@ -109,8 +109,8 @@ def test_schema_tokens_core_vs_core_plus_marketing():
                                {"paid_ads", "ga4", "search_console", "email", "social"})
     both = registry.llm_schemas(states)
     a, b = registry.schema_tokens(core), registry.schema_tokens(both)
-    print(f"\ntool-schema tokens (estimate): core-only {a}, core+marketing (all 20 active) {b}")
-    assert a < b < 3 * a + 1500
+    print(f"\ntool-schema tokens (estimate): core-only {a}, core+marketing (all 31 active) {b}")
+    assert a < b <= 2500      # budget: every active tool's schema, sent on every call
 
 
 # --- gating ------------------------------------------------------------------------------------

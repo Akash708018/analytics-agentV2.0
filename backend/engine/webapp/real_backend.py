@@ -720,6 +720,8 @@ class RealBackend:
         dims = defaults["dims"]
         specs = []
         for name, a in registry.REGISTRY.items():
+            if a.surface != "v1":   # v2 B4 (D-B4-2): v2 analyses run through domain tools
+                continue
             fields = []
             for p in list(inspect.signature(a.run).parameters.values())[3:]:
                 if p.kind is p.VAR_KEYWORD:

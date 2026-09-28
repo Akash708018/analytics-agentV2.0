@@ -123,11 +123,13 @@ def resolve(ctx: Ctx, tool: Tool, value):
         if tpl is not None:
             ctx.used_concepts.update(tpl.required_concepts)
         return ctx.metrics[tid]
+    if ref.startswith("param?:"):
+        return ctx.params.get(ref.split(":", 1)[1])        # None: the analysis's own default
     if ref.startswith("param:"):
         k, _, default = ref.split(":", 1)[1].partition("=")
         if k not in ctx.params:
             if default:
-                return default
+                return int(default) if default.isdigit() else default
             raise ServiceError(422, "param_required", f"this tool needs params.{k}")
         return ctx.params[k]
     if ref.startswith("festival:"):
@@ -176,9 +178,27 @@ def compile_filters(ctx: Ctx, tool: Tool, step) -> list[str]:
             continue            # flag rules never filter; see flags()
         if rid not in ctx.filters_applied:
             ctx.filters_applied.append(rid)
-    f = step.filter
-    if f:
+    for f in ([step.filter] if isinstance(step.filter, dict) else step.filter or []):
+        preds += _step_filter(ctx, tool, f)
+    return preds
+
+
+def _step_filter(ctx: Ctx, tool: Tool, f: dict) -> list[str]:
+    preds = []
+    if True:
         concept = f["concept"]
+        if f.get("exclude_truthy"):
+            try:
+                col = column_for(ctx, concept)
+            except Skip:
+                ctx.notes.append(f"No '{concept}' column: those rows could not be removed, so "
+                                 f"the figures still include them.")
+                return []
+            preds.append(f"NOT coalesce(lower(trim(CAST({q(col)} AS VARCHAR))) IN "
+                         f"('1', 'true', 't', 'yes', 'y'), false)")
+            if f"exclude:{concept}" not in ctx.filters_applied:
+                ctx.filters_applied.append(f"exclude:{concept}")
+            return preds
         col = _slot(ctx, tool, concept[1:]) if concept.startswith("@") else column_for(
             ctx, concept)
         if "between" in f:
@@ -283,6 +303,7 @@ def run(ctx: Ctx, tool: Tool, min_group: int) -> dict:
         title = step.title or step.analysis
         try:
             params = {k: resolve(ctx, tool, v) for k, v in step.params.items()}
+            params = {k: v for k, v in params.items() if v is not None}
             preds = compile_filters(ctx, tool, step)
         except Skip as e:
             if not step.optional:
@@ -317,9 +338,20 @@ def run(ctx: Ctx, tool: Tool, min_group: int) -> dict:
                 caveats.append(f"{title}: '{label}' has {int(num(r[ni]))} row(s), under the "
                                f"minimum group size {min_group}; its figure is suppressed.")
                 value = None
+            prov = "provisional" if provisional else "contract"
             figures.append({"name": f"{title}: {label}", "value": value,
                             "unit": out.headers[vi] if vi is not None else None,
-                            "provenance": "provisional" if provisional else "contract"})
+                            "provenance": prov})
+            # every other numeric cell is a figure too, named by its column (a cohort row carries
+            # CAC, payback and LTV:CAC beside its size); suppressed rows stay suppressed
+            for ci in range(1, len(out.headers)):
+                if ci in (vi, ni) or out.headers[ci] in ("nulls", "rank", "rows"):
+                    continue
+                cell = num(r[ci])
+                if isinstance(cell, (int, float)):
+                    figures.append({"name": f"{title}: {label} [{out.headers[ci]}]",
+                                    "value": None if value is None and ni is not None else cell,
+                                    "unit": out.headers[ci], "provenance": prov})
             if isinstance(value, (int, float)) or value is None:
                 pts.append({"x": label, "y": value})
         chart = "line" if step.analysis in ("trend", "changepoint") else \

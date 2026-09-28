@@ -137,9 +137,9 @@ def test_every_tool_compiles_to_engine_analyses(tmp_path):
     packs = _tree(tmp_path, GATED)
     assert registry.compile_errors(merge(packs, ["demo"])) == []
     bad = _tree(tmp_path, _pack(tools=[{"id": "demo.x", "description": "x", "ui_label": "x",
-                                        "base_analysis": "funnel"}]))
+                                        "base_analysis": "no_such_analysis"}]))
     assert registry.compile_errors(merge(bad, ["demo"])) == [
-        "demo.x: 'funnel' is not an engine analysis"]
+        "demo.x: 'no_such_analysis' is not an engine analysis"]
     real = load_all()
     assert registry.compile_errors(merge(real, list(real))) == []
 

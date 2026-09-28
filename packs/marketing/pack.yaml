@@ -2,7 +2,7 @@
 # B2: sources + vocabulary. B3: templates, forks, validity/interpretation rules, changelog, tools.
 pack:
   id: marketing
-  version: 0.2.0
+  version: 0.4.0
   extends: [core]
   title: Digital marketing
 
@@ -64,6 +64,8 @@ vocabulary:
   - {id: cancelled, hints: [cancelled, canceled, is_cancelled], weight: 0.8}
   - {id: rto, hints: [rto, is_rto, returned_to_origin], weight: 1.0}
   - {id: payment_method, hints: [payment_method, payment_mode, cod, prepaid], weight: 0.8}
+  - {id: customer_id, hints: [customer_id, customer, buyer_id, client_id, customer_email_hash], weight: 0.8}
+  - {id: variant, hints: [variant, experiment_variant, arm, test_group, bucket], weight: 0.6}
   # time and place splits
   - {id: hour, hints: [hour, hour_of_day], weight: 0.3}
   - {id: day_of_week, hints: [day_of_week, weekday, dow, day_name], weight: 0.3}
@@ -100,8 +102,9 @@ metric_templates:
       platform: {numerator: conv_value}
       gross_incl_gst: {numerator: order_revenue}
       net_excl_gst: {numerator: [order_revenue, -gst]}
-      delivered_net: {unsupported: "needs cancels, returns and RTO removed from revenue: marketing.delivered_roas (B4)"}
+      delivered_net: {unsupported: "delivered ROAS removes cancelled and RTO orders row by row: approve the delivered_roas template and run marketing.delivered_roas"}
     authority: Google Ads / Meta definition; basis is the person's choice
+  - {id: delivered_roas, label: Delivered ROAS (net of GST; cancels and RTO removed by the tool), shape: ratio_of_sums, numerator: [order_revenue, -gst], denominator: spend, required_concepts: [order_revenue, gst, spend]}
   - {id: ctor, label: Click-to-open rate (%), shape: ratio_of_sums, numerator: clicks, denominator: opens, scale: 100, required_concepts: [clicks, opens], authority: Mailchimp / industry standard, source_type: vendor_blog}
   - id: email_click_rate
     label: Email click rate (%)
@@ -223,6 +226,60 @@ changelog:
     source: "https://www.jonloomer.com/click-through-attribution-link-click/"
     affects: [conversions, conv_value, clicks]
 
+playbooks:
+  - id: why_roas_dropped
+    description: Why ROAS moved between two periods -- revenue vs spend, mix, then the channels behind it.
+    patterns: [roas, return on ad spend, dropped, fell, declined, down]
+    slots: {period: "the later month, YYYY-MM", baseline: "the earlier month, YYYY-MM"}
+    steps:
+      - {tool: marketing.roas_change_explainer, params: {period: "@slot:period", baseline: "@slot:baseline", by: channel}}
+      - {tool: marketing.channel_mix_shift, params: {period: "@slot:period", baseline: "@slot:baseline", by: channel}, optional: true}
+      - {tool: marketing.channel_efficiency, params: {by: campaign}, optional: true}
+    rules: [required_stratifier, correlational_only]
+    max_tool_calls: 3
+  - id: where_is_spend_wasted
+    description: Which campaigns, search terms or places take spend without conversions.
+    patterns: [waste, wasted, wasting, spend, no conversions, inefficient]
+    steps:
+      - {tool: marketing.spend_waste}
+      - {tool: marketing.device_geo_split, params: {by: city}, optional: true}
+      - {tool: marketing.keyword_ngrams, optional: true}
+    max_tool_calls: 3
+  - id: why_organic_traffic_dropped
+    description: Why search clicks moved -- demand and rank vs CTR, decaying pages, near-misses, cannibalization.
+    patterns: [organic, seo, search console, traffic, clicks, dropped]
+    slots: {period: "the later month, YYYY-MM", baseline: "the earlier month, YYYY-MM"}
+    steps:
+      - {tool: marketing.seo_change_explainer, params: {period: "@slot:period", baseline: "@slot:baseline"}}
+      - {tool: marketing.content_decay, optional: true}
+      - {tool: marketing.striking_distance, optional: true}
+      - {tool: marketing.cannibalization, optional: true}
+    max_tool_calls: 4
+  - id: did_the_campaign_work
+    description: Whether a measure moved after a launch, against its trend and last year; worded as association.
+    patterns: [campaign, launch, work, worked, impact, effect, lift]
+    slots: {start: "the launch date, YYYY-MM-DD"}
+    steps:
+      - {tool: marketing.campaign_impact, params: {start: "@slot:start"}}
+      - {tool: marketing.conversion_reconciliation, optional: true}
+    rules: [correlational_only]
+    max_tool_calls: 2
+  - id: funnel_leak
+    description: Where users drop out between viewing and buying, and on which devices or pages.
+    patterns: [funnel, drop off, drop-off, checkout, cart, abandon, leak]
+    steps:
+      - {tool: marketing.funnel}
+      - {tool: marketing.device_geo_split, params: {by: device}, optional: true}
+      - {tool: marketing.landing_page_performance, optional: true}
+    max_tool_calls: 3
+  - id: email_health
+    description: Email campaign rates and list health -- bounces, unsubscribes, complaints.
+    patterns: [email, newsletter, unsubscribe, bounce, open rate, list]
+    steps:
+      - {tool: marketing.email_performance}
+      - {tool: marketing.list_health, optional: true}
+    max_tool_calls: 2
+
 tools:
   - id: marketing.channel_efficiency
     description: CTR, CPC, CPA and ROAS by channel or campaign (ratio of sums), ranked by spend.
@@ -268,12 +325,12 @@ tools:
   - id: marketing.channel_mix_shift
     description: Whether blended conversion rate moved because the channel mix changed (Simpson check).
     ui_label: Did the mix change
-    base_analysis: mix_shift
+    base_analysis: rate_mix_shift
     slots: {by: [channel, campaign]}
     params_required: [period, baseline]
     required_concepts: [conversions, clicks]
     steps:
-      - {analysis: mix_shift, params: {measure: "@metric:cvr", dimension: "@by", period: "@param:period", baseline: "@param:baseline", grain: "@param:grain=month"}, title: Rate change vs mix change}
+      - {analysis: rate_mix_shift, params: {measure: "@metric:cvr", dimension: "@by", period: "@param:period", baseline: "@param:baseline"}, title: Rate change vs mix change}
     forks: [conversion_source]
     rules: [exclude_test_campaigns, no_sum_of_rate]
     output: {shape: decomposition, chart: bar}
@@ -442,3 +499,110 @@ tools:
       - {analysis: frequency, params: {column: "@session_source", limit: 50}, title: Sources}
       - {analysis: frequency, params: {column: "@session_medium", limit: 50}, optional: true, title: Mediums}
     output: {shape: groups, chart: bar, checks: [case_variants, not_set, missing_medium]}
+  # --- Tier 2 (B4): presets over the tier-9 shared analyses ---
+  - id: marketing.funnel
+    description: Users reaching each step (view item, add to cart, checkout, purchase), in order, with drop-off per step.
+    ui_label: Where the funnel leaks
+    base_analysis: funnel
+    required_concepts: [user_pseudo_id, event_name, date]
+    steps:
+      - {analysis: funnel, params: {entity: "@user_pseudo_id", step_column: "@event_name", steps: "@param:steps=view_item,add_to_cart,begin_checkout,purchase", window_days: "@param?:window_days"}}
+    output: {shape: funnel, chart: funnel}
+  - id: marketing.conversion_reconciliation
+    description: Platform, GA4 and backend conversions side by side, never added, each as a ratio to the backend count.
+    ui_label: Do the conversion numbers agree
+    base_analysis: source_reconciliation
+    params_required: [sources, reference]
+    required_concepts: []
+    steps:
+      - {analysis: source_reconciliation, params: {measures: "@param:sources", reference: "@param:reference", dimension: "@param?:by"}}
+    rules: [no_cross_source_conversion_sum]
+    output: {shape: groups, chart: bar}
+  - id: marketing.ab_test_readout
+    description: A/B test result with sample-ratio check and minimum detectable effect; says not enough data rather than guess.
+    ui_label: A/B test result
+    base_analysis: ab_test
+    params_required: [rate_measure]
+    slots: {variant: [variant]}
+    required_concepts: []
+    steps:
+      - {analysis: ab_test, params: {dimension: "@variant", measure: "@param:rate_measure", expected_split: "@param?:expected_split"}}
+    output: {shape: comparison, chart: bar}
+  - id: marketing.budget_pacing
+    description: Spend to date this month against the budget you enter, with a straight-line month-end projection.
+    ui_label: Budget pacing
+    base_analysis: pacing
+    params_required: [budget, month]
+    required_concepts: [spend, date]
+    steps:
+      - {analysis: pacing, params: {measure: "@spend", budget: "@param:budget", month: "@param:month", as_of: "@param?:as_of"}}
+    rules: [exclude_test_campaigns]
+    output: {shape: table, chart: table}
+  - id: marketing.keyword_ngrams
+    description: The words and word pairs in search terms or queries, ranked by clicks.
+    ui_label: Words in search terms
+    base_analysis: text_ngrams
+    slots: {text: [search_term, query, keyword]}
+    required_concepts: [clicks]
+    steps:
+      - {analysis: text_ngrams, params: {column: "@text", measure: "@clicks", n: "@param:n=1", limit: 30}}
+    output: {shape: groups, chart: bar}
+  - id: marketing.cannibalization
+    description: Search queries where several of your pages split the clicks.
+    ui_label: Pages competing for one query
+    base_analysis: key_overlap
+    required_concepts: [query, page, clicks]
+    steps:
+      - {analysis: key_overlap, params: {key: "@query", member: "@page", measure: "@clicks"}}
+    forks: [gsc_aggregation]
+    output: {shape: groups, chart: table}
+  - id: marketing.ctr_vs_position
+    description: Your own CTR by search position; pages below the CTR their position earns are title/description fixes.
+    ui_label: Titles to rewrite
+    base_analysis: expected_rate_by_bucket
+    required_concepts: [page, position, clicks, impressions]
+    steps:
+      - {analysis: expected_rate_by_bucket, params: {measure: "@metric:ctr", against: "@position", entity: "@page"}}
+    forks: [gsc_aggregation]
+    rules: [no_sum_of_rate]
+    output: {shape: groups, chart: table}
+  - id: marketing.campaign_impact
+    description: A measure after a launch against its own pre-launch trend and the same days last year; correlational wording.
+    ui_label: Did the campaign work
+    base_analysis: before_after_baseline
+    params_required: [start]
+    slots: {measure: [order_revenue, conversions, key_events, sessions, clicks]}
+    required_concepts: [date]
+    steps:
+      - {analysis: before_after_baseline, params: {measure: "@measure", start: "@param:start", pre_days: "@param:pre_days=28", post_days: "@param:post_days=28", holdout: "@param?:holdout"}}
+    rules: [correlational_only]
+    output: {shape: table, chart: table}
+  - id: marketing.delivered_roas
+    description: ROAS on revenue net of GST with cancelled and RTO orders removed, split COD vs prepaid.
+    ui_label: ROAS on delivered orders
+    base_analysis: group_compare
+    required_concepts: [order_revenue, gst, spend, payment_method]
+    steps:
+      - {analysis: group_compare, params: {dimension: "@payment_method", measure: "@metric:delivered_roas"}, filter: [{concept: cancelled, exclude_truthy: true}, {concept: rto, exclude_truthy: true}]}
+    rules: [no_sum_of_rate]
+    output: {shape: groups, chart: bar}
+  - id: marketing.cac_payback
+    description: Customer acquisition cost per first-order cohort from spend you enter, and months to pay it back.
+    ui_label: CAC payback
+    base_analysis: unit_economics
+    params_required: [spend]
+    required_concepts: [customer_id, order_revenue, date]
+    steps:
+      - {analysis: unit_economics, params: {entity: "@customer_id", measure: "@order_revenue", spend: "@param:spend", min_months: "@param:min_months=3"}}
+    forks: [cac_scope]
+    output: {shape: cohorts, chart: table}
+  - id: marketing.ltv_to_cac
+    description: Revenue per customer to date against CAC, per cohort; young cohorts marked, never extrapolated.
+    ui_label: LTV to CAC
+    base_analysis: unit_economics
+    params_required: [spend]
+    required_concepts: [customer_id, order_revenue, date]
+    steps:
+      - {analysis: unit_economics, params: {entity: "@customer_id", measure: "@order_revenue", spend: "@param:spend", min_months: "@param:min_months=6"}}
+    forks: [cac_scope]
+    output: {shape: cohorts, chart: table}

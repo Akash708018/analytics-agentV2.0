@@ -31,6 +31,7 @@ class ToolState:
     missing_concepts: list[str] = field(default_factory=list)
     description: str = ""
     pack: str = "core"
+    tool: object = None      # the pack Tool, for domain tools
 
 
 def _label(name: str) -> str:
@@ -53,7 +54,7 @@ def statuses(confirmed: list[str], concepts: set[str], sources: set[str],
     for tool in merged.tools.values():
         pack_id = tool.id.split(".", 1)[0]
         st = ToolState(tool.id, tool.ui_label, "active", description=tool.description,
-                       pack=pack_id)
+                       pack=pack_id, tool=tool)
         if pack_id not in confirmed:
             st.status, st.needs_domain = "needs_domain", pack_id
         else:
@@ -79,12 +80,13 @@ def llm_schemas(states: list[ToolState]) -> list[dict]:
                                                         "from the contract)"}}}}]
     for s in states:
         if s.pack != "core" and s.status == "active":
-            schemas.append({
-                "name": s.tool_id.replace(".", "_"),
-                "description": s.description,
-                "parameters": {"type": "object", "properties": {
-                    "period": {"type": "string", "description": "e.g. 2026-09 or a range"},
-                    "where": {"type": "string", "description": "optional approved filter"}}}})
+            t = s.tool
+            props = {k: {"type": "string"} for k in (*t.params_required, *t.slots)}
+            schema = {"type": "object", "properties": props}
+            if t.params_required:
+                schema["required"] = list(t.params_required)
+            schemas.append({"name": s.tool_id.replace(".", "_"), "description": s.description,
+                            "parameters": schema})
     return schemas
 
 
@@ -101,7 +103,7 @@ def schema_tokens(schemas: list[dict]) -> int:
 def compile_errors(merged: Merged) -> list[str]:
     """Every domain tool must compile to engine analyses: each part of `base_analysis`
     ("a + b" composes two) is a registered analysis. Returns the problems, empty if none."""
-    known = {name for name, _, _ in analyses.catalogue()}
+    known = {name for name, _, _ in analyses.catalogue(surface=None)}
     bad = []
     for t in merged.tools.values():
         parts = [p.strip() for p in t.base_analysis.split("+")]
@@ -111,12 +113,11 @@ def compile_errors(merged: Merged) -> list[str]:
                        f"{sorted({s.analysis for s in t.steps})}")
         for s in t.steps:
             refs = [v for v in s.params.values() if isinstance(v, str) and v.startswith("@")]
-            if s.filter and s.filter.get("date_range"):
-                refs.append(s.filter["date_range"])
-            if s.filter and str(s.filter.get("concept", "")).startswith("@"):
-                refs.append(s.filter["concept"])
-            elif s.filter:
-                refs.append("@" + s.filter["concept"])
+            for f in ([s.filter] if isinstance(s.filter, dict) else s.filter or []):
+                if f.get("date_range"):
+                    refs.append(f["date_range"])
+                c = str(f.get("concept", ""))
+                refs.append(c if c.startswith("@") else "@" + c)
             for r in refs:
                 ref = r[1:]
                 kind, _, rest = ref.partition(":")
@@ -124,6 +125,7 @@ def compile_errors(merged: Merged) -> list[str]:
                       or (kind == "metric" and rest in merged.templates)
                       or (kind == "param" and (rest.split("=")[0] in t.params_required
                                                or "=" in rest))
+                      or kind == "param?"
                       or (kind == "festival" and rest in ("this", "last")))
                 if not ok:
                     bad.append(f"{t.id}: {r!r} names nothing (concept, slot, metric, param)")

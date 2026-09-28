@@ -441,6 +441,37 @@ class DatasetService:
             festivals=m.festivals, params=dict(params))
         return runner.run(ctx, m.tools[tool_id], m.min_group_size)
 
+    def run_core(self, dataset_id: str, analysis: str, params: dict) -> dict:
+        """A core (v1-surface) analysis as a one-step tool, for the fallback's `core_analyze`.
+        The model supplies column names only: `where` is dropped (the LLM never writes SQL) and
+        no value may start with '@' (bindings are the packs' and the runner's)."""
+        from backend.engine.analysis.registry import catalogue
+        from backend.packs.models import Step, Tool
+        if analysis not in {n for n, _, _ in catalogue()}:
+            raise ServiceError(422, "unknown_analysis", f"{analysis!r} is not a core analysis")
+        clean = {k: v for k, v in (params or {}).items()
+                 if k != "where" and not (isinstance(v, str) and v.startswith("@"))}
+        tool = Tool(id=f"core.{analysis}", description=analysis, ui_label=analysis,
+                    base_analysis=analysis, steps=[Step(analysis=analysis, params=clean)])
+        d = self._get(dataset_id)
+        m = merge(load_all(), d["domains"])
+        c = self._contract(d).contract
+        bound, _ = self._bound(d)
+        with self.be._workspace(d["workspace_id"]):
+            con = db.connect(d["workspace_id"])
+            try:
+                ctx = runner.Ctx(
+                    con=con, workspace_id=d["workspace_id"], table=d["name"], merged=m,
+                    bound=bound, measures={x.name for x in c.measures}, metrics=d["metrics"],
+                    fork_choices=d["fork_choices"], validity=d["validity"],
+                    window=(c.analysis_window.start, c.analysis_window.end)
+                    if c.analysis_window else None, festivals=m.festivals, params={})
+                result = runner.run(ctx, tool, m.min_group_size)
+            finally:
+                con.close()
+        result["dataset_id"] = dataset_id
+        return result
+
     def tools_states(self, d: dict):
         bound, sources = self._bound(d)
         return registry.statuses(d["domains"], set(bound), sources)

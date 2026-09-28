@@ -135,3 +135,64 @@ per entry.
 2026-01-12 caveat on the ROAS explainer; ROAS there uses backend order revenue, which Meta's
 attribution windows do not touch. The caveat correctly fires only where platform conversions
 are used. Test now asserts both.
+
+## B4 — Tier-2 tools on shared engine analyses (2026-09-27)
+
+**D-B4-1. Nine shared analyses in one engine module, tier 9.** Generic names; the guide's own
+Tier 8 (forecasting) stays reserved. Added to the backend copy of the build guide, which v1's
+roster test reads.
+
+**D-B4-2. v2 analyses are off the v1 MCP surface (`surface="v2"`).** v1 asserts every analysis
+is callable through `compute_analysis` / `render_chart`, whose signatures would grow by 20
+parameters — tokens on every call, the cost v2 exists to cut. They are reached through domain
+tools. Three v1 tests now check the v1 surface only (each edit marked `D-B4-2`); `catalogue()`
+defaults to v1, so v1's own messages and menus are unchanged.
+
+**D-B4-3. Marketing-mix modelling and regression forecasting are out of scope for v2.0.** They
+need numpy/statsmodels model fitting in the engine, against the no-numpy rule. A later
+decision, if the user wants them.
+
+**D-B4-4. Person-entered inputs stay inputs.** Budget (pacing), spend per cohort (CAC, under
+the cac_scope fork) and funnel steps are params the person gives, never guessed from data.
+
+**C3. Two engine bugs caught by hand-worked numbers.** DuckDB's RE2 rejected `\u` escapes; and
+`unit_economics` joined cohort customers to month rows, doubling revenue per customer (1800 vs
+900). Both fixed before any figure left the engine.
+
+**C4. The runner reported only the first numeric column.** A cohort row's CAC was lost behind
+its size. Every numeric cell is now a figure, named `step: row [column]`.
+
+## B5 — interpretation filter + playbooks (2026-09-28)
+
+**D-B5-1. Two LLM calls per playbook answer (+1 correction at most).** The planner picks and
+fills slots; the engine runs steps; the explainer only words results. The explainer sees
+figures (≤30 per tool) and caveats — no rows, no SQL.
+
+**D-B5-2. Interpretation rules are regexes over the answer plus the trace, by design.**
+Deterministic, cheap, testable; each has a violating and a passing fixture. They catch the
+wordings listed, not every paraphrase — the flag list says what they checked.
+
+**D-B5-3. `rate_mix_shift` added (tier 9)** because v1's `mix_shift` is for means and refuses
+ratios; a blended rate's mix weight is its denominator share.
+
+**C5. `correlational_only` read "no holdout was marked" as a holdout.** A substring match on
+"holdout was marked". Now only the engine's "(a holdout was marked)" wording counts; a test
+pins the negative.
+
+## B6 — v1-vs-v2 bench (2026-09-28)
+
+**D-B6-1. The bench is offline and scripted, for both agents.** Same question, same generated
+table, same estimator (chars/4 of each request, v1's rounding). It measures machinery; live
+model behaviour needs keys and is out of B6's scope.
+
+**D-B6-2. v1's baseline is v1's own checkout, re-run — not its step-2 doc.** The recorded list
+(2,488…) predates v1's step 3, which grew its schemas; v1 @ 0ba324b measures 2,890…, and the
+seeded copy matches it within 0.5%.
+
+**D-B6-3. The fallback runs core analyses (`core_analyze`) and batches calls.** B5's fallback
+offered domain tools only, so a non-marketing question could run nothing. The model supplies
+column names; `where` is dropped (the LLM writes no SQL).
+
+**C6. Three bench bugs, found by the first run's numbers.** A stale v1 baseline (above); a
+figure filter that matched `line_revenue` inside the COST result's caveats (0/4 → 4/4); a regex
+for a summary line the marketing scripts do not print (replaced by a v1-vs-v2 output diff).

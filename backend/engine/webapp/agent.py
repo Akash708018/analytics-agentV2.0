@@ -111,7 +111,8 @@ def _roster() -> str:
     from backend.engine.analysis.registry import REGISTRY
 
     lines = []
-    for a in sorted(REGISTRY.values(), key=lambda a: (a.tier, a.name)):
+    for a in sorted((a for a in REGISTRY.values() if a.surface == "v1"),  # D-B4-2
+                    key=lambda a: (a.tier, a.name)):
         names = [n for n, prm in inspect.signature(a.run).parameters.items()
                  if n not in ("con", "gate", "scope") and prm.kind is not prm.VAR_KEYWORD]
         if a.narrows:

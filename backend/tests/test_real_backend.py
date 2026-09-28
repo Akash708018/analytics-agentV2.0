@@ -378,7 +378,8 @@ def test_every_analysis_runs_from_its_form_defaults_and_charts_where_it_should(b
     _loaded(be, ws)
     assert be.confirm_contract(ws, be.draft_contract(ws, "clean_sales", **ANSWERS)).ok
     menu = be.analysis_menu(ws, "clean_sales")
-    assert [s.name for s in menu.analyses] == list(registry.REGISTRY)
+    assert [s.name for s in menu.analyses] == [n for n, a in registry.REGISTRY.items()
+                                               if a.surface == "v1"]   # v2 B4 (D-B4-2)
     for spec in menu.analyses:
         run = be.run_analysis(ws, "clean_sales", spec.name,
                               {p.name: p.default for p in spec.params}, spec.chart)

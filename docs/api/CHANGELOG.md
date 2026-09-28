@@ -2,6 +2,15 @@
 
 Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry here.
 
+## 0.4.0 — 2026-09-28 (B5)
+
+Turns are answered (when a model is configured): `plan` (playbook + slots, or
+`mode: tool_calling`), `tool_call` (`status` ok | skipped + `code`/`reason`), `figure_check`
+(passed | failed | corrected | flagged), `interpretation_check` (`rule`, `status`), `answer`
+(`text`, `flags`). `Turn.answer` documented: text, flags, playbook, results, skipped, usage
+(LLM calls, tool calls, estimated tokens). With no model configured turns still end
+`agent_not_wired`. No breaking changes.
+
 ## 0.3.0 — 2026-09-27 (B3)
 
 Now live: `GET /datasets/{id}/metrics/templates` (+ `approved`, `measure`),

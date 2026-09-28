@@ -120,6 +120,14 @@ def _check_refs(m: Merged) -> None:
                 if s not in m.sources]
         known = set(m.validity_rules) | set(m.interpretation_rules)
         bad += [f"tool {t.id}: unknown rule {r}" for r in t.rules if r not in known]
+    for b in m.playbooks.values():
+        bad += [f"playbook {b.id}: unknown tool {s.tool}" for s in b.steps
+                if s.tool not in m.tools]
+        bad += [f"playbook {b.id}: unknown rule {r}" for r in b.rules
+                if r not in m.interpretation_rules]
+        if len(b.steps) > b.max_tool_calls:
+            bad.append(f"playbook {b.id}: {len(b.steps)} steps over its budget "
+                       f"{b.max_tool_calls}")
     for s in m.sources.values():
         bad += [f"source {s.id}: unknown concept {c}" for c in s.concepts + s.required
                 if c not in m.concepts]
