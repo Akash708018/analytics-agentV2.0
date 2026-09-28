@@ -25,6 +25,8 @@ def create_app(state_dir: Path | str | None = None, runner: Runner | None = None
     store = Store(state / "sessions.db")
     sessions = SessionService(store, now=now)
     ds = D.DatasetService(store)
+    from backend.services.keywords import KeywordService
+    ds.keywords = KeywordService(ds)
     if runner is None:
         from backend.llm.provider import EngineLLM
         from backend.playbooks.agent import runner as agent_runner
@@ -196,6 +198,21 @@ def create_app(state_dir: Path | str | None = None, runner: Runner | None = None
     def run_tool(tool_id: str, body: S.ToolRunRequest) -> S.ToolResult:
         return S.ToolResult(**ds.run_tool(tool_id, body.dataset_id, body.params))
 
+    @app.post("/datasets/{dataset_id}/keyword-groups/run", response_model=S.KeywordGroups,
+              responses=R, tags=["keywords"])
+    def keyword_run(dataset_id: str, body: S.KeywordRun | None = None) -> S.KeywordGroups:
+        return S.KeywordGroups(**ds.keywords.run(dataset_id, (body or S.KeywordRun()).column))
+
+    @app.get("/datasets/{dataset_id}/keyword-groups", response_model=S.KeywordGroups,
+             responses=R, tags=["keywords"])
+    def keyword_groups(dataset_id: str) -> S.KeywordGroups:
+        return S.KeywordGroups(**ds.keywords.list(dataset_id))
+
+    @app.post("/datasets/{dataset_id}/keyword-groups/actions", response_model=S.KeywordGroups,
+              responses=R, tags=["keywords"])
+    def keyword_action(dataset_id: str, body: S.KeywordGroupAction) -> S.KeywordGroups:
+        return S.KeywordGroups(**ds.keywords.act(dataset_id, body.model_dump()))
+
     @app.get("/packs", response_model=S.PackList, tags=["packs"])
     def packs() -> S.PackList:
         return S.PackList(**D.packs_list())
@@ -204,9 +221,6 @@ def create_app(state_dir: Path | str | None = None, runner: Runner | None = None
     def pack(pack_id: str) -> S.PackDetail:
         return S.PackDetail(**D.pack_detail(pack_id))
 
-    stub("GET", "/datasets/{dataset_id}/keyword-groups", S.KeywordGroups, "B7", "keywords")
-    stub("POST", "/datasets/{dataset_id}/keyword-groups/actions", S.KeywordGroups, "B7",
-         "keywords", body=S.KeywordGroupAction)
 
     base_openapi = app.openapi
 

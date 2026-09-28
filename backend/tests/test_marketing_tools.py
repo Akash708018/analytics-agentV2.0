@@ -91,7 +91,7 @@ def live_rows():
 def test_marketing_pack_has_20_tools_that_compile():
     m = merge(load_all(), ["marketing"])
     tools = [t for t in m.tools if t.startswith("marketing.")]
-    assert len(tools) == 31      # 20 Tier-1 (B3) + 11 Tier-2 (B4)
+    assert len(tools) == 34      # 20 Tier-1 (B3) + 11 Tier-2 (B4) + 3 keyword (B7)
     assert registry.compile_errors(m) == []
     assert all(len(m.tools[t].description) <= 200 for t in tools)
 

@@ -1,0 +1,15 @@
+# Keyword facets for grouping (B7). PERSON-EDITABLE: add your localities, dishes and brand words.
+# Lower-case; multi-word phrases allowed. A keyword's facets split its group (a delivery search
+# and a near-me search for the same dish are different intents and different pages).
+city: [pune, poona]
+areas: [koregaon park, kp, baner, kalyani nagar, viman nagar, aundh, hinjewadi, kothrud, wakad,
+        camp, fc road, magarpatta, hadapsar, balewadi, pimple saudagar, shivaji nagar]
+delivery: [home delivery, delivery, delivry, delivary, deliver, order online, online order,
+           ghar pe, ghar par, swiggy, zomato, takeaway, take away]
+near_me: [near me, nearby, near by, paas mein, pass me, aas paas, close to me, around me]
+price: [price, prices, cheap, sasta, budget, cost, rate, rates, buffet price, affordable,
+        under 500, under 1000, offers, discount]
+dishes: [sushi, ramen, bento, teppanyaki, tempura, dim sum, gyoza, udon, katsu, donburi,
+         japanese food, japanese restaurant, japanese cuisine]
+brands: [hana, hana japanese, hana restaurant]
+informational: [what is, how to, kaise, kya hai, recipe, calories, meaning, vs, difference]

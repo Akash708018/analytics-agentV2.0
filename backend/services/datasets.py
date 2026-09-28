@@ -415,6 +415,17 @@ class DatasetService:
                                f"{tool_id} needs data for: {st.missing_concepts}",
                                {"needs_domain": st.needs_domain,
                                 "missing_concepts": st.missing_concepts})
+        if m.tools[tool_id].kind == "pipeline":
+            got = self.keywords.run(dataset_id, params.get("column"))
+            n = len(got["groups"])
+            return {"tool_id": tool_id, "dataset_id": dataset_id,
+                    "summary": f"{n} keyword group(s) proposed or kept; a person approves them",
+                    "figures": [{"name": "groups", "value": n, "unit": "groups",
+                                 "provenance": "derived"}], "series": [],
+                    "validity_filters_applied": [], "pack_rules_applied": [], "forks": {},
+                    "caveats": [f"embedding: {got['run']['embedding']}; threshold "
+                                f"{got['run']['threshold']}; groups are PROPOSALS until approved"],
+                    "figure_check": {"status": "not_run", "notes": []}}
         if st.pack == "core":
             raise ServiceError(422, "not_a_domain_tool",
                                "core steps run through their own endpoints (profile, cleaning, "

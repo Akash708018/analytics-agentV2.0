@@ -2,7 +2,7 @@
 # B2: sources + vocabulary. B3: templates, forks, validity/interpretation rules, changelog, tools.
 pack:
   id: marketing
-  version: 0.4.0
+  version: 0.5.0
   extends: [core]
   title: Digital marketing
 
@@ -606,3 +606,29 @@ tools:
       - {analysis: unit_economics, params: {entity: "@customer_id", measure: "@order_revenue", spend: "@param:spend", min_months: "@param:min_months=6"}}
     forks: [cac_scope]
     output: {shape: cohorts, chart: table}
+  # --- keyword grouping (B7) ---
+  - id: marketing.keyword_grouping
+    kind: pipeline
+    description: Groups search terms or queries by topic and intent (typos and Hinglish merged); groups are proposals until approved.
+    ui_label: Group keywords
+    base_analysis: text_pipeline
+    required_concepts: []
+    output: {shape: groups, chart: table}
+  - id: marketing.keyword_group_performance
+    description: Clicks by approved keyword group, with pareto shares and a weekly trend per group.
+    ui_label: Keyword groups performance
+    base_analysis: group_map_totals
+    slots: {text: [search_term, query, keyword]}
+    required_concepts: [clicks]
+    steps:
+      - {analysis: group_map_totals, params: {key: "@text", measure: "@clicks"}, title: By group}
+      - {analysis: group_map_totals, params: {key: "@text", measure: "@clicks", grain: week}, optional: true, title: By week}
+    output: {shape: groups, chart: bar}
+  - id: marketing.page_targeting
+    description: For each approved keyword group, which pages take its clicks; one target page per group, never one per phrasing.
+    ui_label: One page per keyword group
+    base_analysis: group_map_totals
+    required_concepts: [query, page, clicks]
+    steps:
+      - {analysis: group_map_totals, params: {key: "@query", measure: "@clicks", member: "@page"}}
+    output: {shape: groups, chart: table}

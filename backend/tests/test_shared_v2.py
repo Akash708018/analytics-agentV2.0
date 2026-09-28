@@ -279,7 +279,7 @@ def test_rate_mix_shift_simpson(make):
 def test_v2_analyses_stay_off_the_v1_mcp_surface():
     from backend.engine.analysis.registry import REGISTRY, catalogue
     v2 = {a.name for a in REGISTRY.values() if a.surface == "v2"}
-    assert len(v2) == 10 and not v2 & {x for x, _, _ in catalogue()}
+    assert len(v2) == 11 and not v2 & {x for x, _, _ in catalogue()}
     assert v2 <= {x for x, _, _ in catalogue(surface=None)}
 
 

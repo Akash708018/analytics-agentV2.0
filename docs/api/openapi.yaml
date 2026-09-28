@@ -3,7 +3,7 @@ info:
   title: analytics-agent v2
   description: Contract-first API. Figures carry provenance; chart series are computed by the backend.
     501 = spec'd, not live yet.
-  version: 0.4.0
+  version: 0.5.0
 paths:
   /health:
     get:
@@ -930,6 +930,134 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
           description: Conflict
+  /datasets/{dataset_id}/keyword-groups/run:
+    post:
+      tags:
+      - keywords
+      summary: Keyword Run
+      operationId: keyword_run_datasets__dataset_id__keyword_groups_run_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/KeywordRun'
+              - type: 'null'
+              title: Body
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeywordGroups'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/keyword-groups:
+    get:
+      tags:
+      - keywords
+      summary: Keyword Groups
+      operationId: keyword_groups_datasets__dataset_id__keyword_groups_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeywordGroups'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/keyword-groups/actions:
+    post:
+      tags:
+      - keywords
+      summary: Keyword Action
+      operationId: keyword_action_datasets__dataset_id__keyword_groups_actions_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KeywordGroupAction'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeywordGroups'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
   /packs:
     get:
       tags:
@@ -981,62 +1109,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
           description: Unprocessable Entity
-  /datasets/{dataset_id}/keyword-groups:
-    get:
-      tags:
-      - keywords
-      summary: Get /Datasets/{Dataset Id}/Keyword-Groups
-      operationId: get__datasets__dataset_id__keyword_groups_datasets__dataset_id__keyword_groups_get
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/KeywordGroups'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-  /datasets/{dataset_id}/keyword-groups/actions:
-    post:
-      tags:
-      - keywords
-      summary: Post /Datasets/{Dataset Id}/Keyword-Groups/Actions
-      operationId: post__datasets__dataset_id__keyword_groups_actions_datasets__dataset_id__keyword_groups_actions_post
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/KeywordGroupAction'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/KeywordGroups'
-        '501':
-          description: Not Implemented
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorBody'
 components:
   schemas:
     ApprovalResult:
@@ -1725,14 +1797,18 @@ components:
           type: array
           title: Keywords
         facets:
-          additionalProperties:
-            type: string
+          additionalProperties: true
           type: object
           title: Facets
           default: {}
         approved:
           type: boolean
           title: Approved
+        proposed_by:
+          type: string
+          title: Proposed By
+          description: rules | llm | person
+          default: rules
       type: object
       required:
       - group_id
@@ -1744,22 +1820,21 @@ components:
       examples:
       - approved: false
         facets:
-          service: delivery
+          area:
+          - baner
+          delivery:
+          - delivery
         group_id: g1
         intent: transactional
         keywords:
         - sushi delivery pune
         - sushi home delivery
         label: sushi delivery
+        proposed_by: rules
     KeywordGroupAction:
-      examples:
-      - action: move_keyword
-        group_ids:
-        - g1
-        keyword: sushi near me
-        target_group_id: g4
       properties:
         action:
+          type: string
           enum:
           - approve
           - rename
@@ -1767,35 +1842,45 @@ components:
           - move_keyword
           - split
           title: Action
-          type: string
         group_ids:
           items:
             type: string
-          title: Group Ids
           type: array
+          title: Group Ids
         label:
           anyOf:
           - type: string
           - type: 'null'
-          default: null
           title: Label
         keyword:
           anyOf:
           - type: string
           - type: 'null'
-          default: null
           title: Keyword
+        keywords:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Keywords
+          description: 'split: the keywords to move out'
         target_group_id:
           anyOf:
           - type: string
           - type: 'null'
-          default: null
           title: Target Group Id
+      type: object
       required:
       - action
       - group_ids
       title: KeywordGroupAction
-      type: object
+      examples:
+      - action: move_keyword
+        group_ids:
+        - g1
+        keyword: sushi near me
+        target_group_id: g4
     KeywordGroups:
       properties:
         dataset_id:
@@ -1806,6 +1891,13 @@ components:
             $ref: '#/components/schemas/KeywordGroup'
           type: array
           title: Groups
+        run:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Run
+          description: 'The last run: column, embedding backend, threshold, typos merged, counts'
       type: object
       required:
       - dataset_id
@@ -1816,13 +1908,29 @@ components:
         groups:
         - approved: false
           facets:
-            service: delivery
+            area:
+            - baner
+            delivery:
+            - delivery
           group_id: g1
           intent: transactional
           keywords:
           - sushi delivery pune
           - sushi home delivery
           label: sushi delivery
+          proposed_by: rules
+    KeywordRun:
+      properties:
+        column:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Column
+          description: 'Text column; default: the search term / query / keyword column'
+      type: object
+      title: KeywordRun
+      examples:
+      - column: search_term
     MeasureProposal:
       properties:
         column:
@@ -2755,5 +2863,5 @@ components:
       - engine
       title: VersionInfo
       examples:
-      - api_version: 0.4.0
+      - api_version: 0.5.0
         engine: v1@0ba324b
