@@ -41,9 +41,11 @@ festival_confound, measurement_change, or mentions small groups; if a step was s
 what it would need. Results:
 """
 
-FALLBACK = """You answer with tools. Reply with ONE JSON object per turn: either
-{"call": "<tool_id>", "params": {...}} to run a tool, or {"done": true} when the results so far
-answer the question. You never compute numbers. Tools (JSON schemas):
+FALLBACK = """You answer with tools. Reply with ONE JSON object: {"calls": [{"call": "<tool name>",
+"params": {...}}, ...], "then": "answer"} to run every call the question needs at once (add
+"then": "answer" when those will be enough), or {"done": true} when the results so far answer
+it. Column names come from the question and the contract. You never compute numbers and never
+write filters. Tools (JSON schemas):
 """
 
 
@@ -115,11 +117,27 @@ class Agent:
                 break                              # the lead step failed: nothing to build on
         return calls
 
+    def run_core(self, dataset_id, params, emit, trace, skipped):
+        analysis = str((params or {}).get("analysis", ""))
+        inner = (params or {}).get("params") or {}
+        t0 = time.perf_counter()
+        try:
+            res = self.ds.run_core(dataset_id, analysis, inner)
+            trace.append(res)
+            emit("tool_call", {"tool_id": f"core.{analysis}", "params": inner, "status": "ok",
+                               "ms": round((time.perf_counter() - t0) * 1000)})
+            return res
+        except ServiceError as e:
+            skipped.append({"tool_id": f"core.{analysis}", "code": e.code, "reason": e.message})
+            emit("tool_call", {"tool_id": f"core.{analysis}", "params": inner,
+                               "status": "skipped", "code": e.code, "reason": e.message[:300]})
+            return None
+
     def fallback(self, question, states, dataset_id, emit, trace, skipped, usage) -> int:
-        active = [s for s in states.values() if s.status == "active" and s.pack != "core"]
+        """Tool calling over the ACTIVE tools: core_analyze (always) + active domain tools.
+        A reply may carry several calls ({"calls": [...]}); {"done": true} ends it."""
+        active = [s for s in states.values() if s.status == "active"]
         schemas = registry.llm_schemas(active)
-        if not schemas:
-            return 0
         system = FALLBACK + json.dumps(schemas, separators=(",", ":"))
         calls, seen = 0, question
         for _ in range(FALLBACK_MAX_CALLS):
@@ -127,13 +145,28 @@ class Agent:
                 got = parse_json(self._call(usage, "tool_choice", system, seen))
             except ValueError:
                 break
-            tool = str(got.get("call") or "").replace("_", ".", 1)
-            if got.get("done") or tool not in states:
+            batch = got.get("calls") or ([{"call": got["call"], "params": got.get("params")}]
+                                         if got.get("call") else [])
+            if got.get("done") or not batch:
                 break
-            res = self.run_tool(dataset_id, tool, got.get("params") or {}, emit, trace, skipped)
-            calls += 1
-            seen += "\n\n" + (render(res) if res else f"{tool} could not run: "
-                              f"{skipped[-1]['reason'][:200]}")
+            for item in batch[:FALLBACK_MAX_CALLS - calls]:
+                name = str(item.get("call") or "")
+                params = item.get("params") or {}
+                if name == "core_analyze":
+                    res = self.run_core(dataset_id, params, emit, trace, skipped)
+                    label = f"core.{params.get('analysis')}"
+                else:
+                    label = name.replace("_", ".", 1)
+                    if label not in states or states[label].status != "active":
+                        skipped.append({"tool_id": label, "code": "not_active",
+                                        "reason": "not an active tool for this data"})
+                        continue
+                    res = self.run_tool(dataset_id, label, params, emit, trace, skipped)
+                calls += 1
+                seen += "\n\n" + (render(res) if res else f"{label} could not run: "
+                                  f"{skipped[-1]['reason'][:200]}")
+            if got.get("then") == "answer" or calls >= FALLBACK_MAX_CALLS:
+                break
         return calls
 
     # --- 3 + 4. explain and check ------------------------------------------------------------

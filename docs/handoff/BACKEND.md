@@ -1,7 +1,8 @@
 ## Status (date, branch, last commit)
 
 2026-09-27 · branch `claude/analytics-agent-v2-backend-6gcu1p` · B2 in PR #3 (open), B3 on top.
-Done: B0–B4, **B5** (interpretation filter, 6 playbooks, turns answered; API 0.4.0).
+Done: B0–B5, **B6** (v1-vs-v2 bench: 2 LLM calls vs 7, 3.9k vs 33k tokens; v1 checks
+identical). Results: `bench/RESULTS.md`.
 
 ## API: spec version — live | stubbed (501) | changed since last handoff
 
@@ -53,5 +54,5 @@ None (checked 2026-09-26).
 
 ## Next milestone
 
-B6 — v1-vs-v2 bench (checks, LLM calls, tool calls, tokens incl. schema tokens, violations,
-wall time) on v1's marketing benches, the trap files, retail and SLA.
+B7 — keyword grouping (ASK FIRST: the text module is the logged numpy exception; needs a local
+Ollama for embeddings and a user-approved gold file).

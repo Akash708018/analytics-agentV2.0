@@ -178,3 +178,21 @@ ratios; a blended rate's mix weight is its denominator share.
 **C5. `correlational_only` read "no holdout was marked" as a holdout.** A substring match on
 "holdout was marked". Now only the engine's "(a holdout was marked)" wording counts; a test
 pins the negative.
+
+## B6 — v1-vs-v2 bench (2026-09-28)
+
+**D-B6-1. The bench is offline and scripted, for both agents.** Same question, same generated
+table, same estimator (chars/4 of each request, v1's rounding). It measures machinery; live
+model behaviour needs keys and is out of B6's scope.
+
+**D-B6-2. v1's baseline is v1's own checkout, re-run — not its step-2 doc.** The recorded list
+(2,488…) predates v1's step 3, which grew its schemas; v1 @ 0ba324b measures 2,890…, and the
+seeded copy matches it within 0.5%.
+
+**D-B6-3. The fallback runs core analyses (`core_analyze`) and batches calls.** B5's fallback
+offered domain tools only, so a non-marketing question could run nothing. The model supplies
+column names; `where` is dropped (the LLM writes no SQL).
+
+**C6. Three bench bugs, found by the first run's numbers.** A stale v1 baseline (above); a
+figure filter that matched `line_revenue` inside the COST result's caveats (0/4 → 4/4); a regex
+for a summary line the marketing scripts do not print (replaced by a v1-vs-v2 output diff).

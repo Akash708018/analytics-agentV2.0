@@ -71,6 +71,11 @@ class Script:
 
 @pytest.fixture
 def env(tmp_path):
+    yield from make_env(tmp_path)
+
+
+def make_env(tmp_path):
+    """The harness as a plain generator, so bench/compare.py can run the same scenarios."""
     holder = {}
     spaces = []
 
