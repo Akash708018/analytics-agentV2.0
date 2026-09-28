@@ -1,0 +1,339 @@
+# Gold questions. Each has an answer computed WITHOUT the tool under test -- in SQL against the
+# fixture, or fixed by the register -- because a gold answer produced by compute_analysis would
+# agree with compute_analysis forever, including when both are wrong.
+#
+# suite: correctness | behavioural | regression
+#
+#   correctness  `sql` is the truth, run against the loaded table. `call` is the tool call. The
+#                reply must contain every string in `expect`, and those are built from the SQL
+#                answer at run time where they name it as {answer}.
+#   behavioural  the call is expected to be refused with `reason`, and the refusal's NEXT STEP
+#                is then examined: whether it is a call an agent could make verbatim, and where
+#                `retry` is set, whether making it succeeds.
+#   regression   a named check in run_eval.py, mapped to a Failure Mode Register id.
+#
+# Step 1 proves the format carries all three. Filling out to the guide's 30-40 is Step 2:
+# writing forty questions against a format nobody has run is how a format turns out wrong forty
+# times.
+
+- id: C01
+  suite: correctness
+  question: How many orders are in clean_sales?
+  dataset: clean_sales
+  sql: SELECT count(*) FROM clean_sales
+  call: {tool: compute_analysis, args: {analysis_type: summary_stats}}
+  expect: ["{answer} of {answer} row(s) analysed."]
+
+- id: C02
+  suite: correctness
+  # count(DISTINCT region) is 4 and frequency returns 5, because P8-D5 keeps NULL as its own
+  # group and DISTINCT does not count it. The first version of this question asserted 4 and
+  # failed, and the tool was right. A gold answer has to be the answer to the question actually
+  # being asked -- "how many groups does a frequency table have" is not "how many distinct
+  # non-null values are there".
+  question: How many groups does a frequency of region have, counting the null group?
+  dataset: clean_sales
+  sql: SELECT count(*) FROM (SELECT region FROM clean_sales GROUP BY region)
+  call: {tool: compute_analysis, args: {analysis_type: frequency, column: region}}
+  expect: ["{answer} rows"]
+
+- id: C03
+  suite: correctness
+  question: Which region has the highest total revenue?
+  dataset: clean_sales
+  sql: SELECT region FROM clean_sales GROUP BY region ORDER BY sum(revenue) DESC LIMIT 1
+  call: {tool: compute_analysis, args: {analysis_type: top_n, dimension: region,
+                                        measure: revenue, n: 3}}
+  expect: ["{answer}"]
+
+- id: C04
+  suite: correctness
+  question: What is the total revenue?
+  dataset: clean_sales
+  sql: SELECT round(sum(revenue), 2) FROM clean_sales
+  call: {tool: compute_analysis, args: {analysis_type: summary_stats}}
+  expect: ["revenue"]
+
+- id: C05
+  suite: correctness
+  question: How many months does the order data span?
+  dataset: clean_sales
+  sql: SELECT count(DISTINCT strftime(order_date, '%Y-%m')) FROM clean_sales
+  call: {tool: compute_analysis, args: {analysis_type: calendar_coverage, grain: month}}
+  expect: ["{answer}"]
+
+- id: B01
+  suite: behavioural
+  question: Analysis before a contract exists must refuse with the call that fixes it.
+  dataset: clean_sales
+  contract: false
+  call: {tool: compute_analysis, args: {analysis_type: summary_stats}}
+  reason: NO_CONTRACT
+  # Was needs_decision, and was right until 21/09/2026. P13-O1 moved the prose out of this
+  # refusal's next_call, so it now names a runnable propose_dataset_contract(dataset_name="...")
+  # and the decisions the user must make are in DETAIL. The question had to follow the fix.
+  retry: true
+  expect: ["Show the draft to the user"]
+
+- id: B02
+  suite: behavioural
+  question: An analysis nobody registered must come back with the list, not a traceback.
+  dataset: clean_sales
+  call: {tool: compute_analysis, args: {analysis_type: summry_stats}}
+  reason: ANALYSIS_NOT_FOUND
+  retry: true            # the recovery needs no new information
+
+- id: B03
+  suite: behavioural
+  question: A chart shape that does not fit must say the analysis was fine.
+  dataset: clean_sales
+  call: {tool: render_chart, args: {analysis_type: summary_stats, chart: line}}
+  reason: ANALYSIS_NOT_POSSIBLE
+  retry: true
+  expect: ["The numbers are not in question"]
+
+- id: B04
+  suite: behavioural
+  question: A dataset that is not loaded must be refused by build_report, naming what is.
+  dataset: clean_sales
+  call: {tool: build_report, args: {dataset_name: nowhere, question: anything}}
+  reason: DATASET_NOT_LOADED
+  retry: true
+
+- id: B05
+  suite: behavioural
+  question: Asking for a column nobody declared must refuse against the contract.
+  dataset: clean_sales
+  call: {tool: compute_analysis, args: {analysis_type: frequency, column: order_id}}
+  reason: ANALYSIS_NOT_POSSIBLE
+  # Classified needs_decision first, wrongly: the refusal names a clean
+  # propose_dataset_contract(dataset_name="clean_sales") with nothing left to fill in.
+  retry: true
+
+- id: R11
+  suite: regression
+  fmr: F11
+  question: Merged ranges are parsed from sheet XML, not from ws.merged_cells in read-only mode.
+  check: merge_ranges_without_openpyxl
+
+- id: R12
+  suite: regression
+  fmr: F12
+  question: A multi-row CSV header must not make every column VARCHAR with the header as data.
+  check: multiheader_csv_types
+
+- id: R14
+  suite: regression
+  fmr: F14
+  question: Bounded fill must not leak a group label past its merge range.
+  check: bounded_fill_does_not_leak
+
+- id: R15
+  suite: regression
+  fmr: F15
+  question: A type change must go through CTAS rather than UPDATE, and lose no rows.
+  check: ctas_type_change
+
+# --- Step 3: to the guide's 30-40, across three tables and both loaders -----------------------
+
+- id: C06
+  suite: correctness
+  question: How many product groups does a frequency of product have?
+  dataset: clean_sales
+  sql: SELECT count(*) FROM (SELECT product FROM clean_sales GROUP BY product)
+  call: {tool: compute_analysis, args: {analysis_type: frequency, column: product}}
+  expect: ["{answer} rows"]
+
+- id: C07
+  suite: correctness
+  question: Which region sold the most units?
+  dataset: clean_sales
+  sql: SELECT region FROM clean_sales GROUP BY region ORDER BY sum(units) DESC LIMIT 1
+  call: {tool: compute_analysis, args: {analysis_type: top_n, dimension: region,
+                                        measure: units, n: 3}}
+  expect: ["{answer}"]
+
+- id: C08
+  suite: correctness
+  question: How many rows survive once July is removed?
+  dataset: clean_gapped
+  sql: SELECT count(*) FROM clean_gapped
+  call: {tool: compute_analysis, args: {analysis_type: summary_stats}}
+  expect: ["{answer} of {answer} row(s) analysed."]
+
+- id: C09
+  suite: correctness
+  question: How many months hold rows in the gapped copy?
+  dataset: clean_gapped
+  sql: SELECT count(*) FROM (SELECT 1 FROM clean_gapped GROUP BY strftime(order_date, '%Y-%m'))
+  call: {tool: compute_analysis, args: {analysis_type: calendar_coverage, grain: month}}
+  expect: ["{answer} month(s) hold rows"]
+
+- id: C10
+  suite: correctness
+  question: How many rows came out of the merged two-row header spreadsheet?
+  dataset: merged_multiheader
+  sql: SELECT count(*) FROM merged_multiheader
+  call: {tool: compute_analysis, args: {analysis_type: summary_stats}}
+  expect: ["{answer} of {answer} row(s) analysed."]
+
+- id: C11
+  suite: correctness
+  question: How many channel groups are there?
+  dataset: clean_sales
+  sql: SELECT count(*) FROM (SELECT channel FROM clean_sales GROUP BY channel)
+  call: {tool: compute_analysis, args: {analysis_type: frequency, column: channel}}
+  expect: ["{answer} rows"]
+
+- id: C12
+  suite: correctness
+  question: Which product earned the most revenue?
+  dataset: clean_sales
+  sql: SELECT product FROM clean_sales GROUP BY product ORDER BY sum(revenue) DESC LIMIT 1
+  call: {tool: compute_analysis, args: {analysis_type: top_n, dimension: product,
+                                        measure: revenue, n: 5}}
+  expect: ["{answer}"]
+
+- id: C13
+  suite: correctness
+  question: Which region leads the spreadsheet-loaded table by revenue?
+  dataset: merged_multiheader
+  sql: SELECT region FROM merged_multiheader GROUP BY region ORDER BY sum(revenue) DESC LIMIT 1
+  call: {tool: compute_analysis, args: {analysis_type: top_n, dimension: region,
+                                        measure: revenue, n: 3}}
+  expect: ["{answer}"]
+
+- id: C14
+  suite: correctness
+  question: Which channel sold the most units?
+  dataset: clean_sales
+  sql: SELECT channel FROM clean_sales GROUP BY channel ORDER BY sum(units) DESC LIMIT 1
+  call: {tool: compute_analysis, args: {analysis_type: top_n, dimension: channel,
+                                        measure: units, n: 3}}
+  expect: ["{answer}"]
+
+# The guide's own example of a caveat: "a trend request on a dataset with a missing quarter
+# must produce a gap warning, not a clean line". No fixture has a missing period, so
+# clean_gapped is clean_sales with 2024-07 removed -- a constructed condition, said to be one.
+- id: B06
+  suite: behavioural
+  question: A month with no rows must be named, not skipped over.
+  dataset: clean_gapped
+  call: {tool: compute_analysis, args: {analysis_type: calendar_coverage, grain: month}}
+  expect: ["hold none: 2024-07", "A gap is not a zero"]
+
+- id: B07
+  suite: behavioural
+  question: Summary stats must say which columns it did not summarise, and why.
+  dataset: merged_multiheader
+  call: {tool: compute_analysis, args: {analysis_type: summary_stats}}
+  expect: ["Not summarised"]
+
+- id: B08
+  suite: behavioural
+  question: Ranking by a measure declared non-additive must be refused, not totalled.
+  dataset: clean_sales
+  call: {tool: compute_analysis, args: {analysis_type: top_n, dimension: region,
+                                        measure: unit_price, n: 3}}
+  reason: ANALYSIS_NOT_POSSIBLE
+  retry: true
+  expect: ["non-additive"]
+
+- id: B09
+  suite: behavioural
+  question: A chart kind nobody draws must come back with the ones that exist.
+  dataset: clean_sales
+  call: {tool: render_chart, args: {analysis_type: frequency, chart: piechart, column: region}}
+  reason: ANALYSIS_NOT_POSSIBLE
+  retry: true
+  expect: ["line, bar"]
+
+- id: B10
+  suite: behavioural
+  question: A report of a dataset with no contract is written, and says the grain was never agreed.
+  dataset: clean_sales
+  contract: false
+  call: {tool: build_report, args: {question: "anything at all"}}
+  expect: ["nothing to report", "Dataset and grain"]
+
+- id: B11
+  suite: behavioural
+  question: A single-measure chart handed several measures must name the fix, not choose.
+  dataset: clean_sales
+  call: {tool: render_chart, args: {analysis_type: summary_stats, chart: bar}}
+  reason: ANALYSIS_NOT_POSSIBLE
+  retry: true
+  # The retry succeeding is not enough: compute_analysis succeeded too, and returned a
+  # table to an agent that asked for a chart (C93). The recovery must be the chart.
+  retry_tool: render_chart
+  expect: ["Name one with y"]
+
+- id: B12
+  suite: behavioural
+  question: An analysis on the gapped table still names the contract it ran under.
+  dataset: clean_gapped
+  call: {tool: compute_analysis, args: {analysis_type: frequency, column: region}}
+  expect: ["Under contract v1 for clean_gapped"]
+
+- id: R07
+  suite: regression
+  fmr: F7
+  question: No tool returns a bare path; every disk-write carries its own description.
+  check: no_bare_paths
+
+- id: R09
+  suite: regression
+  fmr: F9
+  question: Silent type coercion must be counted, not hidden.
+  check: coercion_is_counted
+
+# --- Step 4: the rest of the register. F2 is Track B with two or more users, which is Phase 14 and
+# --- not built; a green check for a scenario that cannot occur would be a false report.
+
+- id: R01
+  suite: regression
+  fmr: F1
+  question: An agent that skips a gate can ask where it is and be told the exact next call.
+  check: workflow_state_names_the_next_call
+
+- id: R03
+  suite: regression
+  fmr: F3
+  question: A 2 GB file is announced, with its size, before anything reads it.
+  check: size_gate_speaks_before_loading
+
+- id: R04
+  suite: regression
+  fmr: F4
+  question: A fifty-column result is previewed in a window that names what it leaves out.
+  check: wide_results_are_paged_not_dumped
+
+- id: R05
+  suite: regression
+  fmr: F5
+  question: A preview shows fifteen lines without reading the other five hundred.
+  check: preview_reads_only_what_it_shows
+
+- id: R06
+  suite: regression
+  fmr: F6
+  question: A spreadsheet with a merged two-row header loads 150 rows through its spec.
+  check: merged_header_spreadsheet_loads
+
+- id: R08
+  suite: regression
+  fmr: F8
+  question: A pivot table export is named as one rather than loaded as records.
+  check: pivot_export_is_named
+
+- id: R10
+  suite: regression
+  fmr: F10
+  question: A trend across a month with no rows names the month.
+  check: trend_names_the_missing_period
+
+- id: R13
+  suite: regression
+  fmr: F13
+  question: A workspace can be cleared between tasks, and only on confirmation.
+  check: reset_needs_confirmation_and_empties

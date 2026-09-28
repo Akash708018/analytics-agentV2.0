@@ -1,0 +1,2741 @@
+openapi: 3.1.0
+info:
+  title: analytics-agent v2
+  description: Contract-first API. Figures carry provenance; chart series are computed by the backend.
+    501 = spec'd, not live yet.
+  version: 0.3.0
+paths:
+  /health:
+    get:
+      tags:
+      - meta
+      summary: Health
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /version:
+    get:
+      tags:
+      - meta
+      summary: Version
+      operationId: version_version_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionInfo'
+  /sessions:
+    post:
+      tags:
+      - sessions
+      summary: Create Session
+      operationId: create_session_sessions_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/SessionCreate'
+              - type: 'null'
+              title: Body
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionCreated'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /sessions/{sid}:
+    get:
+      tags:
+      - sessions
+      summary: Get Session
+      operationId: get_session_sessions__sid__get
+      parameters:
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Sid
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - sessions
+      summary: Delete Session
+      operationId: delete_session_sessions__sid__delete
+      parameters:
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Sid
+      responses:
+        '204':
+          description: Successful Response
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /sessions/{sid}/ui-state:
+    put:
+      tags:
+      - sessions
+      summary: Put Ui State
+      operationId: put_ui_state_sessions__sid__ui_state_put
+      parameters:
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Sid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UiStatePut'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionConflict'
+          description: Conflict
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /turns:
+    post:
+      tags:
+      - turns
+      summary: Create Turn
+      operationId: create_turn_turns_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TurnCreate'
+        required: true
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurnCreated'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /turns/{turn_id}:
+    get:
+      tags:
+      - turns
+      summary: Get Turn
+      operationId: get_turn_turns__turn_id__get
+      parameters:
+      - name: turn_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Turn Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Turn'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /sessions/{sid}/turns:
+    get:
+      tags:
+      - turns
+      summary: List Turns
+      operationId: list_turns_sessions__sid__turns_get
+      parameters:
+      - name: sid
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Sid
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurnList'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /workspaces/{ws}/uploads:
+    post:
+      tags:
+      - datasets
+      summary: Upload
+      operationId: upload_workspaces__ws__uploads_post
+      parameters:
+      - name: ws
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Ws
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Body_upload_workspaces__ws__uploads_post'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dataset'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}:
+    get:
+      tags:
+      - datasets
+      summary: Get Dataset
+      operationId: get_dataset_datasets__dataset_id__get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dataset'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/profile:
+    get:
+      tags:
+      - datasets
+      summary: Profile
+      operationId: profile_datasets__dataset_id__profile_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/cleaning/proposals:
+    get:
+      tags:
+      - cleaning
+      summary: Cleaning Proposals
+      operationId: cleaning_proposals_datasets__dataset_id__cleaning_proposals_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleaningProposals'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/cleaning/approve:
+    post:
+      tags:
+      - cleaning
+      summary: Cleaning Approve
+      operationId: cleaning_approve_datasets__dataset_id__cleaning_approve_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApproveActions'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalResult'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/domains/detect:
+    get:
+      tags:
+      - domains
+      summary: Detect
+      operationId: detect_datasets__dataset_id__domains_detect_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainDetection'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/domains/confirm:
+    post:
+      tags:
+      - domains
+      summary: Confirm Domains
+      operationId: confirm_domains_datasets__dataset_id__domains_confirm_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainConfirm'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Confirmed'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/contract/proposal:
+    get:
+      tags:
+      - contract
+      summary: Contract Proposal
+      operationId: contract_proposal_datasets__dataset_id__contract_proposal_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractProposal'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/contract/confirm:
+    post:
+      tags:
+      - contract
+      summary: Contract Confirm
+      operationId: contract_confirm_datasets__dataset_id__contract_confirm_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractConfirm'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Confirmed'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/tools:
+    get:
+      tags:
+      - tools
+      summary: Tools
+      operationId: tools_datasets__dataset_id__tools_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolList'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/forks:
+    post:
+      tags:
+      - contract
+      summary: Answer Forks
+      operationId: answer_forks_datasets__dataset_id__forks_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForkAnswers'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Confirmed'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/metrics/templates:
+    get:
+      tags:
+      - metrics
+      summary: Metric Templates
+      operationId: metric_templates_datasets__dataset_id__metrics_templates_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricTemplates'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/metrics/approve:
+    post:
+      tags:
+      - metrics
+      summary: Approve Metric
+      operationId: approve_metric_datasets__dataset_id__metrics_approve_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetricApprove'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Confirmed'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Conflict
+  /datasets/{dataset_id}/validity-rules:
+    get:
+      tags:
+      - rules
+      summary: Validity Rules
+      operationId: validity_rules_datasets__dataset_id__validity_rules_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidityRules'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/validity-rules/approve:
+    post:
+      tags:
+      - rules
+      summary: Approve Rules
+      operationId: approve_rules_datasets__dataset_id__validity_rules_approve_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleApprove'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Confirmed'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /tools/{tool_id}/run:
+    post:
+      tags:
+      - tools
+      summary: Run Tool
+      operationId: run_tool_tools__tool_id__run_post
+      parameters:
+      - name: tool_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Tool Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolRunRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolResult'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Conflict
+  /packs:
+    get:
+      tags:
+      - packs
+      summary: Packs
+      operationId: packs_packs_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackList'
+  /packs/{pack_id}:
+    get:
+      tags:
+      - packs
+      summary: Pack
+      operationId: pack_packs__pack_id__get
+      parameters:
+      - name: pack_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Pack Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackDetail'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /datasets/{dataset_id}/keyword-groups:
+    get:
+      tags:
+      - keywords
+      summary: Get /Datasets/{Dataset Id}/Keyword-Groups
+      operationId: get__datasets__dataset_id__keyword_groups_datasets__dataset_id__keyword_groups_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeywordGroups'
+        '501':
+          description: Not Implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+  /datasets/{dataset_id}/keyword-groups/actions:
+    post:
+      tags:
+      - keywords
+      summary: Post /Datasets/{Dataset Id}/Keyword-Groups/Actions
+      operationId: post__datasets__dataset_id__keyword_groups_actions_datasets__dataset_id__keyword_groups_actions_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KeywordGroupAction'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeywordGroups'
+        '501':
+          description: Not Implemented
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+components:
+  schemas:
+    ApprovalResult:
+      properties:
+        applied:
+          items:
+            type: string
+          type: array
+          title: Applied
+        rejected:
+          items:
+            type: string
+          type: array
+          title: Rejected
+        ledger_entries:
+          type: integer
+          title: Ledger Entries
+      type: object
+      required:
+      - applied
+      - rejected
+      - ledger_entries
+      title: ApprovalResult
+      examples:
+      - applied:
+        - a1
+        ledger_entries: 1
+        rejected: []
+    ApproveActions:
+      properties:
+        approve:
+          items:
+            type: string
+          type: array
+          title: Approve
+          description: ids to apply
+        reject:
+          items:
+            type: string
+          type: array
+          title: Reject
+          default: []
+      type: object
+      required:
+      - approve
+      title: ApproveActions
+      examples:
+      - approve:
+        - a1
+        reject: []
+    Body_upload_workspaces__ws__uploads_post:
+      properties:
+        file:
+          type: string
+          contentMediaType: application/octet-stream
+          title: File
+      type: object
+      required:
+      - file
+      title: Body_upload_workspaces__ws__uploads_post
+    ChartSeries:
+      properties:
+        chart:
+          type: string
+          enum:
+          - line
+          - bar
+          - stacked_bar
+          - scatter
+          - table
+          - funnel
+          title: Chart
+        name:
+          type: string
+          title: Name
+        x_label:
+          type: string
+          title: X Label
+        y_label:
+          type: string
+          title: Y Label
+        points:
+          items:
+            $ref: '#/components/schemas/SeriesPoint'
+          type: array
+          title: Points
+      type: object
+      required:
+      - chart
+      - name
+      - x_label
+      - y_label
+      - points
+      title: ChartSeries
+      description: 'Chart-ready: computed by the backend. The frontend only plots.'
+      examples:
+      - chart: bar
+        name: ROAS by channel
+        points:
+        - x: google
+          y: 3.8
+        - x: meta
+          y: 2.4
+        x_label: channel
+        y_label: ROAS
+    CleaningProposal:
+      properties:
+        action_id:
+          type: string
+          title: Action Id
+        kind:
+          type: string
+          title: Kind
+        column:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Column
+        description:
+          type: string
+          title: Description
+        rows_affected:
+          type: integer
+          title: Rows Affected
+        lossy:
+          type: boolean
+          title: Lossy
+          default: false
+        suggested:
+          type: boolean
+          title: Suggested
+          description: 'Lossless and conflict-free: may be pre-ticked for the person; never applied without
+            approval'
+          default: false
+      type: object
+      required:
+      - action_id
+      - kind
+      - column
+      - description
+      - rows_affected
+      title: CleaningProposal
+    CleaningProposals:
+      properties:
+        dataset_id:
+          type: string
+          title: Dataset Id
+        proposals:
+          items:
+            $ref: '#/components/schemas/CleaningProposal'
+          type: array
+          title: Proposals
+      type: object
+      required:
+      - dataset_id
+      - proposals
+      title: CleaningProposals
+      examples:
+      - dataset_id: ds_ads_2026q3
+        proposals:
+        - action_id: a1
+          column: utm_source
+          description: '''Google'' and ''google'' are one source'
+          kind: normalise_case
+          rows_affected: 311
+    ColumnProfile:
+      properties:
+        name:
+          type: string
+          title: Name
+        type:
+          type: string
+          title: Type
+        null_pct:
+          type: number
+          title: Null Pct
+        distinct:
+          type: integer
+          title: Distinct
+        sample:
+          items: {}
+          type: array
+          title: Sample
+      type: object
+      required:
+      - name
+      - type
+      - null_pct
+      - distinct
+      - sample
+      title: ColumnProfile
+    Confirmed:
+      properties:
+        ok:
+          type: boolean
+          title: Ok
+        version:
+          type: integer
+          title: Version
+        measure:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Measure
+          description: 'metrics/approve: the measure added'
+      type: object
+      required:
+      - ok
+      - version
+      title: Confirmed
+      examples:
+      - ok: true
+        version: 1
+      - measure: roas
+        ok: true
+        version: 2
+    ContractConfirm:
+      properties:
+        contract:
+          additionalProperties: true
+          type: object
+          title: Contract
+          description: The proposal as edited by the person
+        fork_choices:
+          additionalProperties:
+            type: string
+          type: object
+          title: Fork Choices
+      type: object
+      required:
+      - contract
+      - fork_choices
+      title: ContractConfirm
+      examples:
+      - contract:
+          aggregations:
+            clicks: sum
+            cost: sum
+          date_column: date
+          dimensions:
+          - campaign
+          grain: one row per campaign per day
+          measures:
+          - cost
+          - clicks
+          primary_key:
+          - date
+          - campaign
+        fork_choices:
+          roas_revenue_basis: net_excl_gst
+    ContractProposal:
+      properties:
+        dataset_id:
+          type: string
+          title: Dataset Id
+        grain:
+          type: string
+          title: Grain
+        key:
+          items:
+            type: string
+          type: array
+          title: Key
+        date:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Date
+        measures:
+          items:
+            $ref: '#/components/schemas/MeasureProposal'
+          type: array
+          title: Measures
+        dimensions:
+          items:
+            type: string
+          type: array
+          title: Dimensions
+        caveats:
+          items:
+            type: string
+          type: array
+          title: Caveats
+        provisional:
+          items:
+            type: string
+          type: array
+          title: Provisional
+          description: Fields that still need the person's answer; confirm is refused (422) while non-empty
+          default: []
+        questions:
+          items:
+            type: string
+          type: array
+          title: Questions
+          default: []
+        forks:
+          items:
+            $ref: '#/components/schemas/ForkQuestion'
+          type: array
+          title: Forks
+      type: object
+      required:
+      - dataset_id
+      - grain
+      - key
+      - date
+      - measures
+      - dimensions
+      - caveats
+      - forks
+      title: ContractProposal
+      examples:
+      - caveats: []
+        dataset_id: ds_ads_2026q3
+        date: date
+        dimensions:
+        - campaign
+        - channel
+        forks:
+        - fork_id: roas_revenue_basis
+          options:
+          - id: platform
+            label: What the ad platform reports
+          - id: gross_incl_gst
+            label: Order revenue including GST
+          - id: net_excl_gst
+            label: Order revenue excluding GST
+          - id: delivered_net
+            label: Net, after cancels/returns/RTO
+          question: Which revenue should ROAS use?
+          suggested: net_excl_gst
+          suggested_reason: GST is not revenue you keep
+        grain: one row per campaign per day
+        key:
+        - date
+        - campaign
+        measures:
+        - agg: sum
+          column: cost
+          measure_type: additive
+        - agg: sum(clicks)/sum(impressions)
+          column: ctr
+          measure_type: ratio_of_sums
+    Dataset:
+      properties:
+        dataset_id:
+          type: string
+          title: Dataset Id
+        workspace_id:
+          type: string
+          title: Workspace Id
+        name:
+          type: string
+          title: Name
+        rows:
+          type: integer
+          title: Rows
+        columns:
+          type: integer
+          title: Columns
+        created_at:
+          type: string
+          title: Created At
+        assumptions:
+          items:
+            type: string
+          type: array
+          title: Assumptions
+          description: How the file was read (header row, types). Shown to the person; the upload is refused
+            with 422 ingest_needs_answers when the layout is ambiguous
+          default: []
+      type: object
+      required:
+      - dataset_id
+      - workspace_id
+      - name
+      - rows
+      - columns
+      - created_at
+      title: Dataset
+      examples:
+      - assumptions:
+        - row 1 is the header
+        columns: 14
+        created_at: '2026-09-26T10:01:00Z'
+        dataset_id: ds_ads_2026q3
+        name: google_ads_q3
+        rows: 18240
+        workspace_id: ws_3f9a1c2b7d10
+    DomainCandidate:
+      properties:
+        domain:
+          type: string
+          title: Domain
+        evidence:
+          $ref: '#/components/schemas/Evidence'
+      type: object
+      required:
+      - domain
+      - evidence
+      title: DomainCandidate
+    DomainConfirm:
+      properties:
+        domains:
+          items:
+            type: string
+          type: array
+          title: Domains
+      type: object
+      required:
+      - domains
+      title: DomainConfirm
+      examples:
+      - domains:
+        - marketing
+    DomainDetection:
+      properties:
+        dataset_id:
+          type: string
+          title: Dataset Id
+        domains:
+          items:
+            $ref: '#/components/schemas/DomainCandidate'
+          type: array
+          title: Domains
+        marketing_sources:
+          items:
+            $ref: '#/components/schemas/SourceCandidate'
+          type: array
+          title: Marketing Sources
+        confirmed:
+          items:
+            type: string
+          type: array
+          title: Confirmed
+          description: Domains the person confirmed; a guess alone never enables domain tools
+      type: object
+      required:
+      - dataset_id
+      - domains
+      - marketing_sources
+      - confirmed
+      title: DomainDetection
+      examples:
+      - confirmed: []
+        dataset_id: ds_ads_2026q3
+        domains:
+        - domain: marketing
+          evidence:
+            matched_columns:
+            - campaign
+            - impressions
+            - clicks
+            - cost
+            score: 0.92
+        marketing_sources:
+        - evidence:
+            matched_columns:
+            - campaign
+            - ad_group
+            - impressions
+            - cost
+            score: 0.88
+          source: paid_ads
+    ErrorBody:
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+      type: object
+      required:
+      - error
+      title: ErrorBody
+      examples:
+      - error:
+          code: not_found
+          message: session x not found or expired
+    ErrorDetail:
+      properties:
+        code:
+          type: string
+          title: Code
+          description: Stable machine code, e.g. not_found, version_conflict, not_implemented, ui_state_too_large,
+            ui_state_rejected
+        message:
+          type: string
+          title: Message
+        milestone:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Milestone
+          description: 'For not_implemented: the milestone that makes the endpoint live'
+      type: object
+      required:
+      - code
+      - message
+      title: ErrorDetail
+      examples:
+      - code: not_implemented
+        message: GET /datasets/{id}/profile is spec'd but not live yet
+        milestone: B2
+    Evidence:
+      properties:
+        matched_columns:
+          items:
+            type: string
+          type: array
+          title: Matched Columns
+        score:
+          type: number
+          title: Score
+      type: object
+      required:
+      - matched_columns
+      - score
+      title: Evidence
+    Figure:
+      properties:
+        name:
+          type: string
+          title: Name
+        value:
+          anyOf:
+          - type: number
+          - type: integer
+          - type: string
+          - type: 'null'
+          title: Value
+        unit:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Unit
+        provenance:
+          type: string
+          enum:
+          - contract
+          - provisional
+          - derived
+          title: Provenance
+      type: object
+      required:
+      - name
+      - value
+      - provenance
+      title: Figure
+      examples:
+      - name: ROAS
+        provenance: contract
+        unit: x
+        value: 3.21
+    FigureCheck:
+      properties:
+        status:
+          type: string
+          enum:
+          - passed
+          - corrected
+          - flagged
+          - not_run
+          title: Status
+        notes:
+          items:
+            type: string
+          type: array
+          title: Notes
+          default: []
+      type: object
+      required:
+      - status
+      title: FigureCheck
+    ForkAnswers:
+      properties:
+        fork_choices:
+          additionalProperties:
+            type: string
+          type: object
+          title: Fork Choices
+      type: object
+      required:
+      - fork_choices
+      title: ForkAnswers
+      examples:
+      - fork_choices:
+          conversion_source: backend_orders
+          roas_revenue_basis: net_excl_gst
+    ForkOption:
+      properties:
+        id:
+          type: string
+          title: Id
+        label:
+          type: string
+          title: Label
+      type: object
+      required:
+      - id
+      - label
+      title: ForkOption
+    ForkQuestion:
+      properties:
+        fork_id:
+          type: string
+          title: Fork Id
+        question:
+          type: string
+          title: Question
+          description: Plain language
+        options:
+          items:
+            $ref: '#/components/schemas/ForkOption'
+          type: array
+          title: Options
+        suggested:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Suggested
+        suggested_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Suggested Reason
+      type: object
+      required:
+      - fork_id
+      - question
+      - options
+      title: ForkQuestion
+      examples:
+      - fork_id: roas_revenue_basis
+        options:
+        - id: platform
+          label: What the ad platform reports
+        - id: gross_incl_gst
+          label: Order revenue including GST
+        - id: net_excl_gst
+          label: Order revenue excluding GST
+        - id: delivered_net
+          label: Net, after cancels/returns/RTO
+        question: Which revenue should ROAS use?
+        suggested: net_excl_gst
+        suggested_reason: GST is not revenue you keep
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    Health:
+      properties:
+        status:
+          type: string
+          const: ok
+          title: Status
+      type: object
+      required:
+      - status
+      title: Health
+      examples:
+      - status: ok
+    KeywordGroup:
+      properties:
+        group_id:
+          type: string
+          title: Group Id
+        label:
+          type: string
+          title: Label
+        intent:
+          type: string
+          enum:
+          - informational
+          - commercial
+          - transactional
+          - navigational
+          - local
+          title: Intent
+        keywords:
+          items:
+            type: string
+          type: array
+          title: Keywords
+        facets:
+          additionalProperties:
+            type: string
+          type: object
+          title: Facets
+          default: {}
+        approved:
+          type: boolean
+          title: Approved
+      type: object
+      required:
+      - group_id
+      - label
+      - intent
+      - keywords
+      - approved
+      title: KeywordGroup
+      examples:
+      - approved: false
+        facets:
+          service: delivery
+        group_id: g1
+        intent: transactional
+        keywords:
+        - sushi delivery pune
+        - sushi home delivery
+        label: sushi delivery
+    KeywordGroupAction:
+      examples:
+      - action: move_keyword
+        group_ids:
+        - g1
+        keyword: sushi near me
+        target_group_id: g4
+      properties:
+        action:
+          enum:
+          - approve
+          - rename
+          - merge
+          - move_keyword
+          - split
+          title: Action
+          type: string
+        group_ids:
+          items:
+            type: string
+          title: Group Ids
+          type: array
+        label:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Label
+        keyword:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Keyword
+        target_group_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Target Group Id
+      required:
+      - action
+      - group_ids
+      title: KeywordGroupAction
+      type: object
+    KeywordGroups:
+      properties:
+        dataset_id:
+          type: string
+          title: Dataset Id
+        groups:
+          items:
+            $ref: '#/components/schemas/KeywordGroup'
+          type: array
+          title: Groups
+      type: object
+      required:
+      - dataset_id
+      - groups
+      title: KeywordGroups
+      examples:
+      - dataset_id: ds_gsc_pune
+        groups:
+        - approved: false
+          facets:
+            service: delivery
+          group_id: g1
+          intent: transactional
+          keywords:
+          - sushi delivery pune
+          - sushi home delivery
+          label: sushi delivery
+    MeasureProposal:
+      properties:
+        column:
+          type: string
+          title: Column
+        measure_type:
+          type: string
+          title: Measure Type
+          description: additive | ratio_of_sums | weighted_mean | distinct_count | percentile | semi_additive
+            | non_additive | unknown -- read from the suggestion, never applied
+        agg:
+          type: string
+          title: Agg
+          description: The agreed aggregation; empty until the person answers
+        suggested_agg:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Suggested Agg
+        strength:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Strength
+          description: strong | likely | unsure
+        reason:
+          type: string
+          title: Reason
+          default: ''
+      type: object
+      required:
+      - column
+      - measure_type
+      - agg
+      title: MeasureProposal
+    MetricApprove:
+      properties:
+        template_id:
+          type: string
+          title: Template Id
+        bindings:
+          additionalProperties:
+            type: string
+          type: object
+          title: Bindings
+          description: concept -> column
+        fork_choices:
+          additionalProperties:
+            type: string
+          type: object
+          title: Fork Choices
+          default: {}
+      type: object
+      required:
+      - template_id
+      - bindings
+      title: MetricApprove
+      examples:
+      - bindings:
+          order_revenue: net_revenue
+          spend: cost
+        fork_choices:
+          roas_revenue_basis: net_excl_gst
+        template_id: roas
+    MetricTemplate:
+      properties:
+        template_id:
+          type: string
+          title: Template Id
+        label:
+          type: string
+          title: Label
+        shape:
+          type: string
+          title: Shape
+        required_concepts:
+          items:
+            type: string
+          type: array
+          title: Required Concepts
+        forks:
+          items:
+            type: string
+          type: array
+          title: Forks
+        available:
+          type: boolean
+          title: Available
+          description: Its concepts are in the data and the engine can compute its shape
+        approved:
+          type: boolean
+          title: Approved
+          default: false
+        measure:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Measure
+          description: The contract measure it became
+      type: object
+      required:
+      - template_id
+      - label
+      - shape
+      - required_concepts
+      - forks
+      - available
+      title: MetricTemplate
+      examples:
+      - approved: true
+        available: true
+        forks:
+        - roas_revenue_basis
+        label: ROAS
+        measure: roas
+        required_concepts:
+        - spend
+        shape: ratio_of_sums
+        template_id: roas
+    MetricTemplates:
+      properties:
+        templates:
+          items:
+            $ref: '#/components/schemas/MetricTemplate'
+          type: array
+          title: Templates
+      type: object
+      required:
+      - templates
+      title: MetricTemplates
+      examples:
+      - templates:
+        - approved: true
+          available: true
+          forks:
+          - roas_revenue_basis
+          label: ROAS
+          measure: roas
+          required_concepts:
+          - spend
+          shape: ratio_of_sums
+          template_id: roas
+    PackDetail:
+      properties:
+        pack_id:
+          type: string
+          title: Pack Id
+        version:
+          type: string
+          title: Version
+        pack:
+          additionalProperties: true
+          type: object
+          title: Pack
+          description: The validated pack document
+      type: object
+      required:
+      - pack_id
+      - version
+      - pack
+      title: PackDetail
+      examples:
+      - pack:
+          forks: []
+          pack:
+            extends:
+            - core
+            id: marketing
+          tools: []
+        pack_id: marketing
+        version: 0.1.0
+    PackList:
+      properties:
+        packs:
+          items:
+            $ref: '#/components/schemas/PackSummary'
+          type: array
+          title: Packs
+      type: object
+      required:
+      - packs
+      title: PackList
+      examples:
+      - packs:
+        - extends: []
+          pack_id: core
+          tools: 0
+          version: 0.1.0
+        - extends:
+          - core
+          pack_id: marketing
+          tools: 20
+          version: 0.1.0
+    PackSummary:
+      properties:
+        pack_id:
+          type: string
+          title: Pack Id
+        version:
+          type: string
+          title: Version
+        extends:
+          items:
+            type: string
+          type: array
+          title: Extends
+        tools:
+          type: integer
+          title: Tools
+      type: object
+      required:
+      - pack_id
+      - version
+      - extends
+      - tools
+      title: PackSummary
+      examples:
+      - extends:
+        - core
+        pack_id: marketing
+        tools: 20
+        version: 0.1.0
+    Profile:
+      properties:
+        dataset_id:
+          type: string
+          title: Dataset Id
+        rows:
+          type: integer
+          title: Rows
+        columns:
+          items:
+            $ref: '#/components/schemas/ColumnProfile'
+          type: array
+          title: Columns
+        warnings:
+          items:
+            type: string
+          type: array
+          title: Warnings
+      type: object
+      required:
+      - dataset_id
+      - rows
+      - columns
+      - warnings
+      title: Profile
+      examples:
+      - columns:
+        - distinct: 9120
+          name: cost
+          null_pct: 0.0
+          sample:
+          - 12.5
+          - 40.0
+          type: DOUBLE
+        dataset_id: ds_ads_2026q3
+        rows: 18240
+        warnings:
+        - 'ctr is a per-row rate: never sum it'
+    RuleApprove:
+      properties:
+        approve:
+          items:
+            type: string
+          type: array
+          title: Approve
+        reject:
+          items:
+            type: string
+          type: array
+          title: Reject
+          default: []
+      type: object
+      required:
+      - approve
+      title: RuleApprove
+      examples:
+      - approve:
+        - exclude_test_campaigns
+        reject:
+        - roas_spend_positive
+    SeriesPoint:
+      properties:
+        x:
+          anyOf:
+          - type: string
+          - type: number
+          - type: integer
+          title: X
+        y:
+          anyOf:
+          - type: number
+          - type: integer
+          - type: 'null'
+          title: Y
+      type: object
+      required:
+      - x
+      - y
+      title: SeriesPoint
+    Session:
+      properties:
+        sid:
+          type: string
+          title: Sid
+        version:
+          type: integer
+          title: Version
+          description: Increments on every ui-state write; send it back with PUT /ui-state (optimistic
+            concurrency)
+        workspace_id:
+          type: string
+          title: Workspace Id
+        ui_state:
+          additionalProperties: true
+          type: object
+          title: Ui State
+        created_at:
+          type: string
+          title: Created At
+        updated_at:
+          type: string
+          title: Updated At
+        expires_at:
+          type: string
+          title: Expires At
+          description: 'Sliding: 30 days after the last activity'
+      type: object
+      required:
+      - sid
+      - version
+      - workspace_id
+      - ui_state
+      - created_at
+      - updated_at
+      - expires_at
+      title: Session
+      examples:
+      - created_at: '2026-09-26T10:00:00Z'
+        expires_at: '2026-10-26T10:05:00Z'
+        sid: 0b8e0c64-5b0e-4c55-9c1e-2f1c2b9d7a11
+        ui_state:
+          dataset_id: ds_ads_2026q3
+          panel_open: true
+          screen: ask
+        updated_at: '2026-09-26T10:05:00Z'
+        version: 3
+        workspace_id: ws_3f9a1c2b7d10
+    SessionCreate:
+      properties:
+        workspace_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Workspace Id
+          description: 'Reuse a workspace (its datasets persist). Omitted: a new workspace is created.'
+      type: object
+      title: SessionCreate
+      examples:
+      - {}
+      - workspace_id: ws_3f9a1c2b7d10
+    SessionCreated:
+      properties:
+        sid:
+          type: string
+          title: Sid
+          description: UUID4
+        version:
+          type: integer
+          title: Version
+      type: object
+      required:
+      - sid
+      - version
+      title: SessionCreated
+      examples:
+      - sid: 0b8e0c64-5b0e-4c55-9c1e-2f1c2b9d7a11
+        version: 1
+    SourceCandidate:
+      properties:
+        source:
+          type: string
+          enum:
+          - paid_ads
+          - ga4
+          - search_console
+          - email
+          - social
+          - orders
+          title: Source
+        evidence:
+          $ref: '#/components/schemas/Evidence'
+      type: object
+      required:
+      - source
+      - evidence
+      title: SourceCandidate
+    ToolList:
+      properties:
+        tools:
+          items:
+            $ref: '#/components/schemas/ToolStatus'
+          type: array
+          title: Tools
+      type: object
+      required:
+      - tools
+      title: ToolList
+      examples:
+      - tools:
+        - missing_concepts: []
+          status: active
+          tool_id: marketing.channel_efficiency
+          ui_label: Which channels pay back
+        - missing_concepts: []
+          needs_domain: logistics
+          status: needs_domain
+          tool_id: logistics.otif
+          ui_label: On time, in full
+        - missing_concepts:
+          - position
+          - query
+          status: needs_data
+          tool_id: marketing.striking_distance
+          ui_label: Queries close to page one
+    ToolResult:
+      properties:
+        tool_id:
+          type: string
+          title: Tool Id
+        dataset_id:
+          type: string
+          title: Dataset Id
+        summary:
+          type: string
+          title: Summary
+        figures:
+          items:
+            $ref: '#/components/schemas/Figure'
+          type: array
+          title: Figures
+        series:
+          items:
+            $ref: '#/components/schemas/ChartSeries'
+          type: array
+          title: Series
+          default: []
+        validity_filters_applied:
+          items:
+            type: string
+          type: array
+          title: Validity Filters Applied
+          description: By name
+        pack_rules_applied:
+          items:
+            type: string
+          type: array
+          title: Pack Rules Applied
+        forks:
+          additionalProperties:
+            type: string
+          type: object
+          title: Forks
+          description: fork id -> the option the person chose
+          default: {}
+        caveats:
+          items:
+            type: string
+          type: array
+          title: Caveats
+          default: []
+        figure_check:
+          $ref: '#/components/schemas/FigureCheck'
+      type: object
+      required:
+      - tool_id
+      - dataset_id
+      - summary
+      - figures
+      - validity_filters_applied
+      - pack_rules_applied
+      - figure_check
+      title: ToolResult
+      examples:
+      - caveats:
+        - 3 spend rows with 0 impressions flagged, not dropped
+        dataset_id: ds_ads_2026q3
+        figure_check:
+          notes: []
+          status: passed
+        figures:
+        - name: ROAS google
+          provenance: contract
+          unit: x
+          value: 3.8
+        forks:
+          roas_revenue_basis: net_excl_gst
+        pack_rules_applied:
+        - no_sum_of_rate
+        series:
+        - chart: bar
+          name: ROAS by channel
+          points:
+          - x: google
+            y: 3.8
+          - x: meta
+            y: 2.4
+          x_label: channel
+          y_label: ROAS
+        summary: Google ROAS 3.8 vs Meta 2.4 on net-of-GST revenue
+        tool_id: marketing.channel_efficiency
+        validity_filters_applied:
+        - exclude_test_campaigns
+        - roas_spend_positive
+    ToolRunRequest:
+      properties:
+        dataset_id:
+          type: string
+          title: Dataset Id
+        params:
+          additionalProperties: true
+          type: object
+          title: Params
+          description: 'Slot overrides (a column name, e.g. by), period/baseline ''YYYY-MM-DD/YYYY-MM-DD'',
+            bindings {concept: column} when a concept is ambiguous, brand_terms, festival + year + dates_confirmed.
+            409 needs_domain/needs_data; 422 forks_unanswered, ambiguous_binding, param_required, festival_dates_unconfirmed,
+            engine_refused'
+          default: {}
+      type: object
+      required:
+      - dataset_id
+      title: ToolRunRequest
+      examples:
+      - dataset_id: ds_ads_2026q3
+        params:
+          by: channel
+      - dataset_id: ds_ads_2026q3
+        params:
+          baseline: 2026-09-01/2026-09-15
+          period: 2026-09-16/2026-09-30
+    ToolStatus:
+      properties:
+        tool_id:
+          type: string
+          title: Tool Id
+        ui_label:
+          type: string
+          title: Ui Label
+        status:
+          type: string
+          enum:
+          - active
+          - needs_domain
+          - needs_data
+          title: Status
+        needs_domain:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Needs Domain
+        missing_concepts:
+          items:
+            type: string
+          type: array
+          title: Missing Concepts
+          default: []
+      type: object
+      required:
+      - tool_id
+      - ui_label
+      - status
+      title: ToolStatus
+      examples:
+      - missing_concepts:
+        - position
+        - query
+        status: needs_data
+        tool_id: marketing.striking_distance
+        ui_label: Queries close to page one
+    Turn:
+      properties:
+        turn_id:
+          type: string
+          title: Turn Id
+        sid:
+          type: string
+          title: Sid
+        dataset_id:
+          type: string
+          title: Dataset Id
+        question:
+          type: string
+          title: Question
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - done
+          - failed
+          - interrupted
+          title: Status
+        events:
+          items:
+            $ref: '#/components/schemas/TurnEvent'
+          type: array
+          title: Events
+        answer:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Answer
+          description: '{text, results[]} when done'
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - turn_id
+      - sid
+      - dataset_id
+      - question
+      - status
+      - events
+      - created_at
+      title: Turn
+      examples:
+      - answer:
+          results: []
+          text: ROAS fell from 4.1 to 3.2 ...
+        created_at: '2026-09-26T10:06:00Z'
+        dataset_id: ds_ads_2026q3
+        events:
+        - at: '2026-09-26T10:06:20Z'
+          data:
+            text: ROAS fell from 4.1 to 3.2 ...
+          seq: 0
+          type: answer
+        question: Why did ROAS drop in September?
+        sid: 0b8e0c64-5b0e-4c55-9c1e-2f1c2b9d7a11
+        status: done
+        turn_id: t_7c1d9e0a4b2f4e59
+    TurnCreate:
+      properties:
+        sid:
+          type: string
+          title: Sid
+        dataset_id:
+          type: string
+          title: Dataset Id
+        question:
+          type: string
+          maxLength: 4000
+          minLength: 1
+          title: Question
+      type: object
+      required:
+      - sid
+      - dataset_id
+      - question
+      title: TurnCreate
+      examples:
+      - dataset_id: ds_ads_2026q3
+        question: Why did ROAS drop in September?
+        sid: 0b8e0c64-5b0e-4c55-9c1e-2f1c2b9d7a11
+    TurnCreated:
+      properties:
+        turn_id:
+          type: string
+          title: Turn Id
+      type: object
+      required:
+      - turn_id
+      title: TurnCreated
+      examples:
+      - turn_id: t_7c1d9e0a4b2f4e59
+    TurnEvent:
+      properties:
+        seq:
+          type: integer
+          title: Seq
+        type:
+          type: string
+          enum:
+          - plan
+          - tool_call
+          - provider_wait
+          - failover
+          - answer
+          - figure_check
+          - interpretation_check
+          - error
+          title: Type
+        at:
+          type: string
+          title: At
+        data:
+          additionalProperties: true
+          type: object
+          title: Data
+          description: 'plan: {playbook, steps[]} | tool_call: {tool_id, params, result_ref, ms} | provider_wait:
+            {provider, seconds} | failover: {from, to, reason} | answer: {text} | figure_check: {status,
+            checked, corrected[]} | interpretation_check: {rule, status, detail} | error: {code, message}'
+      type: object
+      required:
+      - seq
+      - type
+      - at
+      - data
+      title: TurnEvent
+      examples:
+      - at: '2026-09-26T10:06:00Z'
+        data:
+          playbook: why_roas_dropped
+          steps:
+          - marketing.roas_change_explainer
+          - marketing.channel_mix_shift
+        seq: 0
+        type: plan
+      - at: '2026-09-26T10:06:01Z'
+        data:
+          ms: 412
+          params:
+            baseline: 2026-08
+            period: 2026-09
+          tool_id: marketing.roas_change_explainer
+        seq: 1
+        type: tool_call
+      - at: '2026-09-26T10:06:02Z'
+        data:
+          provider: gemini
+          seconds: 12
+        seq: 2
+        type: provider_wait
+      - at: '2026-09-26T10:06:20Z'
+        data:
+          text: ROAS fell from 4.1 to 3.2 ...
+        seq: 3
+        type: answer
+      - at: '2026-09-26T10:06:21Z'
+        data:
+          checked: 6
+          corrected: []
+          status: passed
+        seq: 4
+        type: figure_check
+    TurnList:
+      properties:
+        turns:
+          items:
+            $ref: '#/components/schemas/Turn'
+          type: array
+          title: Turns
+      type: object
+      required:
+      - turns
+      title: TurnList
+      examples:
+      - turns:
+        - answer:
+            results: []
+            text: ROAS fell from 4.1 to 3.2 ...
+          created_at: '2026-09-26T10:06:00Z'
+          dataset_id: ds_ads_2026q3
+          events:
+          - at: '2026-09-26T10:06:20Z'
+            data:
+              text: ROAS fell from 4.1 to 3.2 ...
+            seq: 0
+            type: answer
+          question: Why did ROAS drop in September?
+          sid: 0b8e0c64-5b0e-4c55-9c1e-2f1c2b9d7a11
+          status: done
+          turn_id: t_7c1d9e0a4b2f4e59
+    UiStatePut:
+      properties:
+        ui_state:
+          additionalProperties: true
+          type: object
+          title: Ui State
+          description: '<=256 KB JSON. No data rows, API keys or PII: rejected with 422'
+        version:
+          type: integer
+          title: Version
+          description: The version you last read
+      type: object
+      required:
+      - ui_state
+      - version
+      title: UiStatePut
+      examples:
+      - ui_state:
+          dataset_id: ds_ads_2026q3
+          screen: contract
+        version: 3
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    ValidityRule:
+      properties:
+        rule_id:
+          type: string
+          title: Rule Id
+        description:
+          type: string
+          title: Description
+        suggested:
+          type: boolean
+          title: Suggested
+        approved:
+          type: boolean
+          title: Approved
+        rows_affected:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Rows Affected
+      type: object
+      required:
+      - rule_id
+      - description
+      - suggested
+      - approved
+      - rows_affected
+      title: ValidityRule
+      examples:
+      - approved: false
+        description: Drop campaigns whose name contains 'test'
+        rows_affected: 42
+        rule_id: exclude_test_campaigns
+        suggested: true
+    ValidityRules:
+      properties:
+        rules:
+          items:
+            $ref: '#/components/schemas/ValidityRule'
+          type: array
+          title: Rules
+      type: object
+      required:
+      - rules
+      title: ValidityRules
+      examples:
+      - rules:
+        - approved: false
+          description: Drop campaigns whose name contains 'test'
+          rows_affected: 42
+          rule_id: exclude_test_campaigns
+          suggested: true
+    VersionConflict:
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+        current:
+          $ref: '#/components/schemas/Session'
+      type: object
+      required:
+      - error
+      - current
+      title: VersionConflict
+      examples:
+      - current:
+          created_at: '2026-09-26T10:00:00Z'
+          expires_at: '2026-10-26T10:05:00Z'
+          sid: 0b8e0c64-5b0e-4c55-9c1e-2f1c2b9d7a11
+          ui_state:
+            dataset_id: ds_ads_2026q3
+            panel_open: true
+            screen: ask
+          updated_at: '2026-09-26T10:05:00Z'
+          version: 3
+          workspace_id: ws_3f9a1c2b7d10
+        error:
+          code: version_conflict
+          message: version 2 is stale; current is 3
+    VersionInfo:
+      properties:
+        api_version:
+          type: string
+          title: Api Version
+        engine:
+          type: string
+          title: Engine
+      type: object
+      required:
+      - api_version
+      - engine
+      title: VersionInfo
+      examples:
+      - api_version: 0.3.0
+        engine: v1@0ba324b

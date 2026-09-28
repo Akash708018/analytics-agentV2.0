@@ -1,0 +1,38 @@
+[project]
+name = "analytics-agent-v2"
+version = "0.0.1"
+description = "analytics-agent v2 backend: v1 engine + domain packs, gated tools, HTTP API"
+authors = [
+    { email = "aki708018861@gmail.com" }
+]
+requires-python = ">=3.12"
+# B0: the v1 engine's dependencies, unchanged (v1 pyproject @ 0ba324b). New ones only per the
+# allowed list in CLAUDE.md, each logged in docs/decisions.md.
+dependencies = [
+    "duckdb>=1.5.5",
+    "fastapi>=0.141.1",
+    "fastmcp>=3.4.7",
+    "matplotlib>=3.11.2",
+    "openpyxl>=3.1.5",
+    "psycopg[binary]>=3.3.4",
+    "pydantic>=2.13.4",
+    "python-multipart>=0.0.32",
+    "pyyaml>=6.0.3",
+    "scipy>=1.18.1",
+    "statsmodels>=0.15.0",
+    "uvicorn>=0.52.4",
+]
+
+[build-system]
+requires = ["uv_build>=0.8.17,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "backend"
+module-root = ""
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]
