@@ -1,9 +1,10 @@
 ## Status (date, branch, last commit)
 
 2026-09-28 (Asia/Kolkata) · `frontend/F1-api-client-mock`.
-F1 implementation and checks complete; publication in progress.
-Base commit: `305bcc0` (main, B3/API 0.3.0). Implementation commit and PR will be
-recorded after publication. F0 was merged in PR #2.
+F1 complete; stopped for human review. Last implementation commit: `124645b`
+(`F1: add HTTP client and spec-driven mock`); this follow-up records publication.
+Base commit: `305bcc0` (main, B3/API 0.3.0). F0 was merged in PR #2.
+PR: [#6](https://github.com/Akash708018/analytics-agentV2.0/pull/6) (open, targets `main`).
 Own clone: `/tmp/analytics-agent-v2-frontend`; v1 read-only: `/tmp/av1-ui` at `0ba324b`.
 
 ## Screens: done | in progress | blocked (by which endpoint/issue)
@@ -44,6 +45,7 @@ labelled `api-request`: required path-parameter declarations and status-specific
 error examples. API 0.3.0 resolved 15 of the original 17 missing declarations;
 only keyword-group GET and actions POST remain. Generic error examples still
 use not_found across statuses. Nonblocking for F1; details in `docs/steps/F1.md`.
+A comment on issue #4 records this API 0.3.0 correction and the final test result.
 
 ## Test tail (pasted)
 
