@@ -21,6 +21,12 @@ Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry h
   `GET /results/{id}` (`StoredResult`), `GET /results/{id}/inspect?step&sort_by&descending&
   group&limit&offset` (stored engine rows, up to 500 per step; sorted/filtered, never
   recomputed). The fallback model has an `inspect_result` tool over the same.
+- Value matching: `params.focus` (logistics.sla_drivers) accepts how people say it — case,
+  spaces and underscores ignored, pack aliases (`value_aliases` in the core pack: bombay ->
+  mumbai, insta -> instagram), a unique partial match; new 422 codes `ambiguous_value`
+  (`candidates`) and `unknown_value` (`values`).
+- Answers are checked for two more claim errors (`interpretation_check.rule`): `claim_unit`
+  (a fraction written as a percent) and `claim_direction` (up/down against the figure's sign).
 
 ## 0.6.0 — 2026-10-01 (B8)
 

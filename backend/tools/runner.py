@@ -253,10 +253,48 @@ def _step_filter(ctx: Ctx, tool: Tool, f: dict, before: list[str]) -> list[str]:
     return preds
 
 
+def _canon(v: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", v.lower())
+
+
+def match_value(ctx: Ctx, col: str, raw: str, param: str) -> str:
+    """A value a person typed, matched to the column's own values (B9 concept 14): exact, then
+    ignoring case/spaces/underscores, then a pack alias (bombay -> mumbai), then a unique
+    containment. Two candidates -> 422 with both; none -> 422 with what the column holds."""
+    vals = [str(r[0]) for r in ctx.con.execute(
+        f"SELECT DISTINCT CAST({q(col)} AS VARCHAR) FROM {q(ctx.table)} WHERE {q(col)} IS NOT "
+        f"NULL LIMIT 5000").fetchall()]
+    if raw in vals:
+        return raw
+    want = _canon(raw)
+    alias = (ctx.merged.value_aliases if ctx.merged else {}).get(raw.lower().strip())
+    for cand in (want, _canon(alias) if alias else None):
+        if not cand:
+            continue
+        hits = sorted({v for v in vals if _canon(v) == cand})
+        if hits:
+            return hits[0]       # spellings of one value ('Pune_South', 'PUNE_SOUTH') are one
+    hits = sorted({v for v in vals if want and (want in _canon(v) or _canon(v) in want)},
+                  key=_canon)
+    canon_hits = {_canon(h) for h in hits}
+    if len(canon_hits) == 1:
+        ctx.notes.append(f"'{raw}' read as {col} = {hits[0]}.")
+        return hits[0]
+    if canon_hits:
+        raise ServiceError(422, "ambiguous_value", f"'{raw}' could be several {col} values: "
+                           f"{hits[:10]}; pass one exactly in params.{param}",
+                           {"param": param, "column": col, "candidates": hits[:20]})
+    raise ServiceError(422, "unknown_value", f"no {col} value matches '{raw}'",
+                       {"param": param, "column": col, "values": sorted(vals)[:30]})
+
+
 def _focus(ctx: Ctx, tool: Tool, f: dict, col: str, preds: list[str]) -> str:
     """The person's `focus` value, or the engine's highest-rate group (D-B8-2)."""
     key = f["focus_param"]
     chosen = ctx.params.get(key)
+    if chosen is not None and not ctx.params.get(f"_{key}_resolved"):
+        chosen = match_value(ctx, col, str(chosen), key)
+        ctx.params[key], ctx.params[f"_{key}_resolved"] = chosen, True
     if chosen is None:
         measure = resolve(ctx, tool, f["worst_by"])
         params = {"dimension": col, "measure": measure}

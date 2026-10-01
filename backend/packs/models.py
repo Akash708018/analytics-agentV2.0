@@ -260,6 +260,8 @@ class Pack(Strict):
     dq_checks: list[DqCheck] = []
     privacy: Privacy = Privacy()
     festivals: list[Festival] = []
+    value_aliases: dict[str, str] = Field({}, description="What people say -> what data says "
+                                          "(lower-case): bombay -> mumbai (B9 concept 14)")
     sources_cited: list[Citation] = []
     changelog: list[ChangelogEntry] = []
 

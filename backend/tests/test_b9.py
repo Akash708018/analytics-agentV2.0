@@ -264,3 +264,42 @@ def test_fallback_model_can_inspect_a_result(env):
         assert calls[1]["status"] == "ok"
     finally:
         workspace.reset(ws)
+
+
+# --- rank 6: claim validation -------------------------------------------------------------------
+
+def test_claims_are_checked_for_unit_and_direction():
+    from backend.rules import interpret
+    trace = [{"tool_id": "logistics.sla_compliance", "figures": [
+        {"name": "Breach rate: Pune_South", "value": 0.638, "unit": "total"},
+        {"name": "Revenue change by group: google [change]", "value": -12.0, "unit": "change"}]}]
+    rules = lambda t: {v.rule for v in interpret.check(t, trace)}   # noqa: E731
+    assert "claim_unit" in rules("Pune_South breached on 0.638% of orders.")
+    assert "claim_unit" not in rules("Pune_South breached on 63.8% of orders.")
+    assert "claim_direction" in rules("Google revenue rose by 12 this month.")
+    assert "claim_direction" not in rules("Google revenue fell by 12 this month.")
+
+
+# --- rank 14: value matching --------------------------------------------------------------------
+
+def test_focus_values_match_spellings_aliases_and_say_when_ambiguous(env):
+    ws, did, _, _ = _load(env, metrics=("sla_breach",))
+    run = lambda **p: env.post("/tools/logistics.sla_drivers/run",   # noqa: E731
+                               json={"dataset_id": did, "params": {"by": "hub", **p}})
+    try:
+        r = run(focus="pune south")
+        assert r.status_code == 200
+        assert r.json()["figures"]                       # resolved to Pune_South's spelling
+        r = run(focus="south")
+        assert r.status_code == 200 and any("read as hub =" in c for c in r.json()["caveats"])
+        r = run(focus="pune")
+        assert r.status_code == 422 and r.json()["error"]["code"] == "ambiguous_value"
+        r = run(focus="nagpur")
+        assert r.status_code == 422 and r.json()["error"]["code"] == "unknown_value"
+    finally:
+        workspace.reset(ws)
+
+
+def test_aliases_are_pack_knowledge():
+    m = merge(load_all(), ["marketing"])
+    assert m.value_aliases["bombay"] == "mumbai" and m.value_aliases["insta"] == "instagram"
