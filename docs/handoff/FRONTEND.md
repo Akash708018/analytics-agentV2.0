@@ -21,10 +21,14 @@ F1 (client + Prism mock, API 0.5.0) is on main via PR #12; PR #6 is closed.
 
 ## API: spec version consumed; endpoints live vs mocked
 
-**0.5.0**. F2 uses sessions (create/get/PUT ui-state), turns (create/get/list), upload and
+**0.6.0** (B8, additive: no new operations; the suite passes, 173). F2 uses sessions (create/get/PUT ui-state), turns (create/get/list), upload and
 `GET /datasets/{id}` against the real backend (browser check) and a stateful fake (tests).
 `ui_state` allowlist: `schema, page, label, dataset_id, datasets[{dataset_id,name,rows,columns}]`.
 Unknown server keys pass through. Saved widget keys: `ui.session.label`, `ui.data.dataset_id`.
+
+0.6.0 items F3 will use: `DomainDetection.sources[]` (every pack's matched sources, with
+`domain`; `marketing_sources` now holds marketing only), a second domain (`logistics`), and
+`Confirmed.provisional` on comparison-template approvals (results then carry a PROVISIONAL caveat).
 
 Rules the next screens must keep (see `frontend/state.py` docstring and C7):
 - Session state is a cache; seed widgets with `state.seed`, record edits with

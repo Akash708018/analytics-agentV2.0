@@ -99,7 +99,7 @@ frontend/.venv/bin/python -m pytest frontend/tests/test_api_client.py frontend/t
 
 For mock failures, tests inject Prism's `Prefer: code=409` / `code=422` header
 through test-only transports. The product client never sends mock-control headers.
-API 0.5.0 declares every path parameter and has no 501 routes, but still shares
+API 0.6.0 declares every path parameter and has no 501 routes, but still shares
 one generic error example across HTTP statuses; see
 [API request #4](https://github.com/Akash708018/analytics-agentV2.0/issues/4).
 
