@@ -54,7 +54,7 @@ def embed_ollama(texts: list[str], cache: Cache) -> np.ndarray:
         r = httpx.post(f"{OLLAMA_URL}/api/embed", json={"model": OLLAMA_MODEL, "input": todo},
                        timeout=120)
         r.raise_for_status()
-        for t, v in zip(todo, r.json()["embeddings"]):
+        for t, v in zip(todo, r.json()["embeddings"], strict=True):
             cache.put(tag, t, v)
     m = np.array([cache.get(tag, t) for t in texts], dtype=float)
     return m / np.clip(np.linalg.norm(m, axis=1, keepdims=True), 1e-12, None)

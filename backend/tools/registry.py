@@ -40,7 +40,7 @@ def _label(name: str) -> str:
 
 def core_tools() -> list[ToolState]:
     out = [ToolState(t, label, "active") for t, label in CORE_STEPS]
-    for name, tier, summary in analyses.catalogue():
+    for name, _, summary in analyses.catalogue():
         out.append(ToolState(f"core.{name}", _label(name), "active",
                              description=summary[:MAX_DESCRIPTION]))
     return out

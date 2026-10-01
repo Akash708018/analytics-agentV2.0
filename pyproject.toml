@@ -15,7 +15,6 @@ dependencies = [
     "matplotlib>=3.11.2",
     "numpy>=2.5.3",
     "openpyxl>=3.1.5",
-    "psycopg[binary]>=3.3.4",
     "pydantic>=2.13.4",
     "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",

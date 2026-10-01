@@ -17,7 +17,7 @@ from typing import Callable
 
 from backend.engine.webapp.llm import parse_json
 from backend.engine.webapp.verify import verify
-from backend.llm.provider import LLM, Usage, tokens
+from backend.llm.provider import LLM, Usage
 from backend.packs.loader import load_all, merge
 from backend.rules import interpret
 from backend.services.sessions import ServiceError
@@ -235,7 +235,3 @@ def runner(datasets, llm: LLM):
     def run(turn: dict, emit) -> dict:
         return agent.answer(turn["dataset_id"], turn["question"], emit)
     return run
-
-
-def token_estimate(text: str) -> int:
-    return tokens(text)

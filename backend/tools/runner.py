@@ -197,59 +197,58 @@ def compile_filters(ctx: Ctx, tool: Tool, step) -> list[str]:
 
 def _step_filter(ctx: Ctx, tool: Tool, f: dict, before: list[str]) -> list[str]:
     preds = []
-    if True:
-        concept = f["concept"]
-        if f.get("exclude_truthy"):
-            try:
-                col = column_for(ctx, concept)
-            except Skip:
-                ctx.notes.append(f"No '{concept}' column: those rows could not be removed, so "
-                                 f"the figures still include them.")
-                return []
-            preds.append(f"NOT coalesce(lower(trim(CAST({q(col)} AS VARCHAR))) IN "
-                         f"('1', 'true', 't', 'yes', 'y'), false)")
-            if f"exclude:{concept}" not in ctx.filters_applied:
-                ctx.filters_applied.append(f"exclude:{concept}")
-            return preds
-        col = _slot(ctx, tool, concept[1:]) if concept.startswith("@") else column_for(
-            ctx, concept)
-        if "between" in f:
-            lo, hi = (float(x) for x in f["between"])
-            preds.append(f"{q(col)} BETWEEN {lo:g} AND {hi:g}")
-        if "date_range" in f:
-            lo, hi = resolve(ctx, tool, f["date_range"]).split("/")
-            lo, hi = date.fromisoformat(lo), date.fromisoformat(hi)
-            ctx.spans.append((lo, hi))
-            preds.append(f"CAST({q(col)} AS DATE) BETWEEN DATE '{lo}' AND DATE '{hi}'")
-        if "keep_matching" in f:
-            words = f["keep_matching"]
-            if not _WORDS.match(words):
-                raise ServiceError(500, "pack_error", f"keep_matching {words!r}: plain words")
-            preds.append(f"coalesce(regexp_matches(lower(trim(CAST({q(col)} AS VARCHAR))), "
-                         f"'^({words})$'), false)")
-        if "compare" in f:
-            if f["compare"] not in OPS:
-                raise ServiceError(500, "pack_error", f"compare {f['compare']!r}: one of {OPS}")
-            other = column_for(ctx, f["other"])
-            preds.append(f"{q(col)} {f['compare']} {q(other)}")
-        if "older_than" in f:
-            o = f["older_than"]
-            as_of, days = ctx.params.get(o["as_of_param"]), ctx.params.get(o["days_param"], 3)
-            try:
-                as_of, days = date.fromisoformat(str(as_of)), int(days)
-            except (TypeError, ValueError):
-                raise ServiceError(422, "param_required", f"params.{o['as_of_param']} must be "
-                                   f"a date (YYYY-MM-DD) and params.{o['days_param']} a whole "
-                                   f"number of days") from None
-            preds.append(f"TRY_CAST({q(col)} AS TIMESTAMP) < TIMESTAMP '{as_of}' - INTERVAL "
-                         f"{days} DAY")
-            ctx.notes.append(f"Open {days}+ days before {as_of} (the as-of date you entered).")
-        if "focus_param" in f:
-            preds.append(_focus(ctx, tool, f, col, before + preds))
-        if "terms_param" in f:
-            alt = "|".join(re.escape(t).replace("'", "''") for t in _terms(ctx, f["terms_param"]))
-            p = f"coalesce(regexp_matches(lower(CAST({q(col)} AS VARCHAR)), '({alt})'), false)"
-            preds.append(f"NOT {p}" if f.get("negate") else p)
+    concept = f["concept"]
+    if f.get("exclude_truthy"):
+        try:
+            col = column_for(ctx, concept)
+        except Skip:
+            ctx.notes.append(f"No '{concept}' column: those rows could not be removed, so "
+                             f"the figures still include them.")
+            return []
+        preds.append(f"NOT coalesce(lower(trim(CAST({q(col)} AS VARCHAR))) IN "
+                     f"('1', 'true', 't', 'yes', 'y'), false)")
+        if f"exclude:{concept}" not in ctx.filters_applied:
+            ctx.filters_applied.append(f"exclude:{concept}")
+        return preds
+    col = _slot(ctx, tool, concept[1:]) if concept.startswith("@") else column_for(
+        ctx, concept)
+    if "between" in f:
+        lo, hi = (float(x) for x in f["between"])
+        preds.append(f"{q(col)} BETWEEN {lo:g} AND {hi:g}")
+    if "date_range" in f:
+        lo, hi = resolve(ctx, tool, f["date_range"]).split("/")
+        lo, hi = date.fromisoformat(lo), date.fromisoformat(hi)
+        ctx.spans.append((lo, hi))
+        preds.append(f"CAST({q(col)} AS DATE) BETWEEN DATE '{lo}' AND DATE '{hi}'")
+    if "keep_matching" in f:
+        words = f["keep_matching"]
+        if not _WORDS.match(words):
+            raise ServiceError(500, "pack_error", f"keep_matching {words!r}: plain words")
+        preds.append(f"coalesce(regexp_matches(lower(trim(CAST({q(col)} AS VARCHAR))), "
+                     f"'^({words})$'), false)")
+    if "compare" in f:
+        if f["compare"] not in OPS:
+            raise ServiceError(500, "pack_error", f"compare {f['compare']!r}: one of {OPS}")
+        other = column_for(ctx, f["other"])
+        preds.append(f"{q(col)} {f['compare']} {q(other)}")
+    if "older_than" in f:
+        o = f["older_than"]
+        as_of, days = ctx.params.get(o["as_of_param"]), ctx.params.get(o["days_param"], 3)
+        try:
+            as_of, days = date.fromisoformat(str(as_of)), int(days)
+        except (TypeError, ValueError):
+            raise ServiceError(422, "param_required", f"params.{o['as_of_param']} must be "
+                               f"a date (YYYY-MM-DD) and params.{o['days_param']} a whole "
+                               f"number of days") from None
+        preds.append(f"TRY_CAST({q(col)} AS TIMESTAMP) < TIMESTAMP '{as_of}' - INTERVAL "
+                     f"{days} DAY")
+        ctx.notes.append(f"Open {days}+ days before {as_of} (the as-of date you entered).")
+    if "focus_param" in f:
+        preds.append(_focus(ctx, tool, f, col, before + preds))
+    if "terms_param" in f:
+        alt = "|".join(re.escape(t).replace("'", "''") for t in _terms(ctx, f["terms_param"]))
+        p = f"coalesce(regexp_matches(lower(CAST({q(col)} AS VARCHAR)), '({alt})'), false)"
+        preds.append(f"NOT {p}" if f.get("negate") else p)
     return preds
 
 
@@ -332,7 +331,7 @@ def context_caveats(ctx: Ctx, spans: list[tuple[date, date]]) -> list[str]:
     out = []
     spans = spans or ([ctx.window] if ctx.window else [])
     for f in ctx.festivals.values():
-        for y, (s, e) in f.dates.items():
+        for s, e in f.dates.values():
             fs, fe = date.fromisoformat(s), date.fromisoformat(e)
             if any(fs <= b and a <= fe for a, b in spans):
                 out.append(f"festival_confound: {f.name} ({s} to {e}) falls in the period; "

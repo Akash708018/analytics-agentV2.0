@@ -29,7 +29,7 @@ import sys
 import tempfile
 import time
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1] / "backend"

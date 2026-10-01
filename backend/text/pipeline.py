@@ -35,7 +35,7 @@ def spelling_map(keywords: list[str], protected: set[str]) -> dict[str, str]:
     counts = Counter(t for k in keywords for t in set(k.split()))
     anchors = {t for t, n in counts.items() if n >= 2} | protected
     out = {}
-    for tok, n in counts.items():
+    for tok in counts:
         if tok in anchors or len(tok) < 4:
             continue
         best = max(((difflib.SequenceMatcher(None, tok, a).ratio(), a) for a in anchors
@@ -90,7 +90,7 @@ def cluster(topics: list[str], backend: str = "auto", cache: Cache | None = None
     X, used = embed(uniq, backend, cache)
     labels = AgglomerativeClustering(n_clusters=None, metric="cosine", linkage="average",
                                      distance_threshold=threshold).fit_predict(X)
-    return {t: int(c) for t, c in zip(uniq, labels)}, used
+    return {t: int(c) for t, c in zip(uniq, labels, strict=True)}, used
 
 
 def intent_of(facets: dict) -> str:
@@ -138,7 +138,7 @@ def group_keywords(raw: list[str], *, backend: str = "auto", cache: Cache | None
         sig = tuple(f for f in FACET_ORDER if f in k.facets)[:1]
         buckets[(cmap.get(k.topic, -1), sig)].append(t)
     groups = []
-    for i, ((cid, sig), texts) in enumerate(sorted(buckets.items(), key=lambda x: -len(x[1]))):
+    for i, ((_, sig), texts) in enumerate(sorted(buckets.items(), key=lambda x: -len(x[1]))):
         members = [r for t in texts for r in merged[t]]
         fac = {f: sorted({kws[t].facets[f] for t in texts if f in kws[t].facets})
                for f in (*FACET_ORDER, "dish") if any(f in kws[t].facets for t in texts)}
