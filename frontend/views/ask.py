@@ -7,7 +7,7 @@ text is not put in ui_state). Rendering tool results and figures is a later mile
 
 import streamlit as st
 
-from frontend import connection, state, turns
+from frontend import connection, datasets, state, turns
 from frontend.api_client import APIError
 from frontend.components.shell import show_error
 
@@ -73,8 +73,7 @@ if dataset_id is None:
     st.info("Choose or upload a dataset first.")
     st.page_link("views/data.py", label="Go to Data", icon="📄", query_params={"sid": sid})
 else:
-    name = next((d["name"] for d in draft["datasets"] if d["dataset_id"] == dataset_id), "")
-    st.caption(f"Questions are about {name or dataset_id}.")
+    st.caption(f"Questions are about {datasets.label(ss, api, dataset_id)}.")
 
 history = st.container()
 

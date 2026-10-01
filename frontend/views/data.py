@@ -1,14 +1,15 @@
-"""Data page (F2 minimum): upload a file, choose the dataset questions use.
+"""Data page: upload a file, choose the dataset the other pages use, see its profile.
 
-Only display metadata is saved with the session; the data stays on the server.
-Answering layout questions, cleaning, domain and contract are later milestones.
+Only dataset ids are saved with the session (C8); names and figures come from the
+server and are shown as returned. Answering ingest layout questions has no endpoint
+yet (api-request), so they are shown, not answered.
 """
 
 import streamlit as st
 
-from frontend import connection, state
+from frontend import connection, datasets, state
 from frontend.api_client import APIError
-from frontend.components.shell import show_error
+from frontend.components.shell import next_steps, show_error
 
 ss = st.session_state
 api = connection.get_client()
@@ -16,66 +17,85 @@ draft = ss[state.DRAFT]
 
 
 def _upload() -> None:
-    # Read session state before the upload; after it, the draft in hand is updated first
-    # so a run stopped midway cannot lose the dataset reference (see state.py).
-    file, draft, workspace_id = ss.get("data.file"), ss[state.DRAFT], ss[state.SERVER]["workspace_id"]
+    # Session state is read before the upload; after it, only held objects change (state.py).
+    file, held_draft, held = ss.get("data.file"), ss[state.DRAFT], state.work(ss)
+    workspace_id = ss[state.SERVER]["workspace_id"]
     if file is None:
         return
     try:
         dataset = api.upload_dataset(workspace_id, file.name, file.getvalue(),
                                      file.type or "application/octet-stream")
     except APIError as error:
-        ss["data.result"] = {"error": error, "name": file.name}
+        held["results"]["upload"] = {"error": error, "name": file.name}
         return
-    dataset_id = state.add_dataset(draft, dataset)
-    ss["data.result"] = {"dataset_id": dataset_id, "name": file.name}
-    ss["ui.data.dataset_id"] = dataset_id
+    dataset_id = state.add_dataset(held_draft, dataset)
+    held["cache"][("record", dataset_id)] = dataset
+    held["results"]["upload"] = {"dataset_id": dataset_id, "name": file.name}
+    held["reseed"].append("ui.data.dataset_id")
 
 
-st.title("Data")
+def _look_again(dataset_id: str) -> None:
+    datasets.invalidate(state.work(ss), dataset_id, ("record", "profile"))
 
-st.subheader("Upload a file")
-chosen = st.file_uploader("CSV or Excel workbook", type=["csv", "xlsx"], key="data.file")
-st.button("Upload", on_click=_upload, disabled=chosen is None, key="data.upload")
-result = ss.get("data.result")
-if result and "error" in result:
-    error = result["error"]
-    show_error(error, f"{result['name']} was not loaded")
-    if error.code == "ingest_needs_answers":
-        for question in (error.payload or {}).get("questions", []):
-            st.markdown(f"- {question}")
-        st.info("Answering layout questions here is not built yet (a later milestone).")
-elif result:
-    st.success(f"Loaded {result['name']}.")
+
+def _upload_section() -> None:
+    st.subheader("Upload a file")
+    chosen = st.file_uploader("CSV or Excel workbook", type=["csv", "xlsx"], key="data.file")
+    st.button("Upload", on_click=_upload, disabled=chosen is None, key="data.upload")
+    result = state.work(ss)["results"].get("upload")
+    if result and "error" in result:
+        error = result["error"]
+        show_error(error, f"{result['name']} was not loaded")
+        if error.code == "ingest_needs_answers":
+            for question in (error.payload or {}).get("questions", []):
+                st.markdown(f"- {question}")
+            st.info("Answering layout questions here needs an API endpoint that does not "
+                    "exist yet; it has been requested.")
+    elif result:
+        st.success(f"Loaded {result['name']}.")
+
+
+def _profile(dataset_id: str) -> None:
+    profile = datasets.cached(ss, "profile", dataset_id, lambda: api.get_profile(dataset_id))
+    if isinstance(profile, APIError):
+        show_error(profile, "Could not read the profile")
+        return
+    st.subheader("What each column holds")
+    st.caption(f"{profile['rows']} rows. Values as the service reports them.")
+    st.dataframe(
+        [{"column": c["name"], "type": c["type"], "null %": str(c["null_pct"]),
+          "distinct": str(c["distinct"]), "sample (min, max)": ", ".join(map(str, c["sample"]))}
+         for c in profile["columns"]],
+        hide_index=True, use_container_width=True,
+    )
+    for warning in profile["warnings"]:
+        st.warning(warning)
 
 
 def _active_dataset() -> None:
-    datasets = draft["datasets"]
-    if not datasets:
+    ids = draft["datasets"]
+    if not ids:
         st.info("No data in this session yet.")
         return
-    st.subheader("Dataset for questions")
-    names = {d["dataset_id"]: f"{d['name'] or d['dataset_id']} · {d['dataset_id']}"
-             for d in datasets}
-    state.seed(ss, "ui.data.dataset_id")
+    st.subheader("Dataset the other pages use")
+    state.bind(ss, "ui.data.dataset_id", ("dataset_id",))
     st.selectbox(
-        "Dataset for questions",
-        options=list(names),
-        format_func=names.get,
+        "Dataset the other pages use",
+        options=ids,
+        format_func=lambda dataset_id: datasets.label(ss, api, dataset_id),
         key="ui.data.dataset_id",
         placeholder="Choose a dataset",
         label_visibility="collapsed",
-        on_change=state.on_widget_change,
-        args=(ss, "ui.data.dataset_id"),
+        on_change=state.on_change,
+        args=(ss, "ui.data.dataset_id", ("dataset_id",)),
     )
     active = draft["dataset_id"]
     if active is None:
         return
-    try:
-        record = api.get_dataset(active)
-    except APIError as error:
-        show_error(error, "Could not load this dataset's record")
-        if error.status_code == 404:
+    record = datasets.cached(ss, "record", active, lambda: api.get_dataset(active))
+    if isinstance(record, APIError):
+        show_error(record, "Could not load this dataset's record")
+        if record.status_code == 404:
             st.button("Forget it in this session", on_click=state.forget_dataset,
                       args=(ss, active), key="data.forget")
         return
@@ -85,8 +105,12 @@ def _active_dataset() -> None:
     right.metric("Columns", record["columns"], border=True)
     for assumption in record.get("assumptions", []):
         st.caption(f"Read as: {assumption}")
-    st.page_link("views/ask.py", label="Ask about this data", icon="💬",
-                 query_params={"sid": ss[state.SID]})
+    st.button("Look again", on_click=_look_again, args=(active,), key="data.refresh",
+              help="Read the record and profile from the service again.")
+    next_steps(ss)
+    _profile(active)
 
 
+st.title("Data")
+_upload_section()
 _active_dataset()

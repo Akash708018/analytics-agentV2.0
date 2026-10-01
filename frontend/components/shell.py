@@ -35,7 +35,7 @@ def _start_session() -> None:
     # Nothing from the previous session may leak into the new one (an unsent question,
     # an upload result, widget values).
     stale = [key for key in ss if key in {state.SID, state.SERVER, state.DRAFT, state.SAVE,
-                                          state.RESTORE}
+                                          state.RESTORE, state.WORK}
              or key.startswith(("ui.", "ask.", "data."))]
     for key in stale:
         del ss[key]
@@ -113,12 +113,38 @@ def render_status(slot: Any, ss: Mapping) -> None:
 
 
 def _values(ui_state: Mapping) -> dict[str, str]:
-    names = {d["dataset_id"]: d["name"] or d["dataset_id"] for d in ui_state["datasets"]}
+    drafts = ui_state["drafts"]
     return {
         "Analysis name": ui_state["label"] or "(none)",
-        "Dataset for questions": names.get(ui_state["dataset_id"], "(none)"),
+        "Active dataset": ui_state["dataset_id"] or "(none)",
+        "Datasets": ", ".join(ui_state["datasets"]) or "(none)",
+        "Preparation drafts": "; ".join(
+            f"{ds}: {', '.join(sorted(parts))}" for ds, parts in sorted(drafts.items())) or "(none)",
         "Page": ui_state["page"],
     }
+
+
+def needs_dataset(ss: Mapping) -> None:
+    st.info("Choose or upload a dataset on Data first.")
+    st.page_link("views/data.py", label="Go to Data", icon="📄",
+                 query_params={"sid": ss[state.SID]})
+
+
+STEPS = (
+    ("views/clean.py", "Clean", "🧹", "review the engine's cleaning proposals; nothing runs "
+                                     "until you apply it"),
+    ("views/domain.py", "Domain", "🏷️", "confirm what kind of data this is; it turns on that "
+                                        "domain's tools and questions"),
+    ("views/contract.py", "Contract", "📝", "say what each column is and how it adds up; "
+                                           "analyses run under it"),
+    ("views/ask.py", "Ask", "💬", "ask questions about the data"),
+)
+
+
+def next_steps(ss: Mapping) -> None:
+    st.markdown("**Next steps**")
+    for path, title, icon, why in STEPS:
+        st.page_link(path, label=f"{title}: {why}", icon=icon, query_params={"sid": ss[state.SID]})
 
 
 def render_banner(container: Any, ss: Mapping) -> None:

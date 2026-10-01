@@ -11,15 +11,15 @@ server = ss[state.SERVER]
 st.title("Analytics agent")
 st.write(TAGLINE)
 
-state.seed(ss, "ui.session.label")
+state.bind(ss, "ui.session.label", ("label",), "")
 st.text_input(
     "Name this analysis (optional)",
     key="ui.session.label",
     max_chars=state.LABEL_MAX,
     placeholder="e.g. Q3 paid search review",
     help="Saved with the session. Don't put personal data here.",
-    on_change=state.on_widget_change,
-    args=(ss, "ui.session.label"),
+    on_change=state.on_change,
+    args=(ss, "ui.session.label", ("label",)),
 )
 
 st.caption(

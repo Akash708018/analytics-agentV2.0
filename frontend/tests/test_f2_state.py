@@ -41,15 +41,38 @@ def test_only_a_canonical_uuid_is_a_sid(raw, expected):
 def test_normalize_keeps_only_the_allowlist_and_unknown_server_keys():
     raw = {
         "page": "nowhere", "label": "x" * 500, "dataset_id": "ds_missing",
-        "datasets": [{**DS, "sample_rows": [[1, 2]], "rows": True}, DS, {"dataset_id": "bad id"}],
+        "datasets": [{**DS, "sample_rows": [[1, 2]]}, DS["dataset_id"], {"dataset_id": "bad id"}],
+        "drafts": {DS["dataset_id"]: {"clean": {"C001|K|": True, "C002|K|": False},
+                                      "contract": {"roles": {"cost": "measure", "x": "boss"},
+                                                   "window_start": "not a date", "rows": [[1]]},
+                                      "forks": {"tax_basis": "net_excl_gst"},
+                                      "confirmed_version": 2, "rows": [[1, 2]]},
+                   "ds_not_listed": {"forks": {"a": "b"}}},
         "from_a_newer_frontend": {"keep": 1},
     }
     out = state.normalize(raw)
     assert out == {
-        "schema": 1, "page": "session", "label": "x" * 120, "dataset_id": None,
-        "datasets": [{"dataset_id": DS["dataset_id"], "name": "ads", "rows": None, "columns": 8}],
+        "schema": 2, "page": "session", "label": "x" * 120, "dataset_id": None,
+        "datasets": [DS["dataset_id"]],
+        "drafts": {DS["dataset_id"]: {"clean": {"C001|K|": True},
+                                      "contract": {"roles": {"cost": "measure"}},
+                                      "forks": {"tax_basis": "net_excl_gst"},
+                                      "confirmed_version": 2}},
         "from_a_newer_frontend": {"keep": 1},
     }
+
+
+def test_schema_1_dataset_objects_migrate_to_ids():
+    # F2 saved {dataset_id, name, rows, columns}; the backend refuses 20 of them as data
+    # rows, and names can look like phone numbers (C8). Schema 2 keeps ids only.
+    v1 = {"schema": 1, "dataset_id": DS["dataset_id"],
+          "datasets": [DS, {**DS, "dataset_id": "ds_ffffffffffff", "name": "leads_9876543210"}]}
+    out = state.normalize(v1)
+    assert out["datasets"] == [DS["dataset_id"], "ds_ffffffffffff"]
+    assert out["dataset_id"] == DS["dataset_id"]
+    assert "9876543210" not in str(out)
+    many = state.normalize({"datasets": [f"ds_{i:012x}" for i in range(60)]})
+    assert len(many["datasets"]) == 50 and all(isinstance(d, str) for d in many["datasets"])
 
 
 def test_an_unchanged_draft_sends_nothing_and_an_edit_sends_one_put(fake, api):
@@ -59,19 +82,20 @@ def test_an_unchanged_draft_sends_nothing_and_an_edit_sends_one_put(fake, api):
     ss["_draft"]["label"] = "Q3"
     state.maybe_save(ss, api)
     state.maybe_save(ss, api)
-    assert fake.bodies("PUT") == [{"ui_state": {"schema": 1, "page": "session", "label": "Q3",
-                                                "dataset_id": None, "datasets": []},
+    assert fake.bodies("PUT") == [{"ui_state": {"schema": 2, "page": "session", "label": "Q3",
+                                                "dataset_id": None, "datasets": [], "drafts": {}},
                                    "version": 1}]
     assert ss["_server"]["version"] == 2
 
 
 def test_session_state_beyond_the_allowlist_is_never_sent(fake, api):
     sid, ss = hydrated(fake, api)
-    ss.update({"data.file": object(), "ask.question": "free text", "ui.session.label": "Q3"})
-    state.on_widget_change(ss, "ui.session.label")
+    ss.update({"data.file": object(), "ask.question": "free text", "ui.session.label": "Q3",
+               "_work": {"cache": {("record", "ds_x"): {"rows": 4}}, "results": {}, "reseed": []}})
+    state.on_change(ss, "ui.session.label", ("label",))
     state.maybe_save(ss, api)
     body, = fake.bodies("PUT")
-    assert set(body["ui_state"]) == {"schema", "page", "label", "dataset_id", "datasets"}
+    assert set(body["ui_state"]) == {"schema", "page", "label", "dataset_id", "datasets", "drafts"}
 
 
 def test_conflict_stops_saving_until_the_person_chooses(fake, api):
@@ -89,12 +113,14 @@ def test_load_latest_adopts_theirs_and_keeps_both_dataset_references(fake, api):
     sid, ss = hydrated(fake, api)
     fake.write_elsewhere(sid, {"label": "theirs", "datasets": [other]})
     ss["_draft"]["label"] = "mine"
-    ss["_draft"]["datasets"] = [DS]
+    ss["_draft"]["datasets"] = [DS["dataset_id"]]
+    ss["_draft"]["drafts"] = {DS["dataset_id"]: {"forks": {"tax_basis": "net_excl_gst"}}}
     ss["ui.session.label"] = "mine"
     state.maybe_save(ss, api)
     state.load_latest(ss)
     assert ss["_draft"]["label"] == "theirs"
-    assert [d["dataset_id"] for d in ss["_draft"]["datasets"]] == ["ds_ffffffffffff", DS["dataset_id"]]
+    assert ss["_draft"]["datasets"] == ["ds_ffffffffffff", DS["dataset_id"]]
+    assert ss["_draft"]["drafts"][DS["dataset_id"]] == {"forks": {"tax_basis": "net_excl_gst"}}
     assert "ui.session.label" not in ss          # reseeded from the draft on next render
     state.maybe_save(ss, api)                    # the union is new to the server: saved once
     assert fake.bodies("PUT")[-1]["version"] == 2
@@ -169,7 +195,7 @@ def test_an_upload_records_display_metadata_and_becomes_active(fake, api):
     added = state.add_dataset(ss["_draft"], {**DS, "workspace_id": "ws_x",
                                              "assumptions": ["a"], "created_at": "t"})
     assert added == DS["dataset_id"]
-    assert ss["_draft"]["datasets"] == [DS]
+    assert ss["_draft"]["datasets"] == [DS["dataset_id"]]          # ids only (C8)
     assert ss["_draft"]["dataset_id"] == DS["dataset_id"]
 
 
@@ -212,7 +238,7 @@ def test_a_save_stopped_after_its_put_still_records_the_new_version(fake, api):
 def test_a_widget_edit_whose_callback_was_cut_short_is_kept(fake, api):
     sid, ss = hydrated(fake, api)
     ss["ui.session.label"] = "edited"            # the widget has it; the draft does not
-    state.seed(ss, "ui.session.label")
+    state.bind(ss, "ui.session.label", ("label",), "")
     assert ss["_draft"]["label"] == "edited"
 
 

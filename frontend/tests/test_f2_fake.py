@@ -42,3 +42,28 @@ def test_fake_responses_carry_every_required_key_of_the_spec(contract):
         assert required(contract, "TurnEvent") <= set(event)
     statuses = contract["components"]["schemas"]["Turn"]["properties"]["status"]["enum"]
     assert {turn["status"], fake.turns[turn_id]["status"]} <= set(statuses)
+
+
+def test_fake_preparation_replies_carry_every_required_key_of_the_spec(contract):
+    fake = FakeBackend()
+    ds = fake.add_dataset("ws_0123456789ab", "ads")["dataset_id"]
+    with httpx.Client(base_url="http://backend.test", transport=httpx.MockTransport(fake.handle)) as http:
+        replies = {
+            "Profile": http.get(f"/datasets/{ds}/profile").json(),
+            "CleaningProposals": http.get(f"/datasets/{ds}/cleaning/proposals").json(),
+            "ApprovalResult": http.post(f"/datasets/{ds}/cleaning/approve",
+                                        json={"approve": ["C001"], "reject": []}).json(),
+            "DomainDetection": http.get(f"/datasets/{ds}/domains/detect").json(),
+            "PackList": http.get("/packs").json(),
+            "Confirmed": http.post(f"/datasets/{ds}/domains/confirm",
+                                   json={"domains": ["marketing"]}).json(),
+            "ContractProposal": http.get(f"/datasets/{ds}/contract/proposal").json(),
+        }
+    for schema, reply in replies.items():
+        assert required(contract, schema) <= set(reply), schema
+    for item, schema in ((replies["Profile"]["columns"][0], "ColumnProfile"),
+                         (replies["CleaningProposals"]["proposals"][0], "CleaningProposal"),
+                         (replies["ContractProposal"]["measures"][0], "MeasureProposal"),
+                         (replies["ContractProposal"]["forks"][0], "ForkQuestion"),
+                         (replies["PackList"]["packs"][0], "PackSummary")):
+        assert required(contract, schema) <= set(item), schema

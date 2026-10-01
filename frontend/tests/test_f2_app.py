@@ -110,9 +110,9 @@ def test_one_edit_is_one_put_with_the_version_read(fake):
     app = open_app(sid)
     app.text_input(key="ui.session.label").input("Q3 review").run()
     app.run()
-    assert fake.bodies("PUT") == [{"ui_state": {"schema": 1, "page": "session",
+    assert fake.bodies("PUT") == [{"ui_state": {"schema": 2, "page": "session",
                                                 "label": "Q3 review", "dataset_id": None,
-                                                "datasets": []}, "version": 1}]
+                                                "datasets": [], "drafts": {}}, "version": 1}]
     assert "Saved · version 2" in text(app)
 
 
@@ -148,7 +148,8 @@ def test_a_field_survives_navigating_away_and_back(fake):
 def test_every_navigation_link_keeps_the_sid(fake):
     sid = fake.new_session()
     app = open_app(sid)
-    assert links(app) == {"Session": f"sid={sid}", "Data": f"sid={sid}", "Ask": f"sid={sid}"}
+    assert links(app) == {title: f"sid={sid}" for title in
+                          ("Session", "Data", "Clean", "Domain", "Contract", "Ask")}
 
 
 def test_a_conflict_waits_for_a_choice_then_load_latest_shows_theirs(fake):

@@ -19,11 +19,12 @@ from frontend.components import shell  # noqa: E402
 
 st.set_page_config(page_title="Analytics agent", page_icon="📊", layout="wide")
 
-TITLES = {"session": "Session", "data": "Data", "ask": "Ask"}
+TITLES = {"session": "Session", "data": "Data", "clean": "Clean", "domain": "Domain",
+          "contract": "Contract", "ask": "Ask"}
 PAGES = {
-    "session": st.Page("views/session.py", title=TITLES["session"], default=True),
-    "data": st.Page("views/data.py", title=TITLES["data"], url_path="data"),
-    "ask": st.Page("views/ask.py", title=TITLES["ask"], url_path="ask"),
+    page_id: st.Page(f"views/{page_id}.py", title=title, default=page_id == "session",
+                     url_path=None if page_id == "session" else page_id)
+    for page_id, title in TITLES.items()
 }
 current = st.navigation(list(PAGES.values()), position="hidden")
 page_id = next(pid for pid, page in PAGES.items() if page.url_path == current.url_path)
@@ -56,6 +57,7 @@ def main() -> None:
     if target is not None:
         st.switch_page(PAGES[target], query_params={"sid": sid})
     state.set_page(ss, page_id)
+    state.apply_reseeds(ss)
 
     status_slot = shell.sidebar(PAGES, TITLES, sid)
     banner = st.container()
