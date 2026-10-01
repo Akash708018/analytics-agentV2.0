@@ -37,3 +37,9 @@ identical in both agents' prompts. Shared file: append-only sections, PR require
   `claude/analytics-agent-v2-backend-6gcu1p` and cannot push to `backend/B<n>-<slug>` without the
   user's permission; B0 is on that branch (see D-B0-1 in `docs/decisions.md`). The backend session
   has no `gh` CLI; it uses the GitHub API through its tools for issues and PRs — same effect.
+- 2026-10-01, Claude Code: at the user's instruction, Claude Code took over the frontend from
+  Codex (see D-F1-5 in `docs/decisions.md`). It now works both sides and follows `AGENTS.md`'s
+  frontend rules for `frontend/`. Its pushes go to its session branch (D-F1-6); Codex's F1
+  PR #6 is superseded by the PR from that branch. The protocol above stays: the API contract
+  is still the backend's `docs/api/openapi.yaml`, and the frontend still talks to it only
+  over HTTP.

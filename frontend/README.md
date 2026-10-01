@@ -3,18 +3,18 @@
 Run commands from the repository root. Use Python 3.12 or newer.
 
 ```sh
-python3 -m venv frontend/.venv
-frontend/.venv/bin/python -m pip install -r frontend/requirements.txt
+uv venv frontend/.venv --python 3.12
+uv pip install --python frontend/.venv/bin/python -r frontend/requirements.txt
 frontend/.venv/bin/python -m streamlit run frontend/app.py
 ```
 
 The landing page deliberately collects no user work until backend session saving
 is connected in F2. `api_client.py` implements the HTTP boundary for OpenAPI
-0.3.0; `state.py` remains the reserved F2 boundary. Neither imports the engine.
+0.5.0; `state.py` remains the reserved F2 boundary. Neither imports the engine.
 
 ## API client and mock (F1)
 
-The client reads `ANALYTICS_API_URL` (required). Its methods map to all 29
+The client reads `ANALYTICS_API_URL` (required). Its methods map to all 30
 operations in `docs/api/openapi.yaml`. Use the client as a context manager so
 connections close. Responses, figure values, and chart points are returned as
 decoded JSON without calculations, sorting, or display formatting.
@@ -30,8 +30,11 @@ with APIClient() as api:
 errors), and the server's `payload`. `VersionConflict` is an `APIError` with
 `current` containing the server session, or None when no valid current state was
 returned. All 409s use this exception as required, but retain the server's code:
-API 0.3.0 also uses 409 `needs_domain`/`needs_data` for tool prerequisites. Only
-`code == "version_conflict"` belongs in the session-conflict UI.
+the API also uses 409 for prerequisites (`needs_domain`/`needs_data` on tool runs,
+`contract_required` on tool runs and metric approval). Only
+`code == "version_conflict"` belongs in the session-conflict UI. Other error
+details (`forks`, `columns`, `missing`, `dates`, `questions`) sit at the top level
+of `payload`, next to `error`.
 The client does not retry failed actions or resolve conflicts. F2 must ask the
 person whether to load the latest state or keep their changes. Do not blindly
 resubmit a turn after a timeout: the server may already have accepted it.
@@ -41,7 +44,7 @@ these are not a total wall-clock deadline. HTTP redirects are not followed.
 Proxy environment variables are disabled; `ANALYTICS_API_URL` selects the service.
 The base URL may include an API path prefix, but not credentials, query, or fragment.
 
-Node is required for the approved Prism mock; Node 26.7.0 was used for F1.
+Node is required for the approved Prism mock; F1 used Node 26.7.0 and 22.22.0.
 From the repository root:
 
 ```sh
@@ -53,7 +56,6 @@ Prism 5.16.0 listens on `127.0.0.1:4010` and reads the canonical YAML unchanged.
 In another terminal, set `ANALYTICS_API_URL=http://127.0.0.1:4010` for client use.
 Stop the mock with Ctrl-C. The mock returns static examples: it does not persist
 session writes, upload data, run turns, or prove any live backend behavior.
-Its success examples for 501 backend routes are for frontend contract testing.
 
 Run all frontend tests after installing both Python and Node dependencies:
 
@@ -70,10 +72,10 @@ is a test failure, not a skip. Unit-only checks, which need no listening port:
 frontend/.venv/bin/python -m pytest frontend/tests/test_api_client.py frontend/tests/test_scaffold.py -q
 ```
 
-For mock failures, tests inject Prism's `Prefer: code=409` / `code=501` header
+For mock failures, tests inject Prism's `Prefer: code=409` / `code=422` header
 through test-only transports. The product client never sends mock-control headers.
-API 0.3.0 still lacks path declarations on its two keyword-group routes and
-shares generic error examples across HTTP statuses; see
+API 0.5.0 declares every path parameter and has no 501 routes, but still shares
+one generic error example across HTTP statuses; see
 [API request #4](https://github.com/Akash708018/analytics-agentV2.0/issues/4).
 
 ## Original state probe (F0)

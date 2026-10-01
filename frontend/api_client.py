@@ -1,4 +1,4 @@
-"""Thin HTTP boundary for docs/api/openapi.yaml v0.3.0.
+"""Thin HTTP boundary for docs/api/openapi.yaml v0.5.0.
 
 Responses are returned unchanged. No retries, figure calculations, or backend
 imports: callers decide when to poll and people decide how to resolve conflicts.
@@ -231,16 +231,24 @@ class APIClient:
     def get_pack(self, pack_id: str) -> JsonObject:
         return self._request("GET", f"packs/{_segment(pack_id)}")
 
+    def run_keyword_grouping(self, dataset_id: str, column: str | None = None) -> JsonObject:
+        body: JsonObject = {} if column is None else {"column": column}
+        return self._request("POST", f"datasets/{_segment(dataset_id)}/keyword-groups/run", json=body)
+
     def list_keyword_groups(self, dataset_id: str) -> JsonObject:
         return self._request("GET", f"datasets/{_segment(dataset_id)}/keyword-groups")
 
     def apply_keyword_group_action(
         self, dataset_id: str, action: str, group_ids: Sequence[str], *,
         label: str | None = None, keyword: str | None = None,
-        target_group_id: str | None = None,
+        keywords: Sequence[str] | None = None, target_group_id: str | None = None,
     ) -> JsonObject:
         body: JsonObject = {"action": action, "group_ids": list(group_ids)}
-        for name, value in (("label", label), ("keyword", keyword), ("target_group_id", target_group_id)):
+        for name, value in (
+            ("label", label), ("keyword", keyword),
+            ("keywords", None if keywords is None else list(keywords)),
+            ("target_group_id", target_group_id),
+        ):
             if value is not None:
                 body[name] = value
         return self._request("POST", f"datasets/{_segment(dataset_id)}/keyword-groups/actions", json=body)

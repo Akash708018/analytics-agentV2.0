@@ -249,7 +249,7 @@ def test_conflict_exposes_current_state_and_never_retries_the_write():
     assert json.loads(requests[0].content) == {"ui_state": {"screen": "ask"}, "version": 7}
 
 
-@pytest.mark.parametrize("code", ["needs_domain", "needs_data"])
+@pytest.mark.parametrize("code", ["needs_domain", "needs_data", "contract_required"])
 @pytest.mark.parametrize("method", ["run_tool", "approve_metric"])
 def test_prerequisite_409_keeps_its_code_instead_of_becoming_a_session_conflict(code, method):
     payload = {"error": {"code": code, "message": "Confirm the required data first"}}
@@ -434,6 +434,31 @@ def test_identifiers_are_encoded_as_one_path_segment():
             {},
             "/tools/synthetic.tool/run",
             {"dataset_id": "ds_synthetic", "params": {"by": "channel", "limit": 3}},
+        ),
+        (
+            "run_keyword_grouping",
+            ("ds_synthetic",),
+            {"column": "search_term"},
+            "/datasets/ds_synthetic/keyword-groups/run",
+            {"column": "search_term"},
+        ),
+        (
+            "run_keyword_grouping",
+            ("ds_synthetic",),
+            {},
+            "/datasets/ds_synthetic/keyword-groups/run",
+            {},
+        ),
+        (
+            "apply_keyword_group_action",
+            ("ds_synthetic", "split", ["g2"]),
+            {"keywords": ("biryani near me", "biryani delivery")},
+            "/datasets/ds_synthetic/keyword-groups/actions",
+            {
+                "action": "split",
+                "group_ids": ["g2"],
+                "keywords": ["biryani near me", "biryani delivery"],
+            },
         ),
         (
             "apply_keyword_group_action",

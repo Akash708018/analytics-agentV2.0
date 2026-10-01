@@ -45,6 +45,7 @@ OPERATIONS = [
     Operation("run_tool", "post", "/tools/{tool_id}/run", "ToolRunRequest"),
     Operation("list_packs", "get", "/packs"),
     Operation("get_pack", "get", "/packs/{pack_id}"),
+    Operation("run_keyword_grouping", "post", "/datasets/{dataset_id}/keyword-groups/run", "KeywordRun"),
     Operation("list_keyword_groups", "get", "/datasets/{dataset_id}/keyword-groups"),
     Operation("apply_keyword_group_action", "post", "/datasets/{dataset_id}/keyword-groups/actions", "KeywordGroupAction"),
 ]
@@ -107,7 +108,7 @@ def test_all_spec_operations_have_a_client_case(contract):
     expected = {(method, path) for path, item in contract["paths"].items()
                 for method in item if method in {"get", "post", "put", "patch", "delete"}}
     assert {(op.method, op.path) for op in OPERATIONS} == expected
-    assert contract["info"]["version"] == "0.3.0"
+    assert contract["info"]["version"] == "0.5.0"
 
 
 @pytest.mark.parametrize("operation", OPERATIONS, ids=lambda op: op.client_method)
