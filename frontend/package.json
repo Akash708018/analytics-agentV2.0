@@ -1,0 +1,10 @@
+{
+  "name": "analytics-agent-frontend-mock",
+  "private": true,
+  "scripts": {
+    "mock": "prism mock ../docs/api/openapi.yaml --host 127.0.0.1 --port 4010"
+  },
+  "devDependencies": {
+    "@stoplight/prism-cli": "5.16.0"
+  }
+}

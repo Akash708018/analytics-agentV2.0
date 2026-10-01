@@ -219,3 +219,28 @@ the method that wrote them.
 engine (a `_kw_groups` table in the workspace, written by the approve/rename/merge/move/split
 actions). The LLM may propose a label and intent; without a model, rules propose them, and
 `proposed_by` says which.
+
+## F1 — HTTP client and spec-driven mock (2026-09-28)
+
+**D-F1-1. Use Prism as explicitly requested when Node is available.** Node 26.7.0
+is installed. Pin `@stoplight/prism-cli` 5.16.0 and commit its lockfile; the mock
+reads the canonical OpenAPI file directly. Contract tests use Prism's bundled
+YAML parser, adding no Python dependency or copied API contract. Examples are
+stateless fixtures, not evidence that sessions or turn execution persist.
+
+**D-F1-2. A conflict is exposed without retry or automatic adoption.** The original
+B1 handoff suggested adopting the current state and retrying. The user's explicit
+two-tab choice requirement governs: `VersionConflict.current` exposes the server
+state; F2 will offer the person's choices. Turn submissions are never retried.
+
+**D-F1-3. Consume API 0.3.0 after its concurrent merge.** The additive dataset lookup
+and fork-answer routes bring coverage to 29 operations. All 409 responses retain
+the requested `VersionConflict` boundary, but preserve the backend's `error.code`.
+`needs_domain` and `needs_data` are prerequisite errors with no current session;
+callers must check the code before showing session-conflict controls.
+
+**D-F1-4. Record mock limitations without changing browser protections.** HTTP
+tests exercised every operation and declared error status. Browser navigation to
+the mock's JSON response was blocked by the browser tool, so F1 makes no browser
+rendering claim. Issue #4 tracks the two remaining missing path declarations and
+generic error examples; the frontend does not patch backend-owned OpenAPI.
