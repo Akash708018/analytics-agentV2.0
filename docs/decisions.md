@@ -220,6 +220,64 @@ engine (a `_kw_groups` table in the workspace, written by the approve/rename/mer
 actions). The LLM may propose a label and intent; without a model, rules propose them, and
 `proposed_by` says which.
 
+## F1 — HTTP client and spec-driven mock (2026-09-28)
+
+**D-F1-1. Use Prism as explicitly requested when Node is available.** Node 26.7.0
+is installed. Pin `@stoplight/prism-cli` 5.16.0 and commit its lockfile; the mock
+reads the canonical OpenAPI file directly. Contract tests use Prism's bundled
+YAML parser, adding no Python dependency or copied API contract. Examples are
+stateless fixtures, not evidence that sessions or turn execution persist.
+
+**D-F1-2. A conflict is exposed without retry or automatic adoption.** The original
+B1 handoff suggested adopting the current state and retrying. The user's explicit
+two-tab choice requirement governs: `VersionConflict.current` exposes the server
+state; F2 will offer the person's choices. Turn submissions are never retried.
+
+**D-F1-3. Consume API 0.3.0 after its concurrent merge.** The additive dataset lookup
+and fork-answer routes bring coverage to 29 operations. All 409 responses retain
+the requested `VersionConflict` boundary, but preserve the backend's `error.code`.
+`needs_domain` and `needs_data` are prerequisite errors with no current session;
+callers must check the code before showing session-conflict controls.
+
+**D-F1-4. Record mock limitations without changing browser protections.** HTTP
+tests exercised every operation and declared error status. Browser navigation to
+the mock's JSON response was blocked by the browser tool, so F1 makes no browser
+rendering claim. Issue #4 tracks the two remaining missing path declarations and
+generic error examples; the frontend does not patch backend-owned OpenAPI.
+
+## F1 refresh — frontend handed to Claude Code; API 0.5.0 (2026-10-01)
+
+**D-F1-5. The frontend moves from Codex to Claude Code, on the user's instruction.** On
+2026-10-01 the user told the Claude Code session to "take over the front-end section from
+codex and start working". Claude Code now owns `frontend/`, `docs/steps/F*` and
+`docs/handoff/FRONTEND.md` as well as the backend paths. The frontend rules in `AGENTS.md`
+(HTTP-only, no computing or reformatting figures, explicit choices, milestone evidence) still
+govern frontend work. `CLAUDE.md`'s ownership line now says so. Codex should not push to
+`frontend/` unless the user hands it back.
+
+**D-F1-6. The branch follows the session, as in D-B0-1.** This session can push only
+`claude/beautiful-lovelace-07dnwu`, not `frontend/F<n>-<slug>`. Codex's F1 branch
+(`frontend/F1-api-client-mock`, PR #6, based on `305bcc0`/API 0.3.0) was merged into it with
+its history kept, then updated. A new PR supersedes PR #6. Nothing was force-pushed.
+
+**D-F1-7. Consume API 0.5.0: 30 operations.** New method `run_keyword_grouping` for
+`POST /datasets/{id}/keyword-groups/run` (body `{}` or `{column}`).
+`apply_keyword_group_action` takes `keywords[]` for `split`. The real backend also answers
+409 `contract_required` (tool runs, metric approval); a unit case now pins that its code is
+kept. Issue #4: 0.5.0 declares every path parameter and has no 501 routes; only the shared
+generic error example remains open.
+
+**D-F1-8. pyyaml was approved for the frontend but not added.** Asked before the F1 branch
+was found: the user approved pinning pyyaml 6.0.3. Codex's tests already read the YAML
+through Prism's bundled parser (D-F1-1), so no Python dependency was needed;
+`frontend/requirements.txt` is unchanged.
+
+**D-F1-9. First run against the real backend, not only Prism.** `frontend/dev/live_smoke.py`
+drives the client against `uvicorn --factory backend.api.app:create_app` (`AA_NO_LLM=1`,
+empty state dir): sessions, a stale-version conflict with `current`, ui_state rejection,
+upload, domain detection, tool gating, a turn, and delete. Output is in `docs/steps/F1.md`.
+Prism stays the contract test; the smoke run is evidence that the live server behaves the same.
+
 ## B8 — logistics pack (2026-10-01)
 
 **D-B8-1. SLA breach, on-time, in-full and RTO rate are COMPARISON metric templates, approved
