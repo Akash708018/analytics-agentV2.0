@@ -141,6 +141,45 @@ def festival_confound(text: str, trace: list[dict]) -> Violation | None:
     return None
 
 
+DRIVERS = r"(weather|rain\w*|address\w*|attempts?|payment|cod|prepaid|distance|traffic)"
+ASSOC = r"associat|correlat|went with|goes with|go with|alongside|coincid|not (proven|a) caus"
+
+
+def drivers_are_associations(text: str, trace: list[dict]) -> Violation | None:
+    m = re.search(rf"\b{DRIVERS}\b[^.]{{0,40}}\b({CAUSAL}|causing)\b", text, re.I) or \
+        re.search(rf"\b(because of|due to|caused by|driven by)\s+(the\s+)?(heavy\s+|poor\s+|"
+                  rf"low\s+|bad\s+)?{DRIVERS}\b", text, re.I)
+    if m and not re.search(ASSOC, text, re.I):
+        return Violation("drivers_are_associations", f"'{m.group(0)[:80]}' names a cause",
+                         "say breaches were more common WITH that condition in this data "
+                         "(an association), not that it caused them")
+    return None
+
+
+def sla_on_delivered_only(text: str, trace: list[dict]) -> Violation | None:
+    for sent in re.split(r"(?<=[.!?])\s+", text):
+        m = re.search(r"\b(rto|cancel\w*|pending|returned|undelivered)\b[^.]{0,50}\b(late|"
+                      r"breach\w*|on[- ]time|sla)\b", sent, re.I)
+        if m and not re.search(r"exclud|separate|not counted|not part|only delivered|out of "
+                               r"delivered|delivered orders only", sent, re.I):
+            return Violation("sla_on_delivered_only", f"'{m.group(0)[:80]}' mixes undelivered "
+                             "orders into SLA", "SLA rates are out of delivered orders; report "
+                             "RTO, cancelled and pending separately")
+    return None
+
+
+def compare_within_zone(text: str, trace: list[dict]) -> Violation | None:
+    m = re.search(r"\b(best|worst|fastest|slowest|better|worse|most reliable)\b[^.]{0,25}\b"
+                  r"(courier|carrier|partner|3pl)s?\b|\b(courier|carrier|partner)\s+\w+\s+"
+                  r"(is|was)\s+(the\s+)?(best|worst|better|worse|faster|slower)\b", text, re.I)
+    if m and not re.search(r"within (each |every |the same )?zone|zone by zone|in each zone|"
+                           r"by zone|same zones?|stratif", text, re.I):
+        return Violation("compare_within_zone", f"'{m.group(0)[:80]}' ranks couriers",
+                         "compare couriers within zone (courier by zone) before naming a "
+                         "winner, or say the ranking ignores zone mix")
+    return None
+
+
 RULES = {
     "no_sum_of_rate": no_sum_of_rate,
     "no_cross_source_conversion_sum": no_cross_source_conversion_sum,
@@ -151,6 +190,9 @@ RULES = {
     "measurement_change": measurement_change,
     "small_sample": small_sample,
     "festival_confound": festival_confound,
+    "drivers_are_associations": drivers_are_associations,
+    "sla_on_delivered_only": sla_on_delivered_only,
+    "compare_within_zone": compare_within_zone,
 }
 ALWAYS = ("no_sum_of_rate", "bounds", "measurement_change", "small_sample", "festival_confound")
 

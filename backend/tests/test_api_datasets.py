@@ -117,7 +117,7 @@ def test_cleaning_proposals_shape(env):
 def test_packs_endpoints(tmp_path):
     c = TestClient(create_app(state_dir=tmp_path))
     ids = [p["pack_id"] for p in c.get("/packs").json()["packs"]]
-    assert ids == ["core", "marketing"]
+    assert ids == ["core", "logistics", "marketing"]
     core = c.get("/packs/core").json()
     assert len(core["pack"]["festivals"]) == 6
     assert c.get("/packs/nope").status_code == 404

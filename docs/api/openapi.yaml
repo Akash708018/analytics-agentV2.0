@@ -3,7 +3,7 @@ info:
   title: analytics-agent v2
   description: Contract-first API. Figures carry provenance; chart series are computed by the backend.
     501 = spec'd, not live yet.
-  version: 0.5.0
+  version: 0.6.0
 paths:
   /health:
     get:
@@ -1314,6 +1314,13 @@ components:
           - type: 'null'
           title: Measure
           description: 'metrics/approve: the measure added'
+        provisional:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Provisional
+          description: 'metrics/approve of a comparison template (0/1 per row): what the engine measured
+            about it; results reading it say PROVISIONAL (not in the contract)'
       type: object
       required:
       - ok
@@ -1540,6 +1547,13 @@ components:
             $ref: '#/components/schemas/SourceCandidate'
           type: array
           title: Marketing Sources
+        sources:
+          items:
+            $ref: '#/components/schemas/DomainSource'
+          type: array
+          title: Sources
+          description: '0.6.0: every pack''s matched sources (marketing_sources is the marketing subset)'
+          default: []
         confirmed:
           items:
             type: string
@@ -1574,6 +1588,23 @@ components:
             - cost
             score: 0.88
           source: paid_ads
+    DomainSource:
+      properties:
+        domain:
+          type: string
+          title: Domain
+          description: The pack the source belongs to (marketing, logistics)
+        source:
+          type: string
+          title: Source
+        evidence:
+          $ref: '#/components/schemas/Evidence'
+      type: object
+      required:
+      - domain
+      - source
+      - evidence
+      title: DomainSource
     ErrorBody:
       properties:
         error:
@@ -2863,5 +2894,5 @@ components:
       - engine
       title: VersionInfo
       examples:
-      - api_version: 0.5.0
+      - api_version: 0.6.0
         engine: v1@0ba324b

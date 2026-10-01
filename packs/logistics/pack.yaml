@@ -1,0 +1,151 @@
+# logistics: last-mile and courier shipments (B8). Knowledge only -- no SQL, no expressions.
+# Concept ids are distinct from marketing's (payment_mode, rto_flag, shipment_id) so a file
+# bound under both packs never has one pack's hints overridden by the other's.
+pack:
+  id: logistics
+  version: 0.1.0
+  extends: [core]
+  title: Logistics and last-mile delivery
+
+vocabulary:
+  - {id: shipment_id, hints: [order_id, shipment_id, awb, awb_no, awb_number, tracking_id, consignment_id, waybill], weight: 0.6}
+  - {id: hub, hints: [hub, hub_name, warehouse, dc, fulfilment_center, fulfillment_center, origin_hub, station], weight: 1.0}
+  - {id: zone, hints: [zone, delivery_zone, locality, pincode_zone, cluster], weight: 0.8}
+  - {id: courier, hints: [courier, carrier, courier_partner, courier_name, logistics_partner, lsp, 3pl, shipping_partner], weight: 1.0}
+  - {id: rider_id, hints: [rider_id, rider, driver_id, delivery_agent, fe_id, agent_id], weight: 0.8}
+  - {id: promised_minutes, hints: [promised_minutes, sla_minutes, promised_mins, sla_mins, promised_tat], weight: 1.0}
+  - {id: delivery_minutes, hints: [recorded_delivery_minutes, delivery_minutes, delivery_time_minutes, actual_minutes, tat_minutes, actual_tat], weight: 1.0}
+  - {id: created_at, hints: [order_created_at, created_at, booked_at, manifested_at, pickup_at, shipped_at], weight: 0.8}
+  - {id: first_attempt_at, hints: [first_attempt_at, first_attempt_time, first_attempt_date], weight: 0.8}
+  - {id: delivered_at, hints: [delivered_at, delivered_on, delivery_timestamp, delivered_time], weight: 1.0}
+  - {id: delivery_status, hints: [delivery_status, shipment_status, current_status, last_status], weight: 1.0}
+  - {id: attempt_count, hints: [attempt_count, attempts, delivery_attempts, attempt_no, ndr_count], weight: 1.0}
+  - {id: distance, hints: [distance_km, distance, distance_kms, trip_distance_km], weight: 0.6}
+  - {id: gps_drop_distance, hints: [gps_drop_distance_m, gps_drop_distance, drop_distance_m, gps_distance_m], weight: 0.3}
+  - {id: package_weight, hints: [package_weight_kg, weight_kg, dead_weight, chargeable_weight, package_weight], weight: 0.6}
+  - {id: address_quality, hints: [address_quality, address_score, address_confidence], weight: 0.8}
+  - {id: weather, hints: [weather, weather_condition], weight: 0.6}
+  - {id: payment_mode, hints: [payment_mode, payment_type, cod_prepaid], weight: 0.6}
+  - {id: rto_flag, hints: [return_flag, rto_flag, is_rto, rto], weight: 1.0}
+  - {id: failure_reason, hints: [cancel_reason, rto_reason, ndr_reason, failure_reason, undelivered_reason], weight: 0.8}
+  - {id: delivery_cost, hints: [delivery_cost_inr, delivery_cost, shipping_cost, freight, freight_cost], weight: 0.6, measure_type: additive}
+  - {id: qty_ordered, hints: [qty_ordered, ordered_qty, quantity_ordered, units_ordered], weight: 0.8, measure_type: additive}
+  - {id: qty_delivered, hints: [qty_delivered, delivered_qty, quantity_delivered, units_delivered], weight: 0.8, measure_type: additive}
+
+sources:
+  - {id: last_mile, title: Last-mile deliveries, concepts: [shipment_id, hub, zone, rider_id, promised_minutes, delivery_minutes, delivered_at, delivery_status, attempt_count, failure_reason], required: [delivery_status], min_score: 0.3}
+  - {id: courier_shipments, title: Courier shipments, concepts: [shipment_id, courier, zone, delivered_at, delivery_status, rto_flag, attempt_count, failure_reason], required: [courier], min_score: 0.3}
+
+metric_templates:
+  - {id: sla_breach, label: SLA breach rate (delivered later than promised), shape: comparison, concept: delivery_minutes, op: ">", right: promised_minutes, definition: the order was delivered later than promised, required_concepts: [delivery_minutes, promised_minutes]}
+  - {id: on_time, label: On-time rate (delivered within the promise), shape: comparison, concept: delivery_minutes, op: "<=", right: promised_minutes, definition: the order was delivered within the promised minutes, required_concepts: [delivery_minutes, promised_minutes]}
+  - {id: in_full, label: In-full rate (every unit delivered), shape: comparison, concept: qty_delivered, op: ">=", right: qty_ordered, definition: every ordered unit was delivered, required_concepts: [qty_delivered, qty_ordered]}
+  - {id: rto_rate, label: RTO rate (returned to origin), shape: comparison, concept: rto_flag, op: "=", value: 1, definition: the shipment was returned to origin (the RTO flag is 1), required_concepts: [rto_flag]}
+  - {id: repeat_attempt, label: Needed more than one attempt, shape: comparison, concept: attempt_count, op: ">", value: 1, definition: delivery took more than one attempt, required_concepts: [attempt_count]}
+
+validity_rules:
+  - id: delivered_after_created
+    description: Leave out orders whose delivery time is not after their creation time (clock or entry errors) from on-time and SLA figures.
+    kind: require_after
+    concept: delivered_at
+    other: created_at
+    applies_to: [sla_breach, on_time]
+
+interpretation_rules:
+  - {id: sla_on_delivered_only, description: "SLA and on-time rates are out of delivered orders; RTO, cancelled and pending orders are reported separately, never as late or on time."}
+  - {id: compare_within_zone, description: "Couriers or hubs serve different zones and distances; a ranking is read within zone before naming a winner."}
+  - {id: drivers_are_associations, description: "Weather, address quality, attempts or payment mode that go with breaches are associations in this data, not proven causes."}
+
+playbooks:
+  - id: sla_where_and_why
+    description: Where SLA breaches concentrate (hub, courier or zone), then what goes with them inside the worst group.
+    patterns: [sla, breach, late, delay, delayed, on time, tat, promised, hub, worst]
+    steps:
+      - {tool: logistics.sla_compliance}
+      - {tool: logistics.sla_drivers}
+      - {tool: logistics.rto_analysis, optional: true}
+    rules: [sla_on_delivered_only, drivers_are_associations]
+    max_tool_calls: 3
+  - id: courier_scorecard
+    description: Which courier is late more often, read within zone, with RTO alongside.
+    patterns: [courier, carrier, partner, 3pl, compare, scorecard]
+    steps:
+      - {tool: logistics.courier_compare}
+      - {tool: logistics.rto_analysis, params: {by: courier}, optional: true}
+    rules: [compare_within_zone]
+    max_tool_calls: 2
+
+tools:
+  - id: logistics.sla_compliance
+    description: SLA breach rate on delivered orders by hub, courier or zone, ranked, with a weekly trend.
+    ui_label: Where SLA breaches are
+    base_analysis: group_compare + trend
+    slots: {by: [hub, courier, zone]}
+    required_concepts: [delivery_minutes, promised_minutes, delivery_status]
+    steps:
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@metric:sla_breach"}, filter: {concept: delivery_status, keep_matching: delivered}, title: Breach rate}
+      - {analysis: trend, params: {measure: "@metric:sla_breach", grain: week}, filter: {concept: delivery_status, keep_matching: delivered}, optional: true, title: Breach rate by week}
+    rules: [delivered_after_created, sla_on_delivered_only, no_sum_of_rate]
+    output: {shape: groups, chart: bar}
+  - id: logistics.sla_drivers
+    description: Inside one hub, courier or zone (the worst, unless you pick), breach rate by weather, address, attempts and payment, and distance late vs on time.
+    ui_label: What goes with breaches
+    base_analysis: group_compare
+    slots: {by: [hub, courier, zone]}
+    required_concepts: [delivery_minutes, promised_minutes, delivery_status]
+    steps:
+      - {analysis: group_compare, params: {dimension: "@weather", measure: "@metric:sla_breach"}, filter: [{concept: delivery_status, keep_matching: delivered}, {concept: "@by", focus_param: focus, worst_by: "@metric:sla_breach"}], optional: true, title: By weather}
+      - {analysis: group_compare, params: {dimension: "@address_quality", measure: "@metric:sla_breach"}, filter: [{concept: delivery_status, keep_matching: delivered}, {concept: "@by", focus_param: focus, worst_by: "@metric:sla_breach"}], optional: true, title: By address quality}
+      - {analysis: group_compare, params: {dimension: "@attempt_count", measure: "@metric:sla_breach"}, filter: [{concept: delivery_status, keep_matching: delivered}, {concept: "@by", focus_param: focus, worst_by: "@metric:sla_breach"}], optional: true, title: By attempts}
+      - {analysis: group_compare, params: {dimension: "@payment_mode", measure: "@metric:sla_breach"}, filter: [{concept: delivery_status, keep_matching: delivered}, {concept: "@by", focus_param: focus, worst_by: "@metric:sla_breach"}], optional: true, title: By payment mode}
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@distance"}, filter: [{concept: delivery_status, keep_matching: delivered}, {concept: "@by", focus_param: focus, worst_by: "@metric:sla_breach"}, {concept: delivery_minutes, compare: ">", other: promised_minutes}], optional: true, title: Distance when late}
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@distance"}, filter: [{concept: delivery_status, keep_matching: delivered}, {concept: "@by", focus_param: focus, worst_by: "@metric:sla_breach"}, {concept: delivery_minutes, compare: "<=", other: promised_minutes}], optional: true, title: Distance when on time}
+    rules: [delivered_after_created, sla_on_delivered_only, drivers_are_associations, no_sum_of_rate]
+    output: {shape: groups, chart: bar}
+  - id: logistics.otif
+    description: On-time rate, in-full rate, and on-time among in-full orders, by hub or courier; the joint rate is not guessed.
+    ui_label: On time, in full
+    base_analysis: group_compare
+    slots: {by: [hub, courier, zone]}
+    required_concepts: [delivery_status]
+    steps:
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@metric:on_time"}, filter: {concept: delivery_status, keep_matching: delivered}, optional: true, title: On time}
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@metric:in_full"}, filter: {concept: delivery_status, keep_matching: delivered}, optional: true, title: In full}
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@metric:on_time"}, filter: [{concept: delivery_status, keep_matching: delivered}, {concept: qty_delivered, compare: ">=", other: qty_ordered}], optional: true, title: On time among in-full}
+    rules: [delivered_after_created, sla_on_delivered_only, no_sum_of_rate]
+    output: {shape: groups, chart: bar}
+  - id: logistics.courier_compare
+    description: Courier breach rates overall and courier by zone, so a courier on easy zones is not mistaken for a better one.
+    ui_label: Compare couriers within zone
+    base_analysis: group_compare + cross_tab + sample_adequacy
+    required_concepts: [courier, zone, delivery_minutes, promised_minutes, delivery_status]
+    steps:
+      - {analysis: group_compare, params: {dimension: "@courier", measure: "@metric:sla_breach"}, filter: {concept: delivery_status, keep_matching: delivered}, title: Breach rate by courier}
+      - {analysis: cross_tab, params: {rows: "@courier", columns: "@zone", measure: "@metric:sla_breach"}, filter: {concept: delivery_status, keep_matching: delivered}, optional: true, title: Courier by zone}
+      - {analysis: sample_adequacy, params: {dimension: "@courier", measure: "@metric:sla_breach"}, filter: {concept: delivery_status, keep_matching: delivered}, optional: true, title: Is each courier big enough}
+    rules: [delivered_after_created, compare_within_zone, no_sum_of_rate]
+    output: {shape: groups, chart: bar}
+  - id: logistics.stuck_shipments
+    description: Shipments still open (pending, in transit) longer than N days before an as-of date you enter, by hub and status.
+    ui_label: Stuck shipments
+    base_analysis: frequency
+    params_required: [as_of]
+    slots: {by: [hub, courier, zone]}
+    required_concepts: [delivery_status, created_at]
+    steps:
+      - {analysis: frequency, params: {column: "@by", limit: 50}, filter: [{concept: delivery_status, keep_matching: "pending|in transit|in_transit|out for delivery|picked up|manifested|shipped"}, {concept: created_at, older_than: {as_of_param: as_of, days_param: days}}], title: Stuck by group}
+      - {analysis: frequency, params: {column: "@delivery_status", limit: 20}, filter: [{concept: delivery_status, keep_matching: "pending|in transit|in_transit|out for delivery|picked up|manifested|shipped"}, {concept: created_at, older_than: {as_of_param: as_of, days_param: days}}], optional: true, title: Stuck by status}
+    output: {shape: groups, chart: bar}
+  - id: logistics.rto_analysis
+    description: RTO rate by hub, zone, payment mode or address quality, the reasons, and where the RTO flag and status disagree.
+    ui_label: Returns to origin
+    base_analysis: group_compare + frequency
+    slots: {by: [hub, courier, zone]}
+    required_concepts: [rto_flag]
+    steps:
+      - {analysis: group_compare, params: {dimension: "@by", measure: "@metric:rto_rate"}, title: RTO rate}
+      - {analysis: group_compare, params: {dimension: "@payment_mode", measure: "@metric:rto_rate"}, optional: true, title: RTO rate by payment mode}
+      - {analysis: group_compare, params: {dimension: "@address_quality", measure: "@metric:rto_rate"}, optional: true, title: RTO rate by address quality}
+      - {analysis: frequency, params: {column: "@failure_reason", limit: 20}, filter: {concept: rto_flag, keep_matching: "1|true|yes"}, optional: true, title: RTO reasons}
+    rules: [drivers_are_associations, no_sum_of_rate]
+    output: {shape: groups, chart: bar, checks: [rto_flag_conflict]}

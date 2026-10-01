@@ -144,8 +144,12 @@ class DatasetService:
         d = self._get(dataset_id)
         cols = [c.name for c in self._evidence(d).columns]
         det = detect(cols)
+        owner = {s.id: pid for pid, p in load_all().items() for s in p.sources}
         return {"dataset_id": dataset_id, "domains": det.domains,
-                "marketing_sources": det.sources, "confirmed": d["domains"]}
+                "marketing_sources": [x for x in det.sources if owner[x["source"]] ==
+                                      "marketing"],
+                "sources": [{**x, "domain": owner[x["source"]]} for x in det.sources],
+                "confirmed": d["domains"]}
 
     def confirm_domains(self, dataset_id: str, domains: list[str]) -> dict:
         d = self._get(dataset_id)
@@ -307,6 +311,8 @@ class DatasetService:
                                f"{t.label} is a {t.shape} metric; the engine cannot compute that "
                                f"shape yet, so it is not offered as a number.")
         forks = {**d["fork_choices"], **fork_choices}
+        if t.shape == "comparison":
+            return self._approve_comparison(d, t, bindings, forks)
         spec = {"numerator": t.numerator, "denominator": t.denominator}
         if t.variants_by:
             choice = forks.get(t.variants_by)
@@ -358,6 +364,37 @@ class DatasetService:
                                        fork_choices=forks)
         return {"ok": True, "version": self._contract(d).version, "measure": name}
 
+    def _approve_comparison(self, d: dict, t, bindings: dict, forks: dict) -> dict:
+        """A 0/1 metric (D-B8-1): proposed and decided as a v1 provisional metric in one step;
+        this API call is the person's approval. Results reading it say PROVISIONAL."""
+        from backend.engine.contract import provisional
+        bound, _ = self._bound(d)
+        ctx = runner.Ctx(con=None, workspace_id=d["workspace_id"], table=d["name"],
+                         merged=None, bound=bound, measures=set(), metrics={},
+                         fork_choices=forks, validity=[], window=None, festivals={},
+                         params={"bindings": bindings})
+        try:
+            left = runner.column_for(ctx, t.concept)
+            right = runner.column_for(ctx, t.right) if t.right else None
+        except runner.Skip as e:
+            raise ServiceError(422, "needs_data", f"{t.label}: {e}") from None
+        ws, contract = d["workspace_id"], self._contract(d).contract
+        with self.be._workspace(ws):
+            con = db.connect(ws)
+            try:
+                p = provisional.propose(con, ws, d["name"], name=t.id, left=left, op=t.op,
+                                        right=right, value=t.value, agg=t.agg,
+                                        definition=t.definition, contract=contract)
+            except provisional.ProposalError as e:
+                raise ServiceError(422, "metric_refused", str(e)) from None
+            finally:
+                con.close()
+            provisional.decide(ws, p.id, True)
+        self.store.set_dataset_choices(d["dataset_id"], metrics={**d["metrics"], t.id: t.id},
+                                       fork_choices=forks)
+        return {"ok": True, "version": self._contract(d).version, "measure": t.id,
+                "provisional": provisional.describe(p)}
+
     # --- validity rules ----------------------------------------------------------------------
     def validity_rules(self, dataset_id: str) -> dict:
         d = self._get(dataset_id)
@@ -376,6 +413,8 @@ class DatasetService:
                              "flag_rows": f"regexp_matches(lower(CAST({c} AS VARCHAR)), "
                                           f"'{r.pattern}')",
                              "require_positive": f"NOT coalesce({c} > 0, false)"}.get(r.kind)
+                    if r.kind == "require_after" and len(bound.get(r.other or "", [])) == 1:
+                        where = "NOT " + runner.after_sql(c, runner.q(bound[r.other][0]))
                     if r.kind == "flag_zero" and len(bound.get(r.other or "", [])) == 1:
                         where = f"{c} > 0 AND coalesce({runner.q(bound[r.other][0])}, 0) = 0"
                     if where:

@@ -100,6 +100,12 @@ class MetricTemplate(Strict):
                                       "denominator} overrides, or {unsupported: reason}")
     engine_ready: bool = Field(True, description="False: the engine cannot compute this shape "
                                "yet; approval is refused with the reason")
+    # comparison (B8): 1 where `concept op right` (or `concept op value`), else 0; agg mean = rate
+    op: Literal[">", ">=", "<", "<=", "=", "<>"] | None = None
+    right: str | None = Field(None, description="comparison: the concept on the right")
+    value: float | None = Field(None, description="comparison: a number on the right")
+    agg: Literal["mean", "sum"] = "mean"
+    definition: str = Field("", description="comparison: what 1 means, in words")
 
     @model_validator(mode="after")
     def _shape_fields(self):
@@ -107,21 +113,25 @@ class MetricTemplate(Strict):
                 "weighted_mean": ("concept", "weight"),
                 "distinct_count": ("concept",), "percentile": ("concept",),
                 "semi_additive": ("concept", "as_of"), "derived": ("numerator", "denominator"),
-                "comparison": ("concept",)}[self.shape]
+                "comparison": ("concept", "op", "definition")}[self.shape]
         missing = [f for f in need if getattr(self, f) is None]
         if missing:
             raise ValueError(f"template {self.id} ({self.shape}) needs {missing}")
+        if self.shape == "comparison" and (self.right is None) == (self.value is None):
+            raise ValueError(f"template {self.id}: compare with a concept or a value, not both")
         return self
 
 
 class ValidityRule(Strict):
     id: str
     description: str
-    kind: Literal["exclude_matching", "flag_rows", "require_positive", "flag_zero"]
+    kind: Literal["exclude_matching", "flag_rows", "require_positive", "flag_zero",
+                  "require_after"]
     concept: str
     pattern: str | None = Field(None, description="Lower-case words joined by |; no regex "
                                 "syntax beyond alternation")
-    other: str | None = Field(None, description="flag_zero: the concept that is zero")
+    other: str | None = Field(None, description="flag_zero: the concept that is zero; "
+                              "require_after: the start timestamp `concept` must follow")
     applies_to: list[str] = Field([], description="Metric templates this rule guards; empty "
                                   "= every tool run on the dataset")
 
@@ -164,7 +174,10 @@ class Step(Strict):
     filter: dict | list[dict] | None = Field(None, description="Structured row filter(s): "
                                              "{concept, between: [lo, hi]} | {concept, "
                                              "terms_param, negate} | {concept, date_range} | "
-                                             "{concept, exclude_truthy: true}")
+                                             "{concept, exclude_truthy: true} | {concept, "
+                                             "keep_matching: words} | {concept, compare: op, "
+                                             "other} | {concept, focus_param, worst_by} | "
+                                             "{concept, older_than: {as_of_param, days_param}}")
     title: str = ""
 
 
