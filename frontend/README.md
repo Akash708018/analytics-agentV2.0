@@ -5,12 +5,37 @@ Run commands from the repository root. Use Python 3.12 or newer.
 ```sh
 uv venv frontend/.venv --python 3.12
 uv pip install --python frontend/.venv/bin/python -r frontend/requirements.txt
-frontend/.venv/bin/python -m streamlit run frontend/app.py
 ```
 
-The landing page deliberately collects no user work until backend session saving
-is connected in F2. `api_client.py` implements the HTTP boundary for OpenAPI
-0.5.0; `state.py` remains the reserved F2 boundary. Neither imports the engine.
+## Running the app (F2)
+
+The app needs the backend. In one terminal (no model configured: questions end
+`agent_not_wired`; with provider keys set they are answered):
+
+```sh
+uv run uvicorn --factory backend.api.app:create_app --port 8000
+```
+
+In another:
+
+```sh
+ANALYTICS_API_URL=http://127.0.0.1:8000 frontend/.venv/bin/python -m streamlit run frontend/app.py
+```
+
+Open the printed URL and click **Start a new session**. The address then holds
+`?sid=<uuid>`: that link is the session. Pages: **Session** (name the analysis),
+**Data** (upload a CSV/xlsx, choose the dataset questions use), **Ask** (questions
+and answers; a running question survives refresh and is never sent twice).
+
+Everything the person sets is saved to the backend session (`ui_state`, an explicit
+allowlist in `state.py`) and comes back after refresh or on another device. Two tabs
+editing the same thing get an explicit **Load latest** / **Keep my changes** choice.
+Text is saved on Enter or when the field loses focus. See
+[F2 evidence](../docs/steps/F2.md).
+
+Layout: `app.py` (router), `state.py` (hydrate/save/conflicts), `turns.py`,
+`connection.py`, `components/shell.py`, `views/` (pages; not `pages/`, see D-F2-2).
+Nothing here imports the backend; `api_client.py` is the only HTTP boundary.
 
 ## API client and mock (F1)
 
@@ -94,5 +119,4 @@ parameters. The probe intentionally loses values so the failure can be measured.
 Do not deploy it or use it with private data. Stop the server with Ctrl-C.
 
 See [F0 evidence and inventory](../docs/steps/F0.md), [F1 evidence](../docs/steps/F1.md),
-and [frontend handoff](../docs/handoff/FRONTEND.md). F2 starts only when the human
-starts the next milestone; session persistence is not implemented in F1.
+[F2 evidence](../docs/steps/F2.md), and [frontend handoff](../docs/handoff/FRONTEND.md).

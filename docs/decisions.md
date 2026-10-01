@@ -277,3 +277,48 @@ drives the client against `uvicorn --factory backend.api.app:create_app` (`AA_NO
 empty state dir): sessions, a stale-version conflict with `current`, ui_state rejection,
 upload, domain detection, tool gating, a turn, and delete. Output is in `docs/steps/F1.md`.
 Prism stays the contract test; the smoke run is evidence that the live server behaves the same.
+
+## F2 — sessions, saved work, conflict choices, turn resume (2026-10-01)
+
+**D-F2-1. The F2 browser check uses the preinstalled Playwright, once, outside the repo.**
+AGENTS.md allows Playwright only in F7. This cloud session has no desktop browser. The user
+chose (2026-10-01): a one-off script, run against the real backend and Streamlit, with its
+output pasted into `docs/steps/F2.md`. It is not in `requirements.txt`, `package.json` or the
+test suite, and the F7 rule still governs Playwright as a dependency.
+
+**D-F2-2. Pages live in `frontend/views/`, not `frontend/pages/`.** Streamlit's legacy
+multipage mode registers every file in a `pages/` folder as a standalone page. AppTest's
+`switch_page` matched that registration and ran `pages/session.py` without the router, so
+nothing was saved (measured: no PUT after a page switch). `st.navigation` ignores `pages/` in
+the browser, but the folder name invited the ambiguity. Renamed.
+
+**D-F2-3. A conflict that differs only in `page` is not put to the person.** Every
+navigation saves `page`. Two tabs of one session that only navigate would otherwise show
+conflict banners with no work at stake. If the server's and this tab's `ui_state` match on
+everything except `page`, the tab adopts the server's version and saves its own page next
+run. Any difference in the person's work (label, active dataset, dataset list, keys from a
+newer frontend) still waits for Load latest / Keep my changes. Measured in the browser: two
+tabs navigating, 0 banners; a stale label edit, 1 banner.
+
+**D-F2-4. Dataset references are unioned on "Load latest".** The API has no dataset listing,
+so `ui_state.datasets[]` is the session's only pointer to uploads (display metadata only:
+id, name, rows, columns). Adopting another tab's state must not orphan an upload that exists
+on the server either way. api-request
+[#14](https://github.com/Akash708018/analytics-agentV2.0/issues/14) asks for
+`GET /workspaces/{ws}/datasets`, which would remove the need.
+
+**D-F2-5. A turn is followed by id; a lost reply is looked up, never resent.** A `POST /turns`
+that fails at the transport level may have been stored. The session's turn list is checked
+for a new turn with the same question. Only if none is found does the person get "Send again".
+A refresh lists the session's turns and polls running ones (`st.fragment(run_every=2)`).
+Question drafts stay in the browser: free text is not put in `ui_state`.
+
+**C7. Streamlit can stop a run between a PUT and recording its new version.** Found only by
+the browser: text typed without Enter, then a click on a sidebar link, produced two reruns.
+The first PUT landed (v2), but Streamlit stopped that run at the next session-state access.
+Every `SafeSessionState` read and write calls `_yield_callback`, and that access was the line
+recording v2. The second run saved with v1 and showed the person a conflict with their own
+tab. Fix: after a network call returns, update only objects already in hand, never
+`st.session_state`. Pinned by a test that stops the run at the first session-state access
+after the PUT, falsified by putting one such access back. The AppTests could not show this,
+because AppTest runs one rerun at a time.
