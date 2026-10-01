@@ -2,6 +2,21 @@
 
 Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry here.
 
+## 0.6.0 — 2026-10-01 (B8)
+
+Second domain: **logistics** (`GET /packs` now lists `core, logistics, marketing`; confirm with
+`POST /datasets/{id}/domains/confirm {"domains": ["logistics"]}`). Additive:
+`DomainDetection.sources[]` (every pack's matched sources, with `domain`); `marketing_sources`
+keeps only marketing ones (a logistics source no longer appears there). `Confirmed.provisional`:
+approving a comparison template (`sla_breach`, `on_time`, `in_full`, `rto_rate`,
+`repeat_attempt` — shape `comparison`) returns what the engine measured about it; results
+reading it carry a PROVISIONAL caveat. New tools: `logistics.sla_compliance`,
+`logistics.sla_drivers` (`params.focus` optional — without it the engine picks the worst group
+and a caveat says which), `logistics.otif`, `logistics.courier_compare`,
+`logistics.stuck_shipments` (`params.as_of` required, `params.days` default 3),
+`logistics.rto_analysis`. Tool results: frequency steps report the row COUNT as the figure
+(was the share); every group row's `n` is now also a figure (`<step>: <group> [n]`).
+
 ## 0.5.0 — 2026-09-28 (B7)
 
 Keyword groups are live: `POST /datasets/{id}/keyword-groups/run` (new; body `{column?}`),

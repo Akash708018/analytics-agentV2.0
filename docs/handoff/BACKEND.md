@@ -1,8 +1,8 @@
 ## Status (date, branch, last commit)
 
-2026-09-27 · branch `claude/analytics-agent-v2-backend-6gcu1p` · B2 in PR #3 (open), B3 on top.
-Done: B0–B6, **B7** (keyword grouping: pipeline, approvals, 3 tools; API 0.5.0). Bench:
-`bench/RESULTS.md`. Open for the user: approve the draft keyword gold (D-B7-3).
+2026-10-01 · branch `claude/analytics-agent-v2-backend-6gcu1p` · B7 merged (PR #11).
+Done: B0–B7, **B8** (logistics pack: 6 tools, 2 playbooks, the 19 SLA checks reproduced through
+the API; API 0.6.0). Open for the user: approve the draft keyword gold (D-B7-3).
 
 ## API: spec version — live | stubbed (501) | changed since last handoff
 
@@ -10,6 +10,8 @@ Done: B0–B6, **B7** (keyword grouping: pipeline, approvals, 3 tools; API 0.5.0
 when a model is configured (env keys as in v1); events: plan, tool_call, figure_check,
 interpretation_check, answer. Earlier: metrics, validity rules, forks, tool run (0.3.0).
 0.5.0: keyword groups live (run, list, actions). No endpoint answers 501.
+**0.6.0** (B8, additive): logistics domain; `DomainDetection.sources[]`; `Confirmed.provisional`
+for comparison metrics; frequency figures are counts; group `n` figures.
 
 ## Tools: active tool ids per domain; tool-schema tokens (core vs core+marketing)
 
@@ -20,7 +22,9 @@ seo_change_explainer, striking_distance, brand_vs_nonbrand, content_decay, email
 list_health, social_post_performance, impression_share_loss, quality_score_vs_cpc,
 utm_hygiene; Tier-2: funnel, conversion_reconciliation, ab_test_readout, budget_pacing,
 keyword_ngrams, cannibalization, ctr_vs_position, campaign_impact, delivered_roas, cac_payback,
-ltv_to_cac. Tokens (estimate): core-only 194; core+marketing (all 31 active) 1886.
+ltv_to_cac.
+logistics (B8): sla_compliance, sla_drivers, otif, courier_compare, stuck_shipments,
+rto_analysis; playbooks sla_where_and_why, courier_scorecard. Tokens (estimate): core-only 194; core+marketing (all 31 active) 1886.
 
 ## For Codex: what to build against now; breaking changes; mock notes
 
@@ -39,6 +43,10 @@ ltv_to_cac. Tokens (estimate): core-only 194; core+marketing (all 31 active) 188
 - Keyword groups screen: `POST .../keyword-groups/run`, list with `approved`, `intent`,
   `facets`, `proposed_by`; actions approve / rename / merge / move_keyword / split. Only
   approved groups feed `marketing.keyword_group_performance` and `marketing.page_targeting`.
+- Logistics: approve metrics `sla_breach` / `rto_rate` (comparison, 0/1 per row) on the
+  metrics screen — show the `provisional` text; results say PROVISIONAL. `sla_drivers` takes an
+  optional `focus` (a hub/courier/zone value); without it a caveat starting `Focus:` says which
+  group the engine chose. `stuck_shipments` needs `as_of` (date) and takes `days`.
 - Period params are calendar labels at `grain` (default month): `2026-01`.
 - B4 figures: every numeric cell is a figure; extra columns are named `step: row [column]`.
   Tier-2 inputs the person types: budget + month (pacing), spend per cohort month (CAC),
@@ -52,10 +60,10 @@ None (checked 2026-09-26).
 
     cd backend && uv run pytest -q -rs
     SKIPPED [1] tests/test_agent.py:580: v2 B0 (D-B0-2): the v1 Streamlit app ui/app.py is not seeded; v2 screens belong to the frontend
-    2338 passed, 1 skipped, 1 warning in 204.31s (0:03:24)
-    eval: SCORE: 76/76 (100%)
+    2349 passed, 1 skipped, 1 warning in 237.94s (0:03:57)
+    eval: SCORE: 76/76 (100%) · sla_bench: 19/19 checks right
 
 ## Next milestone
 
-B8 — logistics pack (ask first per the plan): SLA/OTIF/courier/stuck/RTO tools and the
-`sla_where_and_why` playbook reproducing the 19/19 SLA checks.
+None planned after B8. Open: D-B7-3 (keyword gold approval), O-B2-1 (Claude Desktop
+list_changed, needs a real desktop).

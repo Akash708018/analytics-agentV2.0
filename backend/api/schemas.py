@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-API_VERSION = "0.5.0"
+API_VERSION = "0.6.0"
 
 
 def _ex(*examples: dict) -> ConfigDict:
@@ -312,10 +312,18 @@ class SourceCandidate(BaseModel):
     evidence: Evidence
 
 
+class DomainSource(BaseModel):
+    domain: str = Field(description="The pack the source belongs to (marketing, logistics)")
+    source: str
+    evidence: Evidence
+
+
 class DomainDetection(BaseModel):
     dataset_id: str
     domains: list[DomainCandidate]
     marketing_sources: list[SourceCandidate]
+    sources: list[DomainSource] = Field([], description="0.6.0: every pack's matched sources "
+                                        "(marketing_sources is the marketing subset)")
     confirmed: list[str] = Field(description="Domains the person confirmed; a guess alone "
                                              "never enables domain tools")
     model_config = _ex({
@@ -403,6 +411,9 @@ class Confirmed(BaseModel):
     ok: bool
     version: int
     measure: str | None = Field(None, description="metrics/approve: the measure added")
+    provisional: str | None = Field(None, description="metrics/approve of a comparison "
+                                    "template (0/1 per row): what the engine measured about it; "
+                                    "results reading it say PROVISIONAL (not in the contract)")
     model_config = _ex({"ok": True, "version": 1}, {"ok": True, "version": 2, "measure": "roas"})
 
 
