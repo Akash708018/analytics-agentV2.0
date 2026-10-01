@@ -231,9 +231,31 @@ class APIClient:
     def get_pack(self, pack_id: str) -> JsonObject:
         return self._request("GET", f"packs/{_segment(pack_id)}")
 
-    def run_keyword_grouping(self, dataset_id: str, column: str | None = None) -> JsonObject:
+    def run_keyword_grouping(
+        self, dataset_id: str, column: str | None = None, backend: str | None = None,
+    ) -> JsonObject:
         body: JsonObject = {} if column is None else {"column": column}
+        if backend is not None:
+            body["backend"] = backend
         return self._request("POST", f"datasets/{_segment(dataset_id)}/keyword-groups/run", json=body)
+
+    def list_results(self, dataset_id: str) -> JsonObject:
+        return self._request("GET", f"datasets/{_segment(dataset_id)}/results")
+
+    def get_result(self, result_id: str) -> JsonObject:
+        return self._request("GET", f"results/{_segment(result_id)}")
+
+    def inspect_result(
+        self, result_id: str, *, step: str | None = None, sort_by: str | None = None,
+        descending: bool | None = None, group: str | None = None,
+        limit: int | None = None, offset: int | None = None,
+    ) -> JsonObject:
+        query = {name: value for name, value in (
+            ("step", step), ("sort_by", sort_by),
+            ("descending", None if descending is None else str(descending).lower()),
+            ("group", group), ("limit", limit), ("offset", offset),
+        ) if value is not None}
+        return self._request("GET", f"results/{_segment(result_id)}/inspect", params=query or None)
 
     def list_keyword_groups(self, dataset_id: str) -> JsonObject:
         return self._request("GET", f"datasets/{_segment(dataset_id)}/keyword-groups")

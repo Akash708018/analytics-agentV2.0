@@ -930,6 +930,165 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
           description: Conflict
+  /datasets/{dataset_id}/results:
+    get:
+      tags:
+      - results
+      summary: List Results
+      operationId: list_results_datasets__dataset_id__results_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultList'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /results/{result_id}:
+    get:
+      tags:
+      - results
+      summary: Get Result
+      operationId: get_result_results__result_id__get
+      parameters:
+      - name: result_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Result Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoredResult'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+  /results/{result_id}/inspect:
+    get:
+      tags:
+      - results
+      summary: Inspect Result
+      operationId: inspect_result_results__result_id__inspect_get
+      parameters:
+      - name: result_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Result Id
+      - name: step
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Step
+      - name: sort_by
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sort By
+      - name: descending
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Descending
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 0
+          title: Offset
+      - name: group
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Group
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultInspection'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
   /datasets/{dataset_id}/keyword-groups/run:
     post:
       tags:
@@ -2255,6 +2414,129 @@ components:
         rows: 18240
         warnings:
         - 'ctr is a per-row rate: never sum it'
+    ResultInspection:
+      properties:
+        result_id:
+          type: string
+          title: Result Id
+        step:
+          type: string
+          title: Step
+        steps:
+          items:
+            type: string
+          type: array
+          title: Steps
+        headers:
+          items:
+            type: string
+          type: array
+          title: Headers
+        rows:
+          items:
+            items: {}
+            type: array
+          type: array
+          title: Rows
+          description: 'Engine rows as computed: sorted / filtered here, never recomputed'
+        total_rows:
+          type: integer
+          title: Total Rows
+          description: Rows matching the group filter among those kept
+        rows_kept:
+          type: integer
+          title: Rows Kept
+        rows_in_engine_output:
+          type: integer
+          title: Rows In Engine Output
+      type: object
+      required:
+      - result_id
+      - step
+      - steps
+      - headers
+      - rows
+      - total_rows
+      - rows_kept
+      - rows_in_engine_output
+      title: ResultInspection
+      examples:
+      - headers:
+        - hub
+        - n
+        - total
+        result_id: r_0a1b2c3d4e5f6a7b
+        rows:
+        - - Pune_South
+          - 94
+          - 63.8%
+        rows_in_engine_output: 5
+        rows_kept: 5
+        step: Breach rate
+        steps:
+        - Breach rate
+        total_rows: 1
+    ResultList:
+      properties:
+        dataset_id:
+          type: string
+          title: Dataset Id
+        results:
+          items:
+            $ref: '#/components/schemas/ResultSummary'
+          type: array
+          title: Results
+      type: object
+      required:
+      - dataset_id
+      - results
+      title: ResultList
+      examples:
+      - dataset_id: ds_ads_2026q3
+        results:
+        - created_at: '2026-10-02T09:00:00+00:00'
+          result_id: r_0a1b2c3d4e5f6a7b
+          run_id: r_0a1b2c3d4e5f6a7b
+          stale: true
+          stale_reasons:
+          - the data changed (cleaning or a new upload) since this result
+          status: ok
+          tool_id: logistics.sla_compliance
+    ResultSummary:
+      properties:
+        result_id:
+          type: string
+          title: Result Id
+        tool_id:
+          type: string
+          title: Tool Id
+        run_id:
+          type: string
+          title: Run Id
+        status:
+          type: string
+          title: Status
+        created_at:
+          type: string
+          title: Created At
+        stale:
+          type: boolean
+          title: Stale
+        stale_reasons:
+          items:
+            type: string
+          type: array
+          title: Stale Reasons
+          default: []
+      type: object
+      required:
+      - result_id
+      - tool_id
+      - run_id
+      - status
+      - created_at
+      - stale
+      title: ResultSummary
     RuleApprove:
       properties:
         approve:
@@ -2393,6 +2675,155 @@ components:
       - source
       - evidence
       title: SourceCandidate
+    StoredResult:
+      properties:
+        tool_id:
+          type: string
+          title: Tool Id
+        dataset_id:
+          type: string
+          title: Dataset Id
+        summary:
+          type: string
+          title: Summary
+        figures:
+          items:
+            $ref: '#/components/schemas/Figure'
+          type: array
+          title: Figures
+        series:
+          items:
+            $ref: '#/components/schemas/ChartSeries'
+          type: array
+          title: Series
+          default: []
+        validity_filters_applied:
+          items:
+            type: string
+          type: array
+          title: Validity Filters Applied
+          description: By name
+        pack_rules_applied:
+          items:
+            type: string
+          type: array
+          title: Pack Rules Applied
+        forks:
+          additionalProperties:
+            type: string
+          type: object
+          title: Forks
+          description: fork id -> the option the person chose
+          default: {}
+        caveats:
+          items:
+            type: string
+          type: array
+          title: Caveats
+          default: []
+        figure_check:
+          $ref: '#/components/schemas/FigureCheck'
+        result_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Result Id
+          description: Stored result id (GET /results/{id})
+        run_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Run Id
+          description: The turn that ran it, else its own id
+        status:
+          anyOf:
+          - type: string
+            enum:
+            - ok
+            - partial
+            - insufficient_data
+          - type: 'null'
+          title: Status
+          description: 'partial: a step was skipped or refused; insufficient_data: no reportable figure'
+        snapshot:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Snapshot
+          description: '{hash, rows} of the table it was computed on'
+        contract_version:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Contract Version
+        grain:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Grain
+        metrics_used:
+          additionalProperties: true
+          type: object
+          title: Metrics Used
+          description: template id -> {measure}
+          default: {}
+        stale:
+          type: boolean
+          title: Stale
+          description: The data, contract or a metric it read changed since
+        stale_reasons:
+          items:
+            type: string
+          type: array
+          title: Stale Reasons
+          default: []
+        created_at:
+          type: string
+          title: Created At
+      type: object
+      required:
+      - tool_id
+      - dataset_id
+      - summary
+      - figures
+      - validity_filters_applied
+      - pack_rules_applied
+      - figure_check
+      - stale
+      - created_at
+      title: StoredResult
+      examples:
+      - caveats:
+        - 3 spend rows with 0 impressions flagged, not dropped
+        dataset_id: ds_ads_2026q3
+        figure_check:
+          notes: []
+          status: passed
+        figures:
+        - name: ROAS google
+          provenance: contract
+          unit: x
+          value: 3.8
+        forks:
+          roas_revenue_basis: net_excl_gst
+        pack_rules_applied:
+        - no_sum_of_rate
+        series:
+        - chart: bar
+          name: ROAS by channel
+          points:
+          - x: google
+            y: 3.8
+          - x: meta
+            y: 2.4
+          x_label: channel
+          y_label: ROAS
+        summary: Google ROAS 3.8 vs Meta 2.4 on net-of-GST revenue
+        tool_id: marketing.channel_efficiency
+        validity_filters_applied:
+        - exclude_test_campaigns
+        - roas_spend_positive
     ToolList:
       properties:
         tools:
@@ -2469,6 +2900,51 @@ components:
           default: []
         figure_check:
           $ref: '#/components/schemas/FigureCheck'
+        result_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Result Id
+          description: Stored result id (GET /results/{id})
+        run_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Run Id
+          description: The turn that ran it, else its own id
+        status:
+          anyOf:
+          - type: string
+            enum:
+            - ok
+            - partial
+            - insufficient_data
+          - type: 'null'
+          title: Status
+          description: 'partial: a step was skipped or refused; insufficient_data: no reportable figure'
+        snapshot:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Snapshot
+          description: '{hash, rows} of the table it was computed on'
+        contract_version:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Contract Version
+        grain:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Grain
+        metrics_used:
+          additionalProperties: true
+          type: object
+          title: Metrics Used
+          description: template id -> {measure}
+          default: {}
       type: object
       required:
       - tool_id

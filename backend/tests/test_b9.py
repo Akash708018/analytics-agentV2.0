@@ -182,3 +182,85 @@ def test_a_generation_switch_disables_carry_forward_and_says_so(env):
         assert not any(x["joins"] for x in got["groups"])
     finally:
         workspace.reset(ws)
+
+
+# --- ranks 2, 5, 7: typed results, lineage and staleness, inspection ----------------------------
+
+def test_tool_result_is_typed_stored_and_goes_stale_when_the_data_changes(env):
+    from backend.tests.test_logistics import FIXTURE
+    ws, did, _, _ = _load(env, metrics=("sla_breach",))
+    try:
+        r = env.post("/tools/logistics.sla_compliance/run",
+                     json={"dataset_id": did, "params": {"by": "hub"}}).json()
+        assert r["result_id"].startswith("r_") and r["run_id"] == r["result_id"]
+        assert r["status"] == "ok" and r["snapshot"]["rows"] == 492
+        assert r["contract_version"] >= 1 and r["grain"] == "one row = one order"
+        assert r["metrics_used"] == {"sla_breach": {"measure": "sla_breach"}}
+        got = env.get(f"/results/{r['result_id']}").json()
+        assert got["stale"] is False and got["figures"] == r["figures"]
+        # a corrected upload of the same export: one order's minutes fixed
+        text = FIXTURE.read_text().replace(",92,Delivered,", ",93,Delivered,", 1)
+        env.post(f"/workspaces/{ws}/uploads", files={"file": ("logistics_sla.csv",
+                                                              text.encode())})
+        listed = env.get(f"/datasets/{did}/results").json()["results"]
+        mine = next(x for x in listed if x["result_id"] == r["result_id"])
+        assert mine["stale"] and any("the data changed" in w for w in mine["stale_reasons"])
+    finally:
+        workspace.reset(ws)
+
+
+def test_inspection_reaches_rows_past_the_figure_cap_sorted(env):
+    ws, did, _, _ = _load(env, metrics=("sla_breach",))
+    try:
+        r = env.post("/tools/logistics.sla_compliance/run",
+                     json={"dataset_id": did, "params": {"by": "zone"}}).json()
+        i = env.get(f"/results/{r['result_id']}/inspect",
+                    params={"sort_by": "n", "limit": 3}).json()
+        assert i["step"] == "Breach rate" and len(i["rows"]) == 3
+        n = [int(str(x[i["headers"].index("n")]).replace(",", "")) for x in i["rows"]]
+        assert n == sorted(n, reverse=True)
+        one = env.get(f"/results/{r['result_id']}/inspect", params={"group": "wakad"}).json()
+        assert one["total_rows"] == 1 and str(one["rows"][0][0]).lower() == "wakad"
+        bad = env.get(f"/results/{r['result_id']}/inspect", params={"sort_by": "nope"})
+        assert bad.status_code == 422 and "columns" in bad.text
+        assert env.get("/results/r_missing/inspect").status_code == 404
+    finally:
+        workspace.reset(ws)
+
+
+def test_turn_results_carry_the_turn_id_as_run_id(env):
+    ws, did, _, _ = _load(env, metrics=("sla_breach", "rto_rate"))
+    try:
+        t = env.ask(did, "Which hub is worst on SLA, and what goes with it?",
+                    script=Script({"playbook": None, "slots": {}}))
+        rids = {x["run_id"] for x in t["answer"]["results"]}
+        assert rids == {t["turn_id"]}
+    finally:
+        workspace.reset(ws)
+
+
+def test_fallback_model_can_inspect_a_result(env):
+    import json
+    import re
+    state = {"n": 0}
+
+    def script(system, user):
+        if system.startswith("You route"):
+            return json.dumps({"playbook": None, "slots": {}})
+        if system.startswith("You answer with tools"):
+            state["n"] += 1
+            if state["n"] == 1:
+                return json.dumps({"calls": [{"call": "logistics_sla_compliance",
+                                              "params": {"by": "zone"}}]})
+            rid = re.search(r"result_id (r_[0-9a-f]+)", user).group(1)
+            return json.dumps({"calls": [{"call": "inspect_result", "params": {
+                "result_id": rid, "sort_by": "n", "limit": 2}}], "then": "answer"})
+        return "The two largest zones are listed in the inspection."
+    ws, did, _, _ = _load(env, metrics=("sla_breach",))
+    try:
+        t = env.ask(did, "tell me about zones please", script=script)
+        calls = [e["data"] for e in t["events"] if e["type"] == "tool_call"]
+        assert [c["tool_id"] for c in calls] == ["logistics.sla_compliance", "inspect_result"]
+        assert calls[1]["status"] == "ok"
+    finally:
+        workspace.reset(ws)

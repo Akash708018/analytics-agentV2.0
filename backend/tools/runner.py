@@ -20,6 +20,7 @@ from backend.packs.models import Tool
 from backend.services.sessions import ServiceError
 
 MAX_FIGURES_PER_STEP = 25
+ROWS_KEPT = 500                    # engine rows kept per step for inspection (B9)
 _TERM = re.compile(r"^[a-z0-9][a-z0-9 &'._-]{0,40}$")
 _WORDS = re.compile(r"^[a-z0-9 _-]+(\|[a-z0-9 _-]+)*$")
 OPS = (">", ">=", "<", "<=", "=", "<>")
@@ -369,7 +370,7 @@ def run(ctx: Ctx, tool: Tool, min_group: int) -> dict:
         forks = [{"fork_id": f, "question": ctx.merged.forks[f].question} for f in unanswered]
         raise ServiceError(422, "forks_unanswered", "Answer these before this tool runs; none "
                            "is defaulted.", {"missing": unanswered, "forks": forks})
-    figures, series, caveats, spans, ran = [], [], [], [], 0
+    figures, series, caveats, spans, ran, tables = [], [], [], [], 0, []
     caveats += flags(ctx)
     for step in tool.steps:
         title = step.title or step.analysis
@@ -398,6 +399,9 @@ def run(ctx: Ctx, tool: Tool, min_group: int) -> dict:
                 continue
             raise ServiceError(422, "engine_refused", text) from None
         ran += 1
+        tables.append({"title": title, "headers": list(out.headers),
+                       "rows": [list(r) for r in out.rows[:ROWS_KEPT]],
+                       "rows_kept": min(len(out.rows), ROWS_KEPT), "rows_total": len(out.rows)})
         provisional = any("PROVISIONAL" in s for s in out.summary)
         caveats += [s for s in out.summary[1:] if s not in caveats]
         vi = _value_index(out.headers, out.rows)
@@ -447,7 +451,9 @@ def run(ctx: Ctx, tool: Tool, min_group: int) -> dict:
             "pack_rules_applied": interp,
             "forks": {f: ctx.fork_choices[f] for f in tool.forks if f in ctx.fork_choices},
             "caveats": caveats, "figure_check": {"status": "not_run", "notes": [
-                "figures come straight from the engine; the figure check runs on LLM text (B5)"]}}
+                "figures come straight from the engine; the figure check runs on LLM text (B5)"]},
+            "grain": getattr(ctx, "grain", None), "metrics_used": sorted(ctx.used_metrics),
+            "_tables": tables}
 
 
 def _fork_relevant(ctx: Ctx, fork_id: str) -> bool:

@@ -15,6 +15,7 @@ from backend.engine.util import db
 from backend.engine.webapp.real_backend import RealBackend
 from backend.packs.detector import bind, detect, normalise
 from backend.packs.loader import load_all, merge
+from backend.services import results
 from backend.services.sessions import ServiceError
 from backend.sessions.store import Store
 from backend.engine.contract import store as contract_store
@@ -47,6 +48,7 @@ class DatasetService:
     def __init__(self, store: Store, backend: RealBackend | None = None):
         self.store = store
         self.be = backend or V2Backend()
+        self.results = results.ResultStore(store)
 
     # --- datasets ----------------------------------------------------------------------------
     def _get(self, dataset_id: str) -> dict:
@@ -489,7 +491,8 @@ class DatasetService:
         return {"ok": True, "version": 1, "approved": keep}
 
     # --- tool runs -----------------------------------------------------------------------------
-    def run_tool(self, tool_id: str, dataset_id: str, params: dict) -> dict:
+    def run_tool(self, tool_id: str, dataset_id: str, params: dict,
+                 run_id: str | None = None) -> dict:
         d = self._get(dataset_id)
         packs = load_all()
         m = merge(packs, d["domains"])
@@ -526,10 +529,36 @@ class DatasetService:
             con = db.connect(d["workspace_id"])
             try:
                 result = self._run(con, d, m, c, bound, tool_id, params)
+                snap = results.snapshot(con, d["name"])
             finally:
                 con.close()
         result["dataset_id"] = dataset_id
-        return result
+        result["grain"] = c.grain
+        return self._store_result(d, result, params, snap, sc.version, run_id)
+
+    def _store_result(self, d, result, params, snap, version, run_id) -> dict:
+        tables = result.pop("_tables", [])
+        return self.results.save(d, result, tables, params=params, snap=snap,
+                                 contract_version=version, run_id=run_id)
+
+    def current_state(self, dataset_id: str):
+        """(snapshot, contract version, metrics) now -- what staleness compares against."""
+        d = self.store.get_dataset(dataset_id)
+        if d is None:
+            return None
+        try:
+            version = self._contract(d).version
+        except ServiceError:
+            version = None
+        with self.be._workspace(d["workspace_id"]):
+            con = db.connect(d["workspace_id"])
+            try:
+                snap = results.snapshot(con, d["name"])
+            except Exception:  # noqa: BLE001 -- the table is gone
+                return None
+            finally:
+                con.close()
+        return snap, version, d["metrics"]
 
     def _run(self, con, d, m, c, bound, tool_id, params) -> dict:
         ctx = runner.Ctx(
@@ -541,7 +570,8 @@ class DatasetService:
             festivals=m.festivals, params=dict(params))
         return runner.run(ctx, m.tools[tool_id], m.min_group_size)
 
-    def run_core(self, dataset_id: str, analysis: str, params: dict) -> dict:
+    def run_core(self, dataset_id: str, analysis: str, params: dict,
+                 run_id: str | None = None) -> dict:
         """A core (v1-surface) analysis as a one-step tool, for the fallback's `core_analyze`.
         The model supplies column names only: `where` is dropped (the LLM never writes SQL) and
         no value may start with '@' (bindings are the packs' and the runner's)."""
@@ -555,7 +585,8 @@ class DatasetService:
                     base_analysis=analysis, steps=[Step(analysis=analysis, params=clean)])
         d = self._get(dataset_id)
         m = merge(load_all(), d["domains"])
-        c = self._contract(d).contract
+        sc = self._contract(d)
+        c = sc.contract
         bound, _ = self._bound(d)
         with self.be._workspace(d["workspace_id"]):
             con = db.connect(d["workspace_id"])
@@ -567,10 +598,12 @@ class DatasetService:
                     window=(c.analysis_window.start, c.analysis_window.end)
                     if c.analysis_window else None, festivals=m.festivals, params={})
                 result = runner.run(ctx, tool, m.min_group_size)
+                snap = results.snapshot(con, d["name"])
             finally:
                 con.close()
         result["dataset_id"] = dataset_id
-        return result
+        result["grain"] = c.grain
+        return self._store_result(d, result, clean, snap, sc.version, run_id)
 
     def tools_states(self, d: dict):
         bound, sources = self._bound(d)

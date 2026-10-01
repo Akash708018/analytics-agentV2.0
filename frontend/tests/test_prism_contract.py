@@ -48,6 +48,9 @@ OPERATIONS = [
     Operation("run_keyword_grouping", "post", "/datasets/{dataset_id}/keyword-groups/run", "KeywordRun"),
     Operation("list_keyword_groups", "get", "/datasets/{dataset_id}/keyword-groups"),
     Operation("apply_keyword_group_action", "post", "/datasets/{dataset_id}/keyword-groups/actions", "KeywordGroupAction"),
+    Operation("list_results", "get", "/datasets/{dataset_id}/results"),
+    Operation("get_result", "get", "/results/{result_id}"),
+    Operation("inspect_result", "get", "/results/{result_id}/inspect"),
 ]
 
 IDS = {
@@ -57,6 +60,7 @@ IDS = {
     "dataset_id": "ds_ads_2026q3",
     "tool_id": "marketing.channel_efficiency",
     "pack_id": "marketing",
+    "result_id": "r_0a1b2c3d4e5f6a7b",
 }
 
 

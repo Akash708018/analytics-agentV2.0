@@ -13,6 +13,14 @@ Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry h
   keywords proposed to join that APPROVED group — accept by `merge` with the approved group's
   id first); `run.embedding_version` and `run.carry_forward` (`disabled` with a reason when
   the approved groups were built under another generation).
+- Typed result contract: every `ToolResult` from a domain tool or a turn now carries
+  `result_id`, `run_id` (the turn id inside a turn), `status` (ok | partial |
+  insufficient_data), `snapshot` {hash, rows}, `contract_version`, `grain`, `metrics_used`.
+- New, results are stored: `GET /datasets/{id}/results` (each with `stale` +
+  `stale_reasons`: data changed, contract version changed, a metric's approval changed),
+  `GET /results/{id}` (`StoredResult`), `GET /results/{id}/inspect?step&sort_by&descending&
+  group&limit&offset` (stored engine rows, up to 500 per step; sorted/filtered, never
+  recomputed). The fallback model has an `inspect_result` tool over the same.
 
 ## 0.6.0 — 2026-10-01 (B8)
 
