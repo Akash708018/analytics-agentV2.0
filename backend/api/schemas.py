@@ -525,6 +525,11 @@ class KeywordGroup(BaseModel):
     facets: dict[str, Any] = {}
     approved: bool
     proposed_by: str = Field("rules", description="rules | llm | person")
+    generation: str | None = Field(None, description="0.7.0: the embedding generation it was "
+                                   "proposed under (model, dims, normalisation, input)")
+    joins: str | None = Field(None, description="0.7.0: carry-forward -- these new keywords "
+                              "look like they belong to this APPROVED group; merge [that "
+                              "group, this one] to accept")
     model_config = _ex({"group_id": "g1", "label": "sushi delivery", "intent": "transactional",
                         "keywords": ["sushi delivery pune", "sushi home delivery"],
                         "facets": {"delivery": ["delivery"], "area": ["baner"]},
@@ -542,6 +547,8 @@ class KeywordGroups(BaseModel):
 class KeywordRun(BaseModel):
     column: str | None = Field(None, description="Text column; default: the search term / "
                                                  "query / keyword column")
+    backend: Literal["auto", "chargram", "ollama"] = Field("auto", description="0.7.0: the "
+                                                           "embedding backend for this run")
     model_config = _ex({"column": "search_term"})
 
 

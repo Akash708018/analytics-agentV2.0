@@ -201,7 +201,8 @@ def create_app(state_dir: Path | str | None = None, runner: Runner | None = None
     @app.post("/datasets/{dataset_id}/keyword-groups/run", response_model=S.KeywordGroups,
               responses=R, tags=["keywords"])
     def keyword_run(dataset_id: str, body: S.KeywordRun | None = None) -> S.KeywordGroups:
-        return S.KeywordGroups(**ds.keywords.run(dataset_id, (body or S.KeywordRun()).column))
+        body = body or S.KeywordRun()
+        return S.KeywordGroups(**ds.keywords.run(dataset_id, body.column, body.backend))
 
     @app.get("/datasets/{dataset_id}/keyword-groups", response_model=S.KeywordGroups,
              responses=R, tags=["keywords"])

@@ -66,6 +66,21 @@ def embed_chargram(texts: list[str]) -> np.ndarray:
     return vec.fit_transform(texts).toarray()      # rows are L2-normalised by default
 
 
+#: What goes into the vector besides the model (B9 concept 1). Any change here, or in the model
+#: or its dimensions, is a new GENERATION: groups of different generations are never compared.
+INPUT_SPEC = "topic words of the keyword (facet words removed), lower-case; L2-normalised"
+
+
+def version_of(used: str, dims: int) -> dict:
+    """The embedding version contract: backend/model, dimensions, normalisation, input."""
+    gen = hashlib.sha256(f"{used}|{dims if used.startswith('ollama') else 'vocab'}|"
+                         f"{INPUT_SPEC}".encode()).hexdigest()[:12]
+    return {"embedding": used, "dims": dims if used.startswith("ollama") else None,
+            "dims_note": None if used.startswith("ollama") else "chargram vectors are fit per "
+            "run; comparable only within one run", "normalisation": "l2",
+            "input": INPUT_SPEC, "generation": gen}
+
+
 def embed(texts: list[str], backend: str = "auto", cache: Cache | None = None
           ) -> tuple[np.ndarray, str]:
     if backend == "auto":

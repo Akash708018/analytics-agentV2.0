@@ -8,6 +8,11 @@ Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry h
   column-name Jaccard >= 0.8) with a confirmed contract; never applied until confirmed.
 - Turn events: `plan.routed_by` (`rules` | `planner`); a playbook whose requirements are
   missing answers with `plan.blocked` + `plan.recovery` and runs nothing (`answer.blocked`).
+- Keyword groups: `KeywordRun.backend` (auto | chargram | ollama); `KeywordGroup.generation`
+  (the embedding generation it was proposed under) and `KeywordGroup.joins` (carry-forward: new
+  keywords proposed to join that APPROVED group — accept by `merge` with the approved group's
+  id first); `run.embedding_version` and `run.carry_forward` (`disabled` with a reason when
+  the approved groups were built under another generation).
 
 ## 0.6.0 — 2026-10-01 (B8)
 

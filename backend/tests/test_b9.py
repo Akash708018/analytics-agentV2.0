@@ -103,3 +103,82 @@ def test_second_export_is_prefilled_from_the_first_in_the_same_workspace(env):
         workspace.reset("ws_b9other0001")
     finally:
         workspace.reset(ws)
+
+
+# --- ranks 1 and 16: embedding version contract + keyword carry-forward -------------------------
+
+def _kw_upload(c, ws, kws):
+    import csv
+    import io
+    buf = io.StringIO()
+    csv.writer(buf).writerows([["row_id", "date", "query", "page", "clicks", "impressions",
+                                "position"],
+                               *[[i, "2026-09-01", k, "/p", 5, 50, 3] for i, k in
+                                 enumerate(kws)]])
+    return c.post(f"/workspaces/{ws}/uploads", files={"file": (
+        "gsc_kw.csv", buf.getvalue().encode())}).json()["dataset_id"]
+
+
+def test_new_month_keywords_join_approved_groups_within_one_generation(env):
+    import secrets
+    from backend.tests.fixtures_v2 import keywords_gold as G
+    ws = f"ws_{secrets.token_hex(6)}"
+    try:
+        did = _kw_upload(env, ws, G.KEYWORDS)
+        env.post(f"/datasets/{did}/domains/confirm", json={"domains": ["marketing"]})
+        got = env.post(f"/datasets/{did}/keyword-groups/run",
+                       json={"backend": "chargram"}).json()
+        v = got["run"]["embedding_version"]
+        assert v["embedding"].startswith("chargram") and v["normalisation"] == "l2"
+        assert len(v["generation"]) == 12
+        g = next(x for x in got["groups"] if "sushi delivery pune" in x["keywords"])
+        assert g["generation"] == v["generation"]
+        env.post(f"/datasets/{did}/keyword-groups/actions",
+                 json={"action": "approve", "group_ids": [g["group_id"]]})
+        # next month: the same export plus new phrasings
+        did2 = _kw_upload(env, ws, G.KEYWORDS + ["sushi delivery wakad", "sushi delivry aundh"])
+        assert did2 == did
+        got = env.post(f"/datasets/{did}/keyword-groups/run",
+                       json={"backend": "chargram"}).json()
+        assert got["run"]["carry_forward"]["status"] == "ok"
+        join = next(x for x in got["groups"] if x["joins"] == g["group_id"])
+        assert "sushi delivery wakad" in join["keywords"] and not join["approved"]
+        r = env.post(f"/datasets/{did}/keyword-groups/actions", json={
+            "action": "merge", "group_ids": [g["group_id"], join["group_id"]]}).json()
+        merged = next(x for x in r["groups"] if x["group_id"] == g["group_id"])
+        assert merged["approved"] and "sushi delivery wakad" in merged["keywords"]
+    finally:
+        workspace.reset(ws)
+
+
+def test_a_generation_switch_disables_carry_forward_and_says_so(env):
+    import secrets
+    ws = f"ws_{secrets.token_hex(6)}"
+    try:
+        did = _kw_upload(env, ws, ["sushi delivery pune", "sushi home delivery",
+                                   "sushi near me", "ramen near me"])
+        env.post(f"/datasets/{did}/domains/confirm", json={"domains": ["marketing"]})
+        got = env.post(f"/datasets/{did}/keyword-groups/run",
+                       json={"backend": "chargram"}).json()
+        gid = got["groups"][0]["group_id"]
+        env.post(f"/datasets/{did}/keyword-groups/actions",
+                 json={"action": "approve", "group_ids": [gid]})
+        from backend.services import keywords as K
+        orig = K.KeywordService._rows
+
+        def rows(self, d):                     # an approval recorded under another generation
+            return [{**g, "generation": "0ld0ld0ld0ld"} if g["approved"] else g
+                    for g in orig(self, d)]
+        K.KeywordService._rows = rows
+        try:
+            _kw_upload(env, ws, ["sushi delivery pune", "sushi home delivery",
+                                 "sushi near me", "ramen near me", "sushi delivery wakad"])
+            got = env.post(f"/datasets/{did}/keyword-groups/run",
+                           json={"backend": "chargram"}).json()
+        finally:
+            K.KeywordService._rows = orig
+        cf = got["run"]["carry_forward"]
+        assert cf["status"] == "disabled" and "0ld0ld0ld0ld" in cf["reason"]
+        assert not any(x["joins"] for x in got["groups"])
+    finally:
+        workspace.reset(ws)

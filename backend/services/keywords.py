@@ -25,22 +25,29 @@ class KeywordService:
                         "INTEGER, proposed_by TEXT, PRIMARY KEY (dataset_id, group_id))")
             con.execute("CREATE TABLE IF NOT EXISTS keyword_runs (dataset_id TEXT PRIMARY KEY, "
                         "meta TEXT)")
+            have = {r[1] for r in con.execute("PRAGMA table_info(keyword_groups)")}
+            for col in ("generation", "joins"):          # B9: added to B7's table in place
+                if col not in have:
+                    con.execute(f"ALTER TABLE keyword_groups ADD COLUMN {col} TEXT")
             con.commit()
 
     # --- storage -------------------------------------------------------------------------------
     def _rows(self, did: str) -> list[dict]:
         rows = self.ds.store._q("SELECT group_id, label, intent, keywords, facets, approved, "
-                                "proposed_by FROM keyword_groups WHERE dataset_id=? "
-                                "ORDER BY approved DESC, group_id", (did,))
+                                "proposed_by, generation, joins FROM keyword_groups WHERE "
+                                "dataset_id=? ORDER BY approved DESC, group_id", (did,))
         return [{"group_id": r[0], "label": r[1], "intent": r[2], "keywords": json.loads(r[3]),
-                 "facets": json.loads(r[4]), "approved": bool(r[5]), "proposed_by": r[6]}
-                for r in rows]
+                 "facets": json.loads(r[4]), "approved": bool(r[5]), "proposed_by": r[6],
+                 "generation": r[7], "joins": r[8]} for r in rows]
 
     def _save(self, did: str, g: dict) -> None:
-        self.ds.store._q("INSERT OR REPLACE INTO keyword_groups VALUES (?,?,?,?,?,?,?,?)",
+        self.ds.store._q("INSERT OR REPLACE INTO keyword_groups (dataset_id, group_id, label, "
+                         "intent, keywords, facets, approved, proposed_by, generation, joins) "
+                         "VALUES (?,?,?,?,?,?,?,?,?,?)",
                          (did, g["group_id"], g["label"], g["intent"],
                           json.dumps(sorted(set(g["keywords"]))), json.dumps(g["facets"]),
-                          int(g["approved"]), g.get("proposed_by", "person")))
+                          int(g["approved"]), g.get("proposed_by", "person"),
+                          g.get("generation"), g.get("joins")))
 
     def _drop(self, did: str, gid: str) -> None:
         self.ds.store._q("DELETE FROM keyword_groups WHERE dataset_id=? AND group_id=?",
@@ -66,6 +73,8 @@ class KeywordService:
 
     # --- run -----------------------------------------------------------------------------------
     def run(self, did: str, column: str | None = None, backend: str = "auto") -> dict:
+        if backend not in ("auto", "chargram", "ollama"):
+            raise ServiceError(422, "bad_backend", "backend is auto, chargram or ollama")
         from backend.text.pipeline import group_keywords
         d = self.ds._get(did)
         if column is None:
@@ -82,25 +91,62 @@ class KeywordService:
         finally:
             con.close()
         res = group_keywords(vals, backend=backend, labeler=self.labeler)
+        gen = res["embedding_version"]["generation"]
         # a refresh replaces proposals; approved groups stay as the person left them
-        kept = {k for g in self._rows(did) if g["approved"] for k in g["keywords"]}
+        approved = [g for g in self._rows(did) if g["approved"]]
+        kept = {k for g in approved for k in g["keywords"]}
         for g in self._rows(did):
             if not g["approved"]:
                 self._drop(did, g["group_id"])
+        joins, carry = self._carry_forward(did, vals, kept, approved, backend, gen)
         n = 0
         for g in res["groups"]:
-            kws = [k for k in g.keywords if k not in kept]
+            kws = [k for k in g.keywords if k not in kept and k not in joins]
             if kws:
                 n += 1
                 self._save(did, {"group_id": f"p{secrets.token_hex(3)}", "label": g.label,
                                  "intent": g.intent, "keywords": kws, "facets": g.facets,
-                                 "approved": False, "proposed_by": g.proposed_by})
+                                 "approved": False, "proposed_by": g.proposed_by,
+                                 "generation": gen})
+        by_target: dict[str, list[str]] = {}
+        for k, (gid, _) in joins.items():
+            by_target.setdefault(gid, []).append(k)
+        target = {g["group_id"]: g for g in approved}
+        for gid, kws in by_target.items():
+            n += 1
+            self._save(did, {"group_id": f"p{secrets.token_hex(3)}",
+                             "label": f"{target[gid]['label']} (new keywords)",
+                             "intent": target[gid]["intent"], "keywords": kws,
+                             "facets": target[gid]["facets"], "approved": False,
+                             "proposed_by": "rules", "generation": gen, "joins": gid})
         meta = {"column": column, "embedding": res["embedding"], "threshold": res["threshold"],
+                "embedding_version": res["embedding_version"],
                 "typos_merged": res["typos_merged"], "keywords": res["input"],
-                "proposed_groups": n}
+                "proposed_groups": n, "carry_forward": carry}
         self.ds.store._q("INSERT OR REPLACE INTO keyword_runs VALUES (?, ?)",
                          (did, json.dumps(meta)))
         return self.list(did)
+
+    def _carry_forward(self, did, vals, kept, approved, backend, gen) -> tuple[dict, dict]:
+        """New keywords proposed to join approved groups -- only within one embedding
+        generation (B9 concepts 1 and 16); a switch is said, never silently bridged."""
+        from backend.text.pipeline import carry_forward
+        new = [v for v in vals if v not in kept]
+        if not approved or not new:
+            return {}, {"status": "nothing to carry", "suggested": 0}
+        gens = {g["generation"] for g in approved}
+        if gens != {gen}:
+            return {}, {"status": "disabled", "suggested": 0, "reason": (
+                f"approved groups were built with embedding generation(s) "
+                f"{sorted(x or 'unrecorded' for x in gens)}; this run used {gen}. Vectors of "
+                f"different generations are not compared: re-run with the backend the groups "
+                f"were approved under, or re-approve under this one.")}
+        joins, _ = carry_forward(new, {g["group_id"]: g["keywords"] for g in approved},
+                                 backend=backend)
+        return joins, {"status": "ok", "suggested": len(joins),
+                       "note": "proposals to join approved groups: approve by merging "
+                               "[approved group, this proposal] (the approved group's id "
+                               "first keeps it approved)"}
 
     def list(self, did: str) -> dict:
         self.ds._get(did)

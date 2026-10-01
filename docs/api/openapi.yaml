@@ -1850,6 +1850,20 @@ components:
           title: Proposed By
           description: rules | llm | person
           default: rules
+        generation:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Generation
+          description: '0.7.0: the embedding generation it was proposed under (model, dims, normalisation,
+            input)'
+        joins:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Joins
+          description: '0.7.0: carry-forward -- these new keywords look like they belong to this APPROVED
+            group; merge [that group, this one] to accept'
       type: object
       required:
       - group_id
@@ -1968,6 +1982,15 @@ components:
           - type: 'null'
           title: Column
           description: 'Text column; default: the search term / query / keyword column'
+        backend:
+          type: string
+          enum:
+          - auto
+          - chargram
+          - ollama
+          title: Backend
+          description: '0.7.0: the embedding backend for this run'
+          default: auto
       type: object
       title: KeywordRun
       examples:
