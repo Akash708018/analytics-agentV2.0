@@ -20,7 +20,9 @@ from backend.packs.models import Tool
 from backend.services.sessions import ServiceError
 
 MAX_FIGURES_PER_STEP = 25
-_TERM = re.compile(r"^[a-z0-9][a-z0-9 &'.-]{0,40}$")
+_TERM = re.compile(r"^[a-z0-9][a-z0-9 &'._-]{0,40}$")
+_WORDS = re.compile(r"^[a-z0-9 _-]+(\|[a-z0-9 _-]+)*$")
+OPS = (">", ">=", "<", "<=", "=", "<>")
 _NUM = re.compile(r"^-?[\d,]*\.?\d+%?$")
 # concepts whose columns must never be added across sources (no_cross_source_conversion_sum)
 CONVERSION_FAMILY = {"conversions", "conv_value", "key_events"}
@@ -63,6 +65,11 @@ class Ctx:
 
 class Skip(Exception):
     pass
+
+
+def after_sql(end: str, start: str) -> str:
+    """`end` is a timestamp after `start` (both quoted identifiers)."""
+    return f"TRY_CAST({end} AS TIMESTAMP) > TRY_CAST({start} AS TIMESTAMP)"
 
 
 def column_for(ctx: Ctx, concept: str) -> str:
@@ -174,16 +181,21 @@ def compile_filters(ctx: Ctx, tool: Tool, step) -> list[str]:
                          f"'{r.pattern}'), false)")
         elif r.kind == "require_positive":
             preds.append(f"{q(col)} > 0")
+        elif r.kind == "require_after":
+            try:
+                preds.append(after_sql(q(col), q(column_for(ctx, r.other))))
+            except Skip:
+                continue
         else:
             continue            # flag rules never filter; see flags()
         if rid not in ctx.filters_applied:
             ctx.filters_applied.append(rid)
     for f in ([step.filter] if isinstance(step.filter, dict) else step.filter or []):
-        preds += _step_filter(ctx, tool, f)
+        preds += _step_filter(ctx, tool, f, preds)
     return preds
 
 
-def _step_filter(ctx: Ctx, tool: Tool, f: dict) -> list[str]:
+def _step_filter(ctx: Ctx, tool: Tool, f: dict, before: list[str]) -> list[str]:
     preds = []
     if True:
         concept = f["concept"]
@@ -209,11 +221,70 @@ def _step_filter(ctx: Ctx, tool: Tool, f: dict) -> list[str]:
             lo, hi = date.fromisoformat(lo), date.fromisoformat(hi)
             ctx.spans.append((lo, hi))
             preds.append(f"CAST({q(col)} AS DATE) BETWEEN DATE '{lo}' AND DATE '{hi}'")
+        if "keep_matching" in f:
+            words = f["keep_matching"]
+            if not _WORDS.match(words):
+                raise ServiceError(500, "pack_error", f"keep_matching {words!r}: plain words")
+            preds.append(f"coalesce(regexp_matches(lower(trim(CAST({q(col)} AS VARCHAR))), "
+                         f"'^({words})$'), false)")
+        if "compare" in f:
+            if f["compare"] not in OPS:
+                raise ServiceError(500, "pack_error", f"compare {f['compare']!r}: one of {OPS}")
+            other = column_for(ctx, f["other"])
+            preds.append(f"{q(col)} {f['compare']} {q(other)}")
+        if "older_than" in f:
+            o = f["older_than"]
+            as_of, days = ctx.params.get(o["as_of_param"]), ctx.params.get(o["days_param"], 3)
+            try:
+                as_of, days = date.fromisoformat(str(as_of)), int(days)
+            except (TypeError, ValueError):
+                raise ServiceError(422, "param_required", f"params.{o['as_of_param']} must be "
+                                   f"a date (YYYY-MM-DD) and params.{o['days_param']} a whole "
+                                   f"number of days") from None
+            preds.append(f"TRY_CAST({q(col)} AS TIMESTAMP) < TIMESTAMP '{as_of}' - INTERVAL "
+                         f"{days} DAY")
+            ctx.notes.append(f"Open {days}+ days before {as_of} (the as-of date you entered).")
+        if "focus_param" in f:
+            preds.append(_focus(ctx, tool, f, col, before + preds))
         if "terms_param" in f:
             alt = "|".join(re.escape(t).replace("'", "''") for t in _terms(ctx, f["terms_param"]))
             p = f"coalesce(regexp_matches(lower(CAST({q(col)} AS VARCHAR)), '({alt})'), false)"
             preds.append(f"NOT {p}" if f.get("negate") else p)
     return preds
+
+
+def _focus(ctx: Ctx, tool: Tool, f: dict, col: str, preds: list[str]) -> str:
+    """The person's `focus` value, or the engine's highest-rate group (D-B8-2)."""
+    key = f["focus_param"]
+    chosen = ctx.params.get(key)
+    if chosen is None:
+        measure = resolve(ctx, tool, f["worst_by"])
+        params = {"dimension": col, "measure": measure}
+        if preds:
+            params["where"] = " AND ".join(f"({p})" for p in preds)
+        try:
+            _, out, _ = _produce(ctx.con, ctx.table, "group_compare", params, ctx.workspace_id)
+        except _Refused as e:
+            raise ServiceError(422, "engine_refused", str(e)) from None
+        h = out.headers
+        ni, mi = h.index("n"), h.index("mean")
+        best = None
+        for r in out.rows:
+            n, m = num(r[ni]), num(r[mi])
+            if str(r[0]) in ("(all)", "(null)") or not isinstance(m, (int, float)) or \
+                    not isinstance(n, (int, float)) or n < ctx.merged.min_group_size:
+                continue
+            if best is None or m > best[1]:
+                best = (str(r[0]), m, int(n))
+        if best is None:
+            raise ServiceError(422, "needs_data", f"no {col} group is large enough to focus on")
+        chosen = best[0]
+        ctx.params[key] = chosen                       # one choice for every step of the run
+        ctx.notes.append(f"Focus: {col} = {chosen}, the highest {measure} ({best[1]:.1%} of "
+                         f"{best[2]} rows), chosen by the engine; pass params.{key} to pick "
+                         f"another.")
+    v = str(chosen).lower().strip().replace("'", "''")
+    return f"lower(trim(CAST({q(col)} AS VARCHAR))) = '{v}'"
 
 
 def flags(ctx: Ctx) -> list[str]:
@@ -278,6 +349,8 @@ def context_caveats(ctx: Ctx, spans: list[tuple[date, date]]) -> list[str]:
 def _value_index(headers: list[str], rows: list[list]) -> int | None:
     if "total" in headers:
         return headers.index("total")
+    if headers[:3] == ["value", "rows", "share"]:      # frequency: the count is the figure
+        return 1
     for i in range(1, len(headers)):
         if headers[i] in ("n", "nulls", "rank", "rows"):
             continue
@@ -345,7 +418,7 @@ def run(ctx: Ctx, tool: Tool, min_group: int) -> dict:
             # every other numeric cell is a figure too, named by its column (a cohort row carries
             # CAC, payback and LTV:CAC beside its size); suppressed rows stay suppressed
             for ci in range(1, len(out.headers)):
-                if ci in (vi, ni) or out.headers[ci] in ("nulls", "rank", "rows"):
+                if ci == vi or out.headers[ci] in ("nulls", "rank", "rows"):
                     continue
                 cell = num(r[ci])
                 if isinstance(cell, (int, float)):
@@ -367,7 +440,7 @@ def run(ctx: Ctx, tool: Tool, min_group: int) -> dict:
     if not ran:
         raise ServiceError(422, "needs_data", f"{tool.id}: no step could run -- "
                            + "; ".join(caveats[-3:]))
-    caveats += ctx.notes + context_caveats(ctx, spans)
+    caveats = list(dict.fromkeys(caveats + ctx.notes + context_caveats(ctx, spans)))
     interp = [r for r in tool.rules if r in ctx.merged.interpretation_rules]
     return {"tool_id": tool.id, "summary": f"{tool.ui_label}: {ran} step(s) run",
             "figures": figures, "series": series,
@@ -384,8 +457,24 @@ def _fork_relevant(ctx: Ctx, fork_id: str) -> bool:
 
 
 def dq_check(ctx: Ctx, check: str) -> str | None:
-    """Tagging checks, in SQL over bound columns. Returns a finding, or None."""
+    """Tagging and data checks, in SQL over bound columns. Returns a finding, or None."""
     T = q(ctx.table)
+    if check == "rto_flag_conflict":
+        try:
+            st, fl = column_for(ctx, "delivery_status"), column_for(ctx, "rto_flag")
+        except Skip:
+            return None
+        s = f"lower(trim(CAST({q(st)} AS VARCHAR)))"
+        flag = f"lower(trim(CAST({q(fl)} AS VARCHAR))) IN ('1', 'true', 't', 'yes', 'y')"
+        a, b = ctx.con.execute(
+            f"SELECT count(*) FILTER (WHERE {s} = 'delivered' AND {flag}), "
+            f"count(*) FILTER (WHERE regexp_matches({s}, '^(rto|returned|return to origin)$') "
+            f"AND NOT coalesce({flag}, false)) FROM {T}").fetchone()
+        if a or b:
+            return (f"rto_flag_conflict: the RTO flag and the status disagree on {a + b} row(s) "
+                    f"-- {a} delivered but flagged RTO, {b} RTO by status but not flagged. The "
+                    f"rate reads the flag; check which the business trusts.")
+        return None
     try:
         src = column_for(ctx, "session_source")
     except Skip:

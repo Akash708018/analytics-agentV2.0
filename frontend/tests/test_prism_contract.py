@@ -108,7 +108,7 @@ def test_all_spec_operations_have_a_client_case(contract):
     expected = {(method, path) for path, item in contract["paths"].items()
                 for method in item if method in {"get", "post", "put", "patch", "delete"}}
     assert {(op.method, op.path) for op in OPERATIONS} == expected
-    assert contract["info"]["version"] == "0.5.0"
+    assert contract["info"]["version"] == "0.6.0"
 
 
 @pytest.mark.parametrize("operation", OPERATIONS, ids=lambda op: op.client_method)

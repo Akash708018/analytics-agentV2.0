@@ -277,3 +277,29 @@ drives the client against `uvicorn --factory backend.api.app:create_app` (`AA_NO
 empty state dir): sessions, a stale-version conflict with `current`, ui_state rejection,
 upload, domain detection, tool gating, a turn, and delete. Output is in `docs/steps/F1.md`.
 Prism stays the contract test; the smoke run is evidence that the live server behaves the same.
+
+## B8 — logistics pack (2026-10-01)
+
+**D-B8-1. SLA breach, on-time, in-full and RTO rate are COMPARISON metric templates, approved
+through v1's provisional metrics.** A template names `concept op right` (or `op value`) from the
+engine's fixed operator list; approving it proposes and decides a v1 provisional metric in one
+step (the person's API call is the decision). Every result reading one says PROVISIONAL, exactly
+as v1's SLA bench does. Adding it to the contract is a separate contract change (the v1 contract
+draft takes no comparison measures).
+
+**D-B8-2. "Which group to drill into" is chosen by the engine, never the model.** A step filter
+`{concept, focus_param, worst_by}` uses the person's `params.focus` when given; otherwise the
+runner runs `group_compare` through `_produce` and takes the highest-rate group with at least
+the minimum group size, and says which it took and why. The planner LLM never picks a hub.
+
+**D-B8-3. New structured filters, no SQL in the pack:** `keep_matching` (plain words, exact
+match after trim/lower), `compare {op, other}` (fixed operators), `focus_param/worst_by`, and
+`older_than {as_of_param, days_param}`. One new validity rule kind, `require_after` (drop rows
+whose end timestamp is not after the start), scoped by `applies_to` so it never hides
+undelivered rows from RTO or stuck-shipment tools.
+
+**D-B8-4. OTIF is reported honestly as its parts.** A joint on-time-AND-in-full flag needs a
+row-level AND the comparison metric cannot express; the tool reports on-time rate, in-full
+rate, and on-time rate among in-full rows, and says the joint rate needs one more approved
+column. **RTO** reads the RTO flag column, and a data check names rows where the flag and the
+status disagree (in the SLA fixture: delivered-but-flagged and RTO-but-unflagged rows).

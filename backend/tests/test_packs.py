@@ -178,4 +178,5 @@ def test_detector_finds_marketing_sources_with_evidence():
 def test_logistics_file_is_not_called_marketing():
     cols = next(csv.reader(open(FIX / "logistics_sla.csv")))
     d = detect(cols)
-    assert d.domains == []        # orders matched, but orders alone do not signal marketing
+    # orders matched, but orders alone do not signal marketing; since B8 it is logistics
+    assert [x["domain"] for x in d.domains] == ["logistics"]
