@@ -5,8 +5,11 @@ tools, a deterministic domain-rules filter, and a FastAPI backend. Priority doma
 v1 reference: github.com/Akash708018/analytics-agent @ `0ba324b` (read-only).
 
 ## Ownership
-Backend owns `backend/`, `packs/`, `bench/`, `docs/api/`, `docs/steps/B*`. Frontend (Codex) owns
-`frontend/`, `docs/steps/F*` — never edit them. Shared, append-only, PR required:
+Backend owns `backend/`, `packs/`, `bench/`, `docs/api/`, `docs/steps/B*`. Frontend owns
+`frontend/`, `docs/steps/F*`, `docs/handoff/FRONTEND.md`: Codex until 2026-10-01, then Claude Code
+at the user's instruction (D-F1-5). Frontend work follows `AGENTS.md` (HTTP only, never computes
+or reformats figures; milestone docs `docs/steps/F<n>.md`; tests:
+`frontend/.venv/bin/python -m pytest frontend/tests -q`). Shared, append-only, PR required:
 `docs/COORDINATION.md`, `docs/decisions.md`, `README.md`. Protocol: `docs/COORDINATION.md`.
 
 ## Run

@@ -1,59 +1,63 @@
 ## Status (date, branch, last commit)
 
-2026-09-27 (Asia/Kolkata) · `frontend/F0-scaffold-measure`.
-F0 complete; stopped for human review. Last implementation commit: `6248e34`
-(`F0: scaffold frontend and measure Streamlit state`); this follow-up updates the
-publication record only. Base commit: `7077562`.
-PR: https://github.com/Akash708018/analytics-agentV2.0/pull/2 (open, targets `main`).
-Own clone: `/tmp/analytics-agent-v2-frontend`; v1 read-only: `/tmp/av1-ui` at `0ba324b`.
+2026-10-01 · branch `claude/beautiful-lovelace-07dnwu` · owner **Claude Code** (took over from
+Codex at the user's instruction, D-F1-5). F1 is refreshed to API 0.5.0 and stopped for human
+review. Base: main `42e77cd`. Codex's F1 (PR #6, `frontend/F1-api-client-mock`, API 0.3.0) is
+merged into this branch with its history (`f6cd115`); the PR from this branch supersedes #6.
 
 ## Screens: done | in progress | blocked (by which endpoint/issue)
 
-- F0 landing scaffold: complete, with an explicit service-readiness message and
-  no unsaved product inputs. This is not a functioning analytics application yet.
-- Synthetic two-page measurement probe: complete, separate from product pages.
-- V1 inventory: 101 identified parity items, including all seven screens and 27
-  Explore analyses, embedded in `docs/steps/F0.md`. F7 parity remains unassessed.
-- Sessions, guided screens, tools, results, Ask, and keyword editing: future
-  milestones. F1 blocked until OpenAPI v0.1 is on `main`.
+- Done: F0 landing scaffold (no product inputs) and the separate F0 state probe.
+- Done: F1 HTTP client, 30 methods = every operation in `docs/api/openapi.yaml` 0.5.0;
+  Prism contract tests; live-backend smoke (`frontend/dev/live_smoke.py`).
+- Not started: F2 sessions (hydrate from `GET /sessions/{sid}`, versioned ui_state saves,
+  Load latest / Keep mine on `version_conflict`, sid on every link, turn resume by id). Then the
+  guided screens: upload, cleaning, domain, contract + forks, metrics, validity rules, tools and
+  results, Ask, keyword groups. F7: v1 parity (101 items in `docs/steps/F0.md`) + Playwright.
+- Blocked: nothing. Issue #4's remaining item (one generic error example) does not block.
 
-Browser evidence on Streamlit 1.64.0: refresh retained URL/sid but reset session
-instance and fields. Native A→B navigation removed sid and page-A widget state.
-Back/Forward restored route/query history and shared entrypoint value, but not
-per-page fields. B-route reload retained the B route and sid, with empty state.
-F2 must hydrate from backend records and preserve sid explicitly on every link.
+F0 browser evidence (Streamlit 1.64.0): refresh keeps URL/sid but resets session state; native
+navigation drops `sid` and page widget state; Back/Forward restore route history, not per-page
+fields. F2 must hydrate from backend records and carry `sid` explicitly.
 
 ## API: spec version consumed; endpoints live vs mocked
 
-None consumed; no frontend endpoints live or mocked in F0. `api_client.py` and
-`state.py` reserve F1/F2 boundaries without guessing the API. No engine imports.
+**0.5.0** (main `42e77cd`). All 30 operations are live on the backend; none answers 501.
+Tested two ways: Prism 5.16.0 serving the unmodified YAML (every operation, every declared error
+status), and the real backend via `live_smoke.py` (sessions, conflict, ui_state rejection,
+upload, detection, tool gating, a turn, delete — output in `docs/steps/F1.md`).
 
-Read backend handoff at remote commit `572968d`,
-[B0 PR #1](https://github.com/Akash708018/analytics-agentV2.0/pull/1), after fetching
-`claude/analytics-agent-v2-backend-6gcu1p`. B1 will deliver OpenAPI v0.1 and session/
-turn endpoints; main still contains only `7077562` at this check.
+Client facts the screens rely on:
+- Every 409 raises `VersionConflict`; only `code == "version_conflict"` carries `current`.
+  `needs_domain`, `needs_data`, `contract_required` are prerequisites: branch on `code`.
+- Error extras (`forks`, `options`, `columns`, `concept`, `missing`, `invalid`, `dates`,
+  `questions`, `unresolved`, `provisional`, `needs_domain`, `missing_concepts`, `refusal`) are
+  top-level keys of `APIError.payload`, next to `error`.
+- No retries. Never resubmit `POST /turns` after a timeout; poll the stored turn id.
+- Figures, series points and caveats are returned as decoded JSON, unchanged.
 
 ## api-request issues (links, status)
 
-None opened for F0. Await the first contract before requesting changes.
+[Issue #4](https://github.com/Akash708018/analytics-agentV2.0/issues/4) — open. Path
+parameters: resolved in 0.5.0. Status-specific error examples: still one generic `not_found`
+example for every error status. Nonblocking.
 
 ## Test tail (pasted)
 
 ```text
-$ frontend/.venv/bin/python -m pytest frontend/tests -q
-...                                                                      [100%]
-3 passed in 0.85s
+$ frontend/.venv/bin/python -m pytest frontend/tests -q -rs
+127 passed in 5.58s
 ```
 
-Python 3.12.14; Streamlit 1.64.0; httpx 0.28.1; pytest 9.1.1. Real Brave browser
-refresh/history and product landing observations are pasted in `docs/steps/F0.md`.
-AppTest evidence is not substituted for browser evidence. No Playwright used.
-Both temporary Streamlit servers (ports 8510 and 8511) were stopped; each printed
-`Stopping...` and exited 0. No frontend server is left running by this milestone.
+66 unit (`test_api_client.py`), 58 Prism contract/error (`test_prism_contract.py`), 3 F0
+AppTests. No skips. Python 3.12.3, Streamlit 1.64.0, httpx 0.28.1, pytest 9.1.1, Node 22.22.0,
+Prism 5.16.0. Setup: `uv venv frontend/.venv --python 3.12`, `uv pip install --python
+frontend/.venv/bin/python -r frontend/requirements.txt`, `npm ci --prefix frontend
+--ignore-scripts`.
 
 ## Next milestone
 
-STOP after F0. Human reviews/merges the frontend PR. Begin F1 only when instructed
-and `docs/api/openapi.yaml` v0.1 is on `main`; first re-read BACKEND.md. Implement
-the spec-driven httpx client and mock, with timeout/error/version-conflict tests.
-Do not start session implementation (F2) in the F1 milestone.
+STOP after the F1 refresh. The user reviews/merges the PR (and closes #6). F2 starts on the
+user's instruction: re-read `docs/handoff/BACKEND.md` and the API changelog first, then build
+`frontend/state.py` (hydrate, hash-checked single save per rerun, explicit conflict choice),
+sid-preserving navigation, and turn resume, with AppTests plus a real-browser refresh check.
