@@ -13,8 +13,25 @@ _SPLIT = re.compile(r"[^a-z0-9]+")
 _CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 
 
+#: Column meaning match (B9, concept 12): abbreviations spelled out, unit/currency words dropped,
+#: so `amt_spent_inr` reads as `amount_spent` and `qty_ordered_nos` as `quantity_ordered`.
+ABBREVIATIONS = {"amt": "amount", "qty": "quantity", "impr": "impressions", "imps":
+                 "impressions", "conv": "conversions", "convs": "conversions", "rev": "revenue",
+                 "txn": "transaction", "cust": "customer", "dt": "date", "ts": "timestamp",
+                 "pct": "percent", "avg": "average", "addr": "address", "dist": "distance",
+                 "wt": "weight", "mins": "minutes", "hrs": "hours", "cnt": "count",
+                 "camp": "campaign", "kw": "keyword", "sess": "sessions"}
+UNIT_WORDS = {"inr", "usd", "rs", "rupees", "nos", "num", "in", "kgs", "pc", "pcs"}
+
+
 def normalise(name: str) -> str:
     return "_".join(t for t in _SPLIT.split(_CAMEL.sub("_", name).lower()) if t)
+
+
+def meaning(norm: str) -> str:
+    """The name with abbreviations spelled out and unit words dropped ('' if nothing left)."""
+    toks = [ABBREVIATIONS.get(t, t) for t in norm.split("_") if t not in UNIT_WORDS]
+    return "_".join(toks)
 
 
 def hint_matches(hint: str, norm: str) -> int:
@@ -40,7 +57,9 @@ def bind(columns: list[str], m: Merged) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     for col in columns:
         norm = normalise(col)
-        scored = [(max(hint_matches(h, norm) for h in c.hints), c.id)
+        alt = meaning(norm)
+        forms = [norm] if alt in (norm, "") else [norm, alt]
+        scored = [(max(hint_matches(h, f) for h in c.hints for f in forms), c.id)
                   for c in m.concepts.values()]
         best = max((s for s, _ in scored), default=0)
         if best == 0:

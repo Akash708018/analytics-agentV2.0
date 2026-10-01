@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-API_VERSION = "0.6.0"
+API_VERSION = "0.7.0"
 
 
 def _ex(*examples: dict) -> ConfigDict:
@@ -386,6 +386,11 @@ class ContractProposal(BaseModel):
                                    "answer; confirm is refused (422) while non-empty")
     questions: list[str] = []
     forks: list[ForkQuestion]
+    prefill: dict[str, Any] | None = Field(None, description=(
+        "0.7.0: answers suggested from the most similar dataset with a confirmed contract in "
+        "the same workspace (column-name Jaccard >= 0.8): from_dataset_id, similarity, contract "
+        "(fields of this file's columns, no window), fork_choices, domains, metrics, "
+        "validity_rules. Never applied until the person confirms."))
     model_config = _ex({
         "dataset_id": "ds_ads_2026q3", "grain": "one row per campaign per day",
         "key": ["date", "campaign"], "date": "date",

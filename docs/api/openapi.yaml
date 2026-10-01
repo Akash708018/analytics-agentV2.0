@@ -3,7 +3,7 @@ info:
   title: analytics-agent v2
   description: Contract-first API. Figures carry provenance; chart series are computed by the backend.
     501 = spec'd, not live yet.
-  version: 0.6.0
+  version: 0.7.0
 paths:
   /health:
     get:
@@ -1417,6 +1417,16 @@ components:
             $ref: '#/components/schemas/ForkQuestion'
           type: array
           title: Forks
+        prefill:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Prefill
+          description: '0.7.0: answers suggested from the most similar dataset with a confirmed contract
+            in the same workspace (column-name Jaccard >= 0.8): from_dataset_id, similarity, contract
+            (fields of this file''s columns, no window), fork_choices, domains, metrics, validity_rules.
+            Never applied until the person confirms.'
       type: object
       required:
       - dataset_id
@@ -2894,5 +2904,5 @@ components:
       - engine
       title: VersionInfo
       examples:
-      - api_version: 0.6.0
+      - api_version: 0.7.0
         engine: v1@0ba324b

@@ -92,6 +92,15 @@ class DatasetService:
         finally:
             con.close()
 
+    def _columns(self, d: dict) -> set[str]:
+        con = db.connect_read_only(d["workspace_id"])
+        try:
+            return {r[0] for r in con.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = ?",
+                [d["name"]]).fetchall()}
+        finally:
+            con.close()
+
     # --- profile -------------------------------------------------------------------------------
     def profile(self, dataset_id: str) -> dict:
         d = self._get(dataset_id)
@@ -199,7 +208,48 @@ class DatasetService:
                 "date": c.date_column, "measures": measures, "dimensions": c.dimensions,
                 "caveats": list(c.caveats) + list(c.measured_caveats),
                 "provisional": list(c.provisional), "questions": list(c.questions),
-                "forks": self._forks(d)}
+                "forks": self._forks(d), "prefill": self._prefill(d)}
+
+    PREFILL_MIN_SIMILARITY = 0.8
+
+    def _prefill(self, d: dict) -> dict | None:
+        """Answers from the most similar dataset with a confirmed contract in the SAME workspace
+        (B9 concept 13, D-B9-3): a suggestion the person confirms, never applied here."""
+        cols = self._columns(d)
+        best = None
+        for o in self.store.list_datasets(d["workspace_id"]):
+            if o["dataset_id"] == d["dataset_id"]:
+                continue
+            try:
+                other = self._columns(o)
+                sc = self._contract(o)
+            except (ServiceError, Exception):  # noqa: BLE001 -- no contract / gone: skip it
+                continue
+            sim = len(cols & other) / len(cols | other) if cols | other else 0.0
+            if sim >= self.PREFILL_MIN_SIMILARITY and (best is None or sim > best[0]):
+                best = (sim, o, sc)
+        if best is None:
+            return None
+        sim, o, sc = best
+        kw = self._contract_kwargs(sc.contract)
+        measures = [m for m in kw["measures"] if m in cols]
+        dims = [x for x in kw["dimensions"] if x in cols]
+        contract = {"grain": kw["grain"], "primary_key": [k for k in kw["primary_key"]
+                                                          if k in cols],
+                    "date_column": kw["date_column"] if kw["date_column"] in cols else None,
+                    "measures": measures, "dimensions": dims,
+                    "aggregations": {m: a for m, a in kw["aggregations"].items()
+                                     if m in measures},
+                    "measure_definitions": {m: t for m, t in kw["measure_definitions"].items()
+                                            if m in measures}}
+        return {"from_dataset_id": o["dataset_id"], "from_name": o["name"],
+                "similarity": round(sim, 3), "contract_version": sc.version,
+                "contract": contract, "fork_choices": o["fork_choices"],
+                "domains": o["domains"], "metrics": sorted(o["metrics"]),
+                "validity_rules": o["validity"],
+                "note": "Suggested from a similar file; nothing is applied until you confirm. "
+                        "Set this file's analysis window; approve metrics again after the "
+                        "contract (they are versions of this file's contract)."}
 
     def contract_confirm(self, dataset_id: str, contract: dict, fork_choices: dict) -> dict:
         d = self._get(dataset_id)

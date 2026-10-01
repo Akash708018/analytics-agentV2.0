@@ -51,6 +51,17 @@ def test_routed_sla_question_costs_one_llm_call(env):
         workspace.reset(ws)
 
 
+# --- rank 12: column meaning match ---------------------------------------------------------------
+
+def test_abbreviated_and_unit_suffixed_columns_bind():
+    from backend.packs.detector import bind
+    m = merge(load_all(), ["marketing", "logistics"])
+    b = bind(["amt_spent_inr", "qty_ordered_nos", "conv_value_inr", "Impr", "delivery_mins"], m)
+    assert b["spend"] == ["amt_spent_inr"] and b["qty_ordered"] == ["qty_ordered_nos"]
+    assert b["conv_value"] == ["conv_value_inr"] and b["impressions"] == ["Impr"]
+    assert b["delivery_minutes"] == ["delivery_mins"]
+
+
 # --- rank 9: boundary-aware playbooks -----------------------------------------------------------
 
 def test_blocked_playbook_answers_with_recovery_and_runs_nothing(env):
@@ -61,5 +72,34 @@ def test_blocked_playbook_answers_with_recovery_and_runs_nothing(env):
         a = t["answer"]
         assert a["usage"]["llm_calls"] == 0 and a["usage"]["tool_calls"] == 0
         assert "the approved metric 'sla_breach'" in a["text"] and "Approve the SLA" in a["text"]
+    finally:
+        workspace.reset(ws)
+
+
+# --- rank 13: contract pre-fill -----------------------------------------------------------------
+
+def _upload(c, ws, name):
+    from backend.tests.test_logistics import FIXTURE
+    return c.post(f"/workspaces/{ws}/uploads", files={"file": (
+        name, FIXTURE.read_bytes())}).json()["dataset_id"]
+
+
+def test_second_export_is_prefilled_from_the_first_in_the_same_workspace(env):
+    ws, first, _, _ = _load(env, metrics=("sla_breach",))
+    try:
+        second = _upload(env, ws, "logistics_sla_september.csv")
+        p = env.get(f"/datasets/{second}/contract/proposal").json()["prefill"]
+        assert p["from_dataset_id"] == first and p["similarity"] == 1.0
+        assert p["contract"]["date_column"] == "order_date"
+        assert "recorded_delivery_minutes" in p["contract"]["measures"]
+        assert p["domains"] == ["logistics"] and p["metrics"] == ["sla_breach"]
+        assert "analysis_window_start" not in p["contract"]
+        # a suggestion only: the second dataset has no contract until the person confirms
+        r = env.post("/tools/logistics.sla_compliance/run",
+                     json={"dataset_id": second, "params": {"by": "hub"}})
+        assert r.status_code in (409, 422)
+        other = _upload(env, "ws_" + "b9other0001", "logistics_sla.csv")
+        assert env.get(f"/datasets/{other}/contract/proposal").json()["prefill"] is None
+        workspace.reset("ws_b9other0001")
     finally:
         workspace.reset(ws)

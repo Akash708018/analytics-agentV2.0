@@ -2,6 +2,13 @@
 
 Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry here.
 
+## 0.7.0 — 2026-10-02 (B9, additive)
+
+- `ContractProposal.prefill`: answers suggested from the most similar dataset (same workspace,
+  column-name Jaccard >= 0.8) with a confirmed contract; never applied until confirmed.
+- Turn events: `plan.routed_by` (`rules` | `planner`); a playbook whose requirements are
+  missing answers with `plan.blocked` + `plan.recovery` and runs nothing (`answer.blocked`).
+
 ## 0.6.0 — 2026-10-01 (B8)
 
 Second domain: **logistics** (`GET /packs` now lists `core, logistics, marketing`; confirm with
