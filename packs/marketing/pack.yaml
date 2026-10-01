@@ -237,6 +237,8 @@ playbooks:
       - {tool: marketing.channel_efficiency, params: {by: campaign}, optional: true}
     rules: [required_stratifier, correlational_only]
     max_tool_calls: 3
+    requires_metrics: [roas]
+    recovery: "Approve ROAS on the metrics screen (answer which revenue it uses first)."
   - id: where_is_spend_wasted
     description: Which campaigns, search terms or places take spend without conversions.
     patterns: [waste, wasted, wasting, spend, no conversions, inefficient]

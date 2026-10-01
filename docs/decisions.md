@@ -303,3 +303,37 @@ row-level AND the comparison metric cannot express; the tool reports on-time rat
 rate, and on-time rate among in-full rows, and says the joint rate needs one more approved
 column. **RTO** reads the RTO flag column, and a data check names rows where the flag and the
 status disagree (in the SLA fixture: delivered-but-flagged and RTO-but-unflagged rows).
+
+## B9 — "Implement now" concepts from the Future Concepts doc (2026-10-02)
+
+Source: the user's doc "analytics-agent — Future Concepts for Upgrade", section "Implement now"
+(ranks 1–23). The user asked to implement only the ideas that support the finished backend.
+
+**D-B9-1. Built (rank):** 1 embedding version contract · 2 typed result contract · 5 evidence
+lineage + staleness · 6 claim validation (direction and rate-as-percent) · 7 on-demand result
+inspection · 9 boundary-aware playbooks · 10 playbook routing · 12 column meaning match ·
+13 contract pre-fill · 14 value matching (for `focus`) · 16 keyword carry-forward ·
+22 metamorphic tests. **Already done before B9:** 3 (measure types, ratio-of-sums templates,
+B2–B4), 20 (`marketing.conversion_reconciliation`, B4), 21 (logistics, B8).
+**Not built, with the reason:** 4 bitemporal definitions (needs valid-time on every
+definition — a contract-store redesign, not a fold-in); 8 Desktop gating (needs a real Claude
+Desktop, O-B2-1); 11 example retrieval (no store of approved examples exists yet); 15 hybrid
+retrieval (no retrieval index to fuse); 17 cleaning variants by meaning (cleaning proposals are
+the v1 engine's; a separate milestone); 18 creative themes, 19 paid vs organic (new tools on
+data shapes with no fixture); 23 synthetic ledger/payroll/inventory data (no such packs).
+
+**D-B9-2. Routing never guesses.** A question skips the planner only when exactly one usable
+playbook matches at least two of its pattern words, leads the next by two, and every slot it
+needs is filled unambiguously by a pattern in the question (two YYYY-MM months: later =
+period; one YYYY-MM-DD date = start). Otherwise the planner runs as before.
+
+**D-B9-3. Pre-fill stays inside one workspace and is only a suggestion.** The most similar
+dataset (column-name Jaccard ≥ 0.8) with a confirmed contract, in the SAME workspace, supplies
+`prefill` on the contract proposal; nothing is applied until the person confirms it with the
+ordinary call. Across workspaces would leak one client's definitions to another.
+
+**D-B9-4. Stored results.** Every domain tool run is stored (SQLite) with a snapshot hash of
+the table (order-independent hash computed in DuckDB), the contract version and the metric
+versions; up to 500 rows per step are kept for inspection. A result is `stale` when the table
+or contract has changed since. Inspection sorts and filters stored engine rows; it computes
+nothing new.

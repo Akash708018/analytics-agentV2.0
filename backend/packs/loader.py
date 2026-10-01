@@ -125,6 +125,10 @@ def _check_refs(m: Merged) -> None:
                 if s.tool not in m.tools]
         bad += [f"playbook {b.id}: unknown rule {r}" for r in b.rules
                 if r not in m.interpretation_rules]
+        bad += [f"playbook {b.id}: unknown metric {t}" for t in b.requires_metrics
+                if t not in m.templates]
+        bad += [f"playbook {b.id}: unknown concept {c}" for c in b.requires_concepts
+                if c not in m.concepts]
         if len(b.steps) > b.max_tool_calls:
             bad.append(f"playbook {b.id}: {len(b.steps)} steps over its budget "
                        f"{b.max_tool_calls}")
