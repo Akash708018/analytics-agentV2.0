@@ -303,3 +303,134 @@ def test_focus_values_match_spellings_aliases_and_say_when_ambiguous(env):
 def test_aliases_are_pack_knowledge():
     m = merge(load_all(), ["marketing"])
     assert m.value_aliases["bombay"] == "mumbai" and m.value_aliases["insta"] == "instagram"
+
+
+# --- rank 22: metamorphic tests on the SLA file -------------------------------------------------
+# Shuffle rows, rename columns, duplicate rows, add a totals row: the SLA answer must stay the
+# same, or the change must be caught and said.
+
+def _sla_with(c, header, rows, rename=None):
+    import csv
+    import io
+    import secrets
+    from backend.tests.test_logistics import DIMS, MEASURES
+    rn = rename or {}
+    ws = f"ws_{secrets.token_hex(6)}"
+    buf = io.StringIO()
+    csv.writer(buf).writerows([[rn.get(h, h) for h in header], *rows])
+    did = c.post(f"/workspaces/{ws}/uploads", files={"file": (
+        "logistics_sla.csv", buf.getvalue().encode())}).json()["dataset_id"]
+    props = c.get(f"/datasets/{did}/cleaning/proposals").json()["proposals"]
+    c.post(f"/datasets/{did}/cleaning/approve",
+           json={"approve": [p["action_id"] for p in props]})
+    c.post(f"/datasets/{did}/domains/confirm", json={"domains": ["logistics"]})
+    p = c.get(f"/datasets/{did}/contract/proposal").json()
+    ms, ds = [rn.get(m, m) for m in MEASURES], [rn.get(x, x) for x in DIMS]
+    r = c.post(f"/datasets/{did}/contract/confirm", json={"contract": {
+        "grain": "one row = one order", "primary_key": [], "date_column": "order_date",
+        "measures": ms, "dimensions": ds,
+        "aggregations": {m: "sum" if m.endswith("_inr") else "mean" for m in ms},
+        "measure_definitions": {m: m for m in ms},
+        "analysis_window_start": "2026-08-01", "analysis_window_end": "2026-08-31"},
+        "fork_choices": {f["fork_id"]: f["options"][0]["id"] for f in p["forks"]}})
+    assert r.status_code == 200, r.text
+    assert c.post(f"/datasets/{did}/metrics/approve", json={
+        "template_id": "sla_breach", "bindings": {}}).status_code == 200
+    c.post(f"/datasets/{did}/validity-rules/approve",
+           json={"approve": ["delivered_after_created"]})
+    return ws, did, props
+
+
+def _hub_rates(c, did, by):
+    res = c.post("/tools/logistics.sla_compliance/run",
+                 json={"dataset_id": did, "params": {"by": by}}).json()
+    return {f["name"].split(": ", 1)[1].lower(): f["value"] for f in res["figures"]
+            if f["name"].startswith("Breach rate: ") and "[" not in f["name"]}, res
+
+
+@pytest.fixture(scope="module")
+def sla_rows():
+    import csv
+    from backend.tests.test_logistics import FIXTURE
+    rows = list(csv.reader(FIXTURE.open()))
+    return rows[0], rows[1:]
+
+
+@pytest.fixture(scope="module")
+def baseline(sla_rows, tmp_path_factory):
+    from fastapi.testclient import TestClient
+    from backend.api.app import create_app
+    c = TestClient(create_app(state_dir=tmp_path_factory.mktemp("meta")))
+    ws, did, _ = _sla_with(c, *sla_rows)
+    rates, _ = _hub_rates(c, did, "hub")
+    workspace.reset(ws)
+    return rates
+
+
+def test_metamorphic_shuffled_rows_give_the_same_rates(env, sla_rows, baseline):
+    import random
+    header, rows = sla_rows
+    rows = rows[:]
+    random.Random(7).shuffle(rows)
+    ws, did, _ = _sla_with(env, header, rows)
+    try:
+        assert _hub_rates(env, did, "hub")[0] == baseline
+    finally:
+        workspace.reset(ws)
+
+
+def test_metamorphic_renamed_columns_bind_and_give_the_same_rates(env, sla_rows, baseline):
+    rename = {"hub": "warehouse", "recorded_delivery_minutes": "delivery_time_minutes",
+              "promised_minutes": "sla_minutes", "delivery_status": "shipment_status",
+              "order_created_at": "booked_at", "delivered_at": "delivered_on"}
+    ws, did, _ = _sla_with(env, *sla_rows, rename=rename)
+    try:
+        assert _hub_rates(env, did, "warehouse")[0] == baseline
+    finally:
+        workspace.reset(ws)
+
+
+def test_metamorphic_duplicated_rows_are_caught_and_removed(env, sla_rows, baseline):
+    header, rows = sla_rows
+    ws, did, props = _sla_with(env, header, rows + rows[:25])
+    try:
+        assert any(p["kind"].lower().startswith(("dedup", "drop_dup", "duplicate")) or
+                   "duplicate" in p["description"].lower() or "cop" in
+                   p["description"].lower() for p in props), props
+        assert _hub_rates(env, did, "hub")[0] == baseline
+    finally:
+        workspace.reset(ws)
+
+
+def test_metamorphic_trailing_totals_row_is_dropped_at_upload_and_said(env, sla_rows,
+                                                                      baseline):
+    import csv
+    import io
+    import secrets
+    header, rows = sla_rows
+    fill = {"hub": "Total", "order_date": "2026-08-31"}
+    buf = io.StringIO()
+    csv.writer(buf).writerows([header, *rows, [fill.get(h, "") for h in header]])
+    ws = f"ws_{secrets.token_hex(6)}"
+    try:
+        up = env.post(f"/workspaces/{ws}/uploads", files={"file": (
+            "logistics_sla.csv", buf.getvalue().encode())}).json()
+        assert up["rows"] == len(rows), up
+        assert any("total" in a.lower() for a in up.get("assumptions", [])), up
+    finally:
+        workspace.reset(ws)
+
+
+def test_metamorphic_mid_file_total_row_is_named_and_real_groups_hold(env, sla_rows, baseline):
+    header, rows = sla_rows
+    fill = {"order_id": "TOTAL", "hub": "Total", "order_date": "2026-08-15",
+            "order_created_at": "2026-08-15 10:00:00", "delivery_status": "Delivered"}
+    total = [fill.get(h, "") for h in header]
+    ws, did, _ = _sla_with(env, header, rows[:200] + [total] + rows[200:])
+    try:
+        rates, res = _hub_rates(env, did, "hub")
+        assert {k: v for k, v in rates.items() if k != "total"} == baseline
+        assert rates.get("total") is None             # one row: under the minimum group size
+        assert any("'total'" in c.lower() and "subtotal" in c for c in res["caveats"]), res["caveats"]
+    finally:
+        workspace.reset(ws)
