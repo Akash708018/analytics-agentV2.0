@@ -44,6 +44,49 @@ def _use_suggested_forks(dataset_id: str, picks: dict[str, str]) -> None:
              option)
 
 
+WIDGET = {"grain": "grain", "key": "key", "roles": "role", "aggregations": "agg",
+          "definitions": "def"}
+
+
+def _use_prefill(dataset_id: str, fills: dict, picks: dict[str, str]) -> None:
+    for path, value in fills.items():
+        _set(dataset_id, k(dataset_id, WIDGET[path[0]], *path[1:]), p(dataset_id, *path), value)
+    _use_suggested_forks(dataset_id, picks)
+
+
+def _prefill(dataset_id: str, prefill: dict, columns: list[str], forks: list[dict]) -> None:
+    """API 0.7.0: a similar file's confirmed answers, offered; nothing applies until confirm."""
+    c = prefill.get("contract") or {}
+    with st.container(border=True):
+        st.markdown(f"**Answers from a similar file: {prefill.get('from_name')}**")
+        st.caption(f"{prefill.get('from_dataset_id')} · same workspace · column-name similarity "
+                   f"{prefill.get('similarity')} · its contract v{prefill.get('contract_version')}")
+        measures = ", ".join(f"{m} ({(c.get('aggregations') or {}).get(m, '?')})"
+                             for m in c.get("measures", []))
+        st.markdown(f"- Grain: {c.get('grain') or '—'}\n- Key: {', '.join(c.get('primary_key') or []) or '—'}"
+                    f"\n- Date: {c.get('date_column') or '—'}\n- Measures: {measures or '—'}"
+                    f"\n- Dimensions: {', '.join(c.get('dimensions') or []) or '—'}"
+                    f"\n- Definitions: {len(c.get('measure_definitions') or {})} · "
+                    f"answers to questions: {len(prefill.get('fork_choices') or {})}")
+        other = [f"{name}: {', '.join(v)}" for name, v in (
+            ("domains", prefill.get("domains") or []), ("metrics", prefill.get("metrics") or []),
+            ("validity rules", prefill.get("validity_rules") or [])) if v]
+        if other:
+            st.caption("It also had " + "; ".join(other) + ". Those are not applied here: "
+                       "confirm them on Domain and Metrics.")
+        if prefill.get("note"):
+            st.caption(prefill["note"])
+        answered = state.get_path(draft, p(dataset_id), {})
+        fills, picks = prep.prefill_answers(
+            prefill, columns, answered, state.get_path(draft, ("drafts", dataset_id, "forks"), {}),
+            forks)
+        count = len(fills) + len(picks)
+        st.button(f"Use these answers ({count} you have not answered)", key="contract.prefill",
+                  disabled=count == 0, on_click=_use_prefill, args=(dataset_id, fills, picks),
+                  help="Fills only fields you have not answered; your answers stay. The window "
+                       "is this file's, so it stays yours to set.")
+
+
 def _start_over(dataset_id: str) -> None:
     held_draft = ss[state.DRAFT]
     for part in ("contract", "forks"):
@@ -240,6 +283,8 @@ def main() -> None:
                          expanded=version is None):
             for question in proposal["questions"]:
                 st.markdown(f"- {question}")
+    if proposal.get("prefill"):
+        _prefill(dataset_id, proposal["prefill"], [c["name"] for c in profile["columns"]], forks)
     key, path = k(dataset_id, "grain"), p(dataset_id, "grain")
     state.bind(ss, key, path, proposal.get("grain") or "")
     st.text_input("One row of this table is…", key=key, max_chars=300,

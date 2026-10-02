@@ -119,7 +119,18 @@ PARAMS: dict[str, tuple[str, str, str]] = {
     "start": ("Campaign start", "text", "The first day of the campaign, e.g. 2026-09-01."),
     "as_of": ("As of", "text", "The day to measure from, e.g. 2026-09-30."),
     "days": ("Days", "number", "How many days counts as stuck."),
+    "focus": ("Focus on (optional)", "text", "One value of the group above, e.g. a hub. Case, "
+              "spaces and the pack's aliases are matched; if it could be several, you are "
+              "asked which. Blank: the engine picks the worst group and says so."),
 }
+
+
+def optional_params(spec: Mapping[str, Any]) -> list[str]:
+    """Params a pack tool reads without requiring them: the `focus_param` its step filters
+    name (F8: `logistics.sla_drivers` reads `focus`, but its spec does not list it)."""
+    found = {f["focus_param"] for step in spec.get("steps", []) or []
+             for f in (step.get("filter") or []) if isinstance(f, Mapping) and f.get("focus_param")}
+    return sorted(found - set(spec.get("params_required", [])))
 
 
 def param_spec(name: str) -> tuple[str, str, str]:
@@ -148,7 +159,64 @@ def run_params(required: Iterable[str], values: Mapping[str, Any], slots: Mappin
     return out
 
 
+def prefill_answers(prefill: Mapping[str, Any], columns: Iterable[str],
+                    answered: Mapping[str, Any], answered_forks: Mapping[str, Any],
+                    forks: Iterable[Mapping[str, Any]]) -> tuple[dict[tuple, Any], dict[str, str]]:
+    """A similar dataset's confirmed answers (API 0.7.0 `prefill`) for the fields the person
+    has NOT answered: {draft path under `contract`: value}, {fork id: option}. The window
+    is never filled (it belongs to this file); answers the form cannot hold are dropped."""
+    cols = set(columns)
+    c = prefill.get("contract") or {}
+    out: dict[tuple, Any] = {}
+    if not (answered.get("grain") or "").strip() and c.get("grain"):
+        out[("grain",)] = c["grain"]
+    key = [k for k in c.get("primary_key") or [] if k in cols]
+    if not answered.get("key") and key:
+        out[("key",)] = key
+    roles = {**{d: "dimension" for d in c.get("dimensions", [])},
+             **{m: "measure" for m in c.get("measures", [])}}
+    if c.get("date_column"):
+        roles[c["date_column"]] = "date"
+    for column, role in roles.items():
+        if column in cols and column not in (answered.get("roles") or {}):
+            out[("roles", column)] = role
+    for measure, agg in (c.get("aggregations") or {}).items():
+        if agg in AGGREGATIONS and not (answered.get("aggregations") or {}).get(measure):
+            out[("aggregations", measure)] = agg
+    for measure, text in (c.get("measure_definitions") or {}).items():
+        if text and not ((answered.get("definitions") or {}).get(measure) or "").strip():
+            out[("definitions", measure)] = text
+    offered = {f["fork_id"]: {o["id"] for o in f.get("options", [])} for f in forks}
+    picks = {f: v for f, v in (prefill.get("fork_choices") or {}).items()
+             if v in offered.get(f, set()) and not answered_forks.get(f)}
+    return out, picks
+
+
 # --- results ---------------------------------------------------------------------------------
+
+STATUS_NOTES = {
+    "partial": "Partial: a step was skipped or refused (see the caveats).",
+    "insufficient_data": "Insufficient data: no figure could be reported.",
+}
+
+
+def lineage(result: Mapping[str, Any]) -> str | None:
+    """Where a result came from (API 0.7.0), as returned; None for an older result."""
+    parts = []
+    snapshot = result.get("snapshot") or {}
+    if snapshot:
+        parts.append(f"computed on {snapshot.get('rows')} rows (snapshot {snapshot.get('hash')})")
+    if result.get("contract_version") is not None:
+        parts.append(f"contract v{result['contract_version']}")
+    if result.get("grain"):
+        parts.append(f"grain: {result['grain']}")
+    used = result.get("metrics_used") or {}
+    if used:
+        parts.append("metrics: " + ", ".join(
+            f"{t} → {(m or {}).get('measure', '?')}" for t, m in used.items()))
+    if result.get("result_id"):
+        parts.append(f"result {result['result_id']}")
+    return " · ".join(parts) or None
 
 PROVENANCE = {
     "contract": "from the confirmed contract",

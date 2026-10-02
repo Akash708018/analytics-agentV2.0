@@ -11,7 +11,7 @@ from typing import Any
 
 import streamlit as st
 
-from frontend import prep
+from frontend import prep, state
 
 
 def _chart(series: Mapping[str, Any]) -> None:
@@ -32,10 +32,21 @@ def _chart(series: Mapping[str, Any]) -> None:
                      hide_index=True, use_container_width=True)
 
 
-def render_result(result: Mapping[str, Any], key: str) -> None:
+def render_result(result: Mapping[str, Any], key: str, link: bool = True) -> None:
     """`key` tells apart two results on one page (an answer may rest on the same tool twice)."""
     st.markdown(f"#### {result['summary']}")
     st.caption(f"{result['tool_id']} · {result['dataset_id']}")
+    if result.get("stale"):
+        st.warning("Out of date: " + "; ".join(result.get("stale_reasons") or ["no reason given"])
+                   + ". Run it again for current figures.")
+    if (status := result.get("status")) in prep.STATUS_NOTES:
+        st.warning(prep.STATUS_NOTES[status])
+    if (line := prep.lineage(result)):
+        st.caption(line)
+    if link and result.get("result_id") and st.session_state.get(state.SID):
+        st.page_link("views/results.py", label="Page through every row on Results", icon="🗂️",
+                     query_params={"sid": st.session_state[state.SID],
+                                   "result": result["result_id"]})
     for series in result.get("series", []):
         _chart(series)
     figures = result.get("figures", [])

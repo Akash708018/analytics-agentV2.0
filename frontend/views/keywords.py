@@ -90,6 +90,33 @@ def _choose(dataset_id: str) -> None:
     ss[k(dataset_id, "chosen")] = ss[k(dataset_id, "group")]
 
 
+def _accept_join(dataset_id: str, approved_id: str, proposal_id: str, label: str) -> None:
+    # The approved group's id first: the merge keeps its label and approval (API 0.7.0).
+    _send(dataset_id, "merge",
+          lambda: api.apply_keyword_group_action(dataset_id, "merge", [approved_id, proposal_id]),
+          f"Added to '{label}'.")
+
+
+def _joins(dataset_id: str, groups: list[dict]) -> None:
+    """Carry-forward (API 0.7.0): new keywords the engine proposes for an APPROVED group.
+    Accepting is a person's merge; leaving them keeps an ordinary proposal."""
+    by_id = {g["group_id"]: g for g in groups}
+    joins = [(g, by_id[g["joins"]]) for g in groups
+             if g.get("joins") in by_id and by_id[g["joins"]]["approved"] and not g["approved"]]
+    if not joins:
+        return
+    st.markdown(f"**New keywords for approved groups ({len(joins)})**")
+    for proposal, target in joins:
+        with st.container(border=True):
+            st.markdown(f"{', '.join(proposal['keywords'])} → **{target['label']}**")
+            st.caption(f"Adding them puts {len(proposal['keywords'])} keyword(s) into "
+                       f"'{target['label']}', which is approved, so they count as approved. "
+                       "Left alone they stay a proposal.")
+            st.button(f"Add to '{target['label']}'", key=f"kw.{dataset_id}.join.{proposal['group_id']}",
+                      on_click=_accept_join,
+                      args=(dataset_id, target["group_id"], proposal["group_id"], target["label"]))
+
+
 def _propose(dataset_id: str, columns: list[str] | None, listing: dict | None) -> None:
     st.subheader("Propose groups")
     key, path = k(dataset_id, "column"), p(dataset_id, "column")
@@ -113,7 +140,16 @@ def _propose(dataset_id: str, columns: list[str] | None, listing: dict | None) -
     if run:
         st.caption(f"Last run: column `{run.get('column')}` · {run.get('keywords')} keyword(s) "
                    f"read · {run.get('proposed_groups')} proposal(s) · embedding "
-                   f"{run.get('embedding')}, threshold {run.get('threshold')}")
+                   f"{run.get('embedding')}, threshold {run.get('threshold')}"
+                   + (f" · generation {version['generation']}"
+                      if (version := run.get("embedding_version") or {}).get("generation") else ""))
+        carry = run.get("carry_forward") or {}
+        if carry.get("status") == "disabled":
+            st.warning("New keywords were not matched to your approved groups: "
+                       f"{carry.get('reason', 'no reason given')}")
+        elif carry.get("status") == "ok":
+            st.caption(f"{carry.get('suggested', 0)} proposal(s) to join approved groups: "
+                       "see New keywords for approved groups below.")
         typos = run.get("typos_merged") or {}
         if typos:
             with st.expander(f"Spellings merged before grouping ({len(typos)})"):
@@ -181,6 +217,7 @@ def _edit_one(dataset_id: str, groups: list[dict]) -> None:
 
 
 def _list(dataset_id: str, groups: list[dict]) -> None:
+    by_id = {g["group_id"]: g for g in groups}
     left, mid, right = st.columns(3)
     status = left.radio("Show", kw.STATUS, key=k(dataset_id, "f", "status"), horizontal=True)
     options, key = sorted({g["intent"] for g in groups}), k(dataset_id, "f", "intent")
@@ -198,7 +235,9 @@ def _list(dataset_id: str, groups: list[dict]) -> None:
             state.bind(ss, key, path, False)
             st.checkbox(kw.heading(g), key=key, on_change=state.on_change, args=(ss, key, path))
             facets = kw.facets_text(g.get("facets") or {})
+            joins = by_id.get(g.get("joins") or "")
             st.caption(f"`{gid}` · proposed by {g.get('proposed_by', 'rules')}"
+                       + (f" · proposed to join '{joins['label']}'" if joins else "")
                        + (f" · {facets}" if facets else ""))
             st.caption(", ".join(g["keywords"]))
 
@@ -240,6 +279,7 @@ def main() -> None:
     st.page_link("views/tools.py", label="Tools: keyword group performance, page targeting",
                  icon="🧰", query_params={"sid": ss[state.SID]})
     ids = kw.ticked(state.get_path(draft, p(dataset_id, "ticks"), {}), groups)
+    _joins(dataset_id, groups)
     _ticked_actions(dataset_id, groups, ids)
     _edit_one(dataset_id, groups)
     _list(dataset_id, groups)

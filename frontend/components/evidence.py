@@ -15,12 +15,21 @@ from frontend.components.results import render_result
 CHECK_ICON = {"passed": "✅", "corrected": "🛠️", "flagged": "⚠️", "failed": "❌", "not_run": "➖"}
 
 
+ROUTED = {"rules": "chosen by its question patterns, no model call",
+          "planner": "chosen by the model"}
+
+
 def _plan(data: Mapping[str, Any]) -> str:
     if data.get("mode") == "tool_calling" or not data.get("playbook"):
         return "No playbook fitted: the model chose tools itself, from the active ones."
     slots = ", ".join(f"{k} = {v}" for k, v in (data.get("slots") or {}).items())
-    return (f"Playbook **{data['playbook']}**" + (f" ({slots})" if slots else "")
-            + ": " + " → ".join(f"`{s}`" for s in data.get("steps", [])))
+    routed = ROUTED.get(data.get("routed_by"), data.get("routed_by"))
+    line = (f"Playbook **{data['playbook']}**" + (f" ({slots})" if slots else "")
+            + (f", {routed}" if routed else ""))
+    if data.get("blocked"):                       # 0.7.0: requirements missing, nothing ran
+        return (line + f" · ⛔ blocked: needs {', '.join(data['blocked'])}."
+                + (f" {data['recovery']}" if data.get("recovery") else ""))
+    return line + ": " + " → ".join(f"`{s}`" for s in data.get("steps", []))
 
 
 def _event(event: Mapping[str, Any]) -> str | None:
@@ -67,6 +76,9 @@ def usage_line(usage: Mapping[str, Any]) -> str:
 
 def render_answer(turn: Mapping[str, Any]) -> None:
     answer = turn.get("answer") or {}
+    if answer.get("blocked"):
+        st.warning("Nothing was run: this question needs "
+                   + ", ".join(answer["blocked"]) + " first. What to do is below.")
     st.markdown(answer.get("text", ""))
     for flag in answer.get("flags", []):
         st.warning(f"Unresolved check: {flag}")
@@ -80,4 +92,6 @@ def render_answer(turn: Mapping[str, Any]) -> None:
             render_result(result, key=f"ask.{turn.get('turn_id')}.{i}")
     if not results:
         st.caption("No tool result backs this answer"
-                   + (": every step was skipped (see How this was answered)." if answer.get("skipped") else "."))
+                   + (": nothing was run." if answer.get("blocked") else
+                      ": every step was skipped (see How this was answered)."
+                      if answer.get("skipped") else "."))

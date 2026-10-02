@@ -29,7 +29,8 @@ from typing import Any
 from frontend.api_client import APIClient, APIError, VersionConflict
 
 SCHEMA = 2
-PAGES = ("session", "data", "clean", "domain", "contract", "metrics", "keywords", "tools", "ask")
+PAGES = ("session", "data", "clean", "domain", "contract", "metrics", "keywords", "tools",
+         "results", "ask")
 DEFAULT_PAGE = "session"
 LABEL_MAX = 120
 TEXT_MAX = 2000
@@ -174,6 +175,8 @@ def _dataset_draft(raw: Any) -> dict:
         out["bindings"] = bindings
     if keywords := _keywords(raw.get("keywords")):
         out["keywords"] = keywords
+    if isinstance(raw.get("result"), str):          # F8: the stored result chosen on Results
+        out["result"] = raw["result"][:NAME_MAX]
     version = raw.get("confirmed_version")
     if isinstance(version, int) and not isinstance(version, bool):
         out["confirmed_version"] = version

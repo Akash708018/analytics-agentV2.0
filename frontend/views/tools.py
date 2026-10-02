@@ -58,6 +58,14 @@ def _run(dataset_id: str, tool_id: str, required: list[str], slots: list[str]) -
         datasets.invalidate(held, dataset_id, ("keywords",))
 
 
+def _pick_value(dataset_id: str, tool_id: str, param: str, picked_key: str) -> None:
+    """The person chose one of the backend's values: it becomes the param; they run again."""
+    value = ss.get(picked_key)
+    if value is not None:
+        ss[k(dataset_id, tool_id, "p", param)] = value
+        state.set_path(ss[state.DRAFT], p(dataset_id, tool_id, param), value)
+
+
 def _answer_forks(dataset_id: str, fork_ids: list[str]) -> None:
     answers = {f: ss.get(f"ui.tools.{dataset_id}.fork.{f}") for f in fork_ids}
     answers = {f: v for f, v in answers.items() if v}
@@ -112,6 +120,17 @@ def _error(dataset_id: str, tool_id: str, error: APIError, forks: list[dict]) ->
                      on_change=state.on_change, args=(ss, key, path))
         st.button("Save the answers", key="tools.forks", on_click=_answer_forks,
                   args=(dataset_id, missing))
+    elif error.code in ("ambiguous_value", "unknown_value"):
+        param, column = extra.get("param", ""), extra.get("column", "")
+        options = extra.get("candidates" if error.code == "ambiguous_value" else "values", [])
+        st.warning(error.message)
+        key = k(dataset_id, tool_id, "pick", param)
+        label = f"Which {column} did you mean?" if error.code == "ambiguous_value" else \
+            f"The {column} values in this data"
+        widget = st.radio if len(options) <= 10 else st.selectbox
+        widget(label, options, key=key, index=None,
+               on_change=_pick_value, args=(dataset_id, tool_id, param, key))
+        st.caption("Choosing one puts it in the form above; then run again.")
     elif error.code == "festival_dates_unconfirmed":
         st.warning(error.message)
         for year, (start, end) in sorted(extra.get("dates", {}).items()):
@@ -185,6 +204,9 @@ def main() -> None:
     required = list(spec.get("params_required", []))
     for name in required:
         _param_input(dataset_id, tool_id, name, festivals)
+    optional = prep.optional_params(spec)               # F8: read by the tool, not required
+    for name in optional:
+        _param_input(dataset_id, tool_id, name, festivals)
     slots = list(spec.get("slots", {}))
     profile = datasets.cached(ss, "profile", dataset_id, lambda: api.get_profile(dataset_id))
     columns = [] if isinstance(profile, APIError) else [c["name"] for c in profile["columns"]]
@@ -196,7 +218,7 @@ def main() -> None:
                      on_change=state.on_change, args=(ss, key, path))
     binding_form(ss, f"tools.{dataset_id}.{tool_id}", p(dataset_id, tool_id, "bindings"), columns)
     st.button("Run", type="primary", key="tools.run", on_click=_run,
-              args=(dataset_id, tool_id, required, slots))
+              args=(dataset_id, tool_id, required + optional, slots))
     saved = state.work(ss)["results"].get(("forks", dataset_id))
     if saved and "error" in saved:
         show_error(saved["error"], "The answers were not saved")

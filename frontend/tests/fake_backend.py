@@ -119,6 +119,8 @@ class FakeBackend:
                                       ["festival", "year"], {}),
         "marketing.creative_fatigue": ("Creative fatigue", "marketing", ["frequency"], [], {}),
         "marketing.keyword_grouping": ("Group keywords", "marketing", [], [], {}),
+        "logistics.sla_drivers": ("What goes with breaches", "logistics", [], [],
+                                  {"by": ["hub", "courier", "zone"]}),
         "logistics.otif": ("On time, in full", "logistics", [], [], {}),
         "core.trend": ("Trend", None, [], [], {}),
     }
@@ -249,7 +251,7 @@ class FakeBackend:
                                   "strength": "strong", "reason": "rows add up"}
                                  for m in c["measures"]],
                     "caveats": [], "provisional": [], "questions": [],
-                    "forks": self._forks(dataset_id)}
+                    "forks": self._forks(dataset_id), "prefill": state.get("prefill")}
         return {"dataset_id": dataset_id, "grain": "", "key": [], "date": "date",
                 "measures": [{"column": "ctr", "measure_type": "non_additive", "agg": "",
                               "suggested_agg": "none", "strength": "strong",
@@ -259,7 +261,7 @@ class FakeBackend:
                 "provisional": ["grain", "measures[ctr].agg", "analysis_window"],
                 "questions": ["What is one row of this table?", "How does ctr combine?",
                               "What period should the analysis cover?"],
-                "forks": self._forks(dataset_id)}
+                "forks": self._forks(dataset_id), "prefill": state.get("prefill")}
 
     def _confirm_contract(self, dataset_id: str, body: dict) -> httpx.Response:
         state = self._prep(dataset_id)
@@ -346,12 +348,23 @@ class FakeBackend:
                           "Festival dates move every year: confirm them, then re-run.",
                           dates={"2026": ["2026-11-08", "2026-11-08"],
                                  "2025": ["2025-10-20", "2025-10-21"]})
+        if tool_id == "logistics.sla_drivers" and params.get("focus") is not None:
+            focus = str(params["focus"]).lower()
+            matches = [h for h in self.HUBS if focus in h.lower()]
+            if not matches:
+                return _error(422, "unknown_value", f"no hub value matches '{params['focus']}'",
+                              param="focus", column="hub", values=self.HUBS)
+            if len(matches) > 1 and focus not in [h.lower() for h in matches]:
+                return _error(422, "ambiguous_value",
+                              f"'{params['focus']}' could be several hub values: {matches}; "
+                              "pass one exactly in params.focus",
+                              param="focus", column="hub", candidates=matches)
         if tool_id == "marketing.channel_efficiency" and "conversion_source" not in state["fork_choices"]:
             return _error(422, "forks_unanswered", "Answer these before this tool runs.",
                           missing=["conversion_source"],
                           forks=[{"fork_id": "conversion_source",
                                   "question": "Which conversions count?"}])
-        return httpx.Response(200, json={
+        return httpx.Response(200, json=self._store_result({
             "tool_id": tool_id, "dataset_id": dataset_id,
             "summary": f"{self.TOOLS[tool_id][0]}: 1 step(s) run",
             "figures": [{"name": "Spend by group: social", "value": 449.0, "unit": "cost (sum)",
@@ -367,9 +380,67 @@ class FakeBackend:
             "pack_rules_applied": ["no_sum_of_rate"],
             "forks": {k: v for k, v in state["fork_choices"].items() if k == "conversion_source"},
             "caveats": ["CTR: skipped -- metric 'ctr' is not approved for this dataset"],
-            "figure_check": {"status": "not_run", "notes": ["figures come straight from the engine"]}})
+            "figure_check": {"status": "not_run", "notes": ["figures come straight from the engine"]}}))
 
-    def _prep_route(self, method: str, parts: list[str], body) -> httpx.Response | None:
+    # --- stored results (API 0.7.0; shapes from the F8 probe) ------------------------------
+    HUBS = ["PUNE_CENTRAL", "PUNE_EAST", "PUNE_SOUTH", "PUNE_WEST"]
+    STEPS = {"Spend by group": (["channel", "n", "cost (sum)"],
+                                [["social", "40", "449.0"], ["search", "52", "560.0"],
+                                 ["video", "7", "88.5"]]),
+             "Spend by week": (["period", "cost (sum)"], [["2026-W36", "300.0"], ["2026-W37", "709.0"]])}
+
+    def _store_result(self, result: dict) -> dict:
+        self.stored = getattr(self, "stored", {})
+        result_id = f"r_{len(self.stored) + 1:016x}"
+        state = self._prep(result["dataset_id"])
+        result.update(result_id=result_id, run_id=result_id, status="ok",
+                      snapshot={"hash": "e63766b0e708a9c4-12", "rows": 12},
+                      contract_version=state["version"] or None,
+                      grain=(state["contract"] or {}).get("grain"),
+                      metrics_used={t: {"measure": m} for t, m in state["metrics"].items()})
+        self.stored[result_id] = {**result, "stale": False, "stale_reasons": [],
+                                  "created_at": f"2026-10-02T10:0{len(self.stored)}:00+00:00"}
+        return result
+
+    def make_stale(self, result_id: str, reason: str = "the data changed (cleaning or a new "
+                                                          "upload) since this result") -> None:
+        self.stored[result_id].update(stale=True, stale_reasons=[reason])
+
+    def _results_route(self, method: str, parts: list[str], params) -> httpx.Response | None:
+        stored = getattr(self, "stored", {})
+        if method == "GET" and parts[0] == "datasets" and parts[2:] == ["results"]:
+            return httpx.Response(200, json={"dataset_id": parts[1], "results": [
+                {k: r[k] for k in ("result_id", "tool_id", "run_id", "status", "created_at",
+                                   "stale", "stale_reasons")}
+                for r in stored.values() if r["dataset_id"] == parts[1]]})
+        if parts[0] != "results" or method != "GET":
+            return None
+        if parts[1] not in stored:
+            return _error(404, "not_found", f"result {parts[1]} not found")
+        if len(parts) == 2:
+            return httpx.Response(200, json=stored[parts[1]])
+        step = params.get("step") or next(iter(self.STEPS))
+        if step not in self.STEPS:
+            return _error(422, "unknown_step", f"no step {step!r}", steps=list(self.STEPS))
+        headers, rows = self.STEPS[step]
+        if (group := params.get("group")):
+            rows = [r for r in rows if r[0].lower() == group.lower()]
+        if (sort_by := params.get("sort_by")):
+            if sort_by not in headers or getattr(self, "refuse_sort", False):
+                return _error(422, "unknown_column", f"sort_by '{sort_by}'; columns: {headers}",
+                              columns=headers)
+            i = headers.index(sort_by)
+            rows = sorted(rows, key=lambda r: float(r[i]) if r[i].replace(".", "", 1).isdigit()
+                          else r[i], reverse=params.get("descending") == "true")
+        offset, limit = int(params.get("offset", 0)), int(params.get("limit", 50))
+        return httpx.Response(200, json={
+            "result_id": parts[1], "step": step, "steps": list(self.STEPS), "headers": headers,
+            "rows": rows[offset:offset + limit], "total_rows": len(rows),
+            "rows_kept": len(self.STEPS[step][1]), "rows_in_engine_output": len(self.STEPS[step][1])})
+
+    def _prep_route(self, method: str, parts: list[str], body, params=None) -> httpx.Response | None:
+        if (found := self._results_route(method, parts, params or {})) is not None:
+            return found
         if parts[0] == "packs" and method == "GET" and len(parts) == 1:
             return httpx.Response(200, json={"packs": [
                 {"pack_id": p, "version": "0.1.0", "extends": [] if p == "core" else ["core"],
@@ -377,7 +448,10 @@ class FakeBackend:
         if parts[0] == "packs" and method == "GET" and len(parts) == 2:
             pack_id = parts[1]
             tools = [{"id": t, "ui_label": v[0], "description": f"{v[0]} (fake description).",
-                      "params_required": v[3], "slots": v[4]}
+                      "params_required": v[3], "slots": v[4],
+                      "steps": [{"analysis": "group_compare", "filter": [
+                          {"concept": "@by", "focus_param": "focus"}]}]
+                      if t == "logistics.sla_drivers" else []}
                      for t, v in self.TOOLS.items() if t.startswith(pack_id + ".")]
             pack = {"pack": {"id": pack_id}, "tools": tools, "forks": [],
                     "festivals": [{"id": "diwali", "name": "Diwali"}] if pack_id == "core" else []}
@@ -501,6 +575,22 @@ class FakeBackend:
             "usage": {"llm_calls": 2, "tool_calls": 2, "tokens_in_est": 1001,
                       "tokens_out_est": 56, "per_call": [], "model": "scripted"}})
 
+    def block_turn(self, turn_id: str) -> None:
+        """A playbook whose requirements are missing: nothing runs (F8 probe, API 0.7.0)."""
+        blocked = ["the approved metric 'sla_breach'"]
+        recovery = ("Approve the SLA breach metric (metrics screen: sla_breach = delivery "
+                    "minutes > promised minutes).")
+        self.add_event(turn_id, "plan", {"playbook": "sla_where_and_why", "slots": {}, "steps": [],
+                                         "routed_by": "rules", "blocked": blocked,
+                                         "recovery": recovery})
+        text = f"Before I can answer this, this dataset needs {blocked[0]}. {recovery}"
+        self.add_event(turn_id, "answer", {"text": text, "flags": []})
+        self.turns[turn_id].update(status="done", answer={
+            "text": text, "flags": [], "playbook": "sla_where_and_why", "results": [],
+            "skipped": [], "blocked": blocked,
+            "usage": {"llm_calls": 0, "tool_calls": 0, "tokens_in_est": 0, "tokens_out_est": 0,
+                      "per_call": [], "model": None}})
+
     def finish_turn(self, turn_id: str, text: str = "ROAS fell from 4.1 to 3.2.") -> None:
         t = self.turns[turn_id]
         t["status"] = "done"
@@ -529,6 +619,8 @@ class FakeBackend:
         if request.headers.get("content-type", "").startswith("application/json"):
             body = json.loads(request.content or b"null")
         self.calls.append((method, path, body))
+        if request.url.params:                          # F8: inspect's query, as sent
+            self.queries = getattr(self, "queries", []) + [(path, dict(request.url.params))]
         fault = self.faults.pop((method, path), None)
         if fault and not fault[1]:
             raise fault[0]("injected", request=request)
@@ -541,7 +633,7 @@ class FakeBackend:
 
     def _route(self, method: str, path: str, body, request) -> httpx.Response:
         parts = path.strip("/").split("/")
-        if (prep := self._prep_route(method, parts, body)) is not None:
+        if (prep := self._prep_route(method, parts, body, dict(request.url.params))) is not None:
             return prep
         if method == "POST" and parts == ["sessions"]:
             sid = self.new_session(workspace_id=(body or {}).get("workspace_id")

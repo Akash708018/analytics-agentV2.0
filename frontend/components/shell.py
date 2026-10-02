@@ -145,6 +145,8 @@ STEPS = (
     ("views/keywords.py", "Keyword groups", "🔤", "review the proposed search-term groups; "
                                                   "only approved groups reach the tools"),
     ("views/tools.py", "Tools", "🧰", "run a marketing tool and see every figure with its source"),
+    ("views/results.py", "Results", "🗂️", "every stored result, whether it is out of date, and "
+                                          "all its rows"),
     ("views/ask.py", "Ask", "💬", "ask questions about the data"),
 )
 

@@ -21,7 +21,7 @@ st.set_page_config(page_title="Analytics agent", page_icon="📊", layout="wide"
 
 TITLES = {"session": "Session", "data": "Data", "clean": "Clean", "domain": "Domain",
           "contract": "Contract", "metrics": "Metrics", "keywords": "Keyword groups",
-          "tools": "Tools", "ask": "Ask"}
+          "tools": "Tools", "results": "Results", "ask": "Ask"}
 PAGES = {
     page_id: st.Page(f"views/{page_id}.py", title=title, default=page_id == "session",
                      url_path=None if page_id == "session" else page_id)
