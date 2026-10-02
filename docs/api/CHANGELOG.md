@@ -2,6 +2,18 @@
 
 Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry here.
 
+## 0.9.0 — 2026-10-02 (B11, issue #22: direct analyses and reports)
+
+- New `GET /datasets/{id}/analyses` (`AnalysisList`): the 27 core analyses, each field with
+  `kind`, `required` and the contract's own `choices` (measures, dimensions, columns, grains).
+- `POST /tools/core.<analysis>/run` now RUNS the analysis (was 422 `not_a_domain_tool`) and
+  returns a `ToolResult` with a `result_id`. A missing required field → 422 `param_required`;
+  an unknown one (including `where`) → 422 `unknown_params`. `core.<step>` ids (profile,
+  cleaning, contract) still answer 422 `not_a_domain_tool`.
+- New `POST /datasets/{id}/reports {playbook, slots}` (`Report`): a playbook the person picks,
+  run with no model call; its results share one `run_id`. Blocked → 422 `playbook_blocked`
+  with `missing` + `recovery`; unknown → 404; missing slots → 422 `param_required`.
+
 ## 0.8.0 — 2026-10-02 (B10, additive: the frontend's api-request issues)
 
 - #20: `KeywordGroupAction.action` gains `unapprove` (the group returns to proposal; the engine

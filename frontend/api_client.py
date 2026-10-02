@@ -242,6 +242,12 @@ class APIClient:
     def run_tool(self, tool_id: str, dataset_id: str, params: JsonObject | None = None) -> JsonObject:
         return self._request("POST", f"tools/{_segment(tool_id)}/run", json={"dataset_id": dataset_id, "params": params if params is not None else {}})
 
+    def list_analyses(self, dataset_id: str) -> JsonObject:
+        return self._request("GET", f"datasets/{_segment(dataset_id)}/analyses")
+
+    def run_report(self, dataset_id: str, playbook: str, slots: Mapping[str, str] | None = None) -> JsonObject:
+        return self._request("POST", f"datasets/{_segment(dataset_id)}/reports", json={"playbook": playbook, "slots": dict(slots or {})})
+
     def list_packs(self) -> JsonObject:
         return self._request("GET", "packs")
 

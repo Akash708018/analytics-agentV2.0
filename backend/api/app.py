@@ -208,6 +208,16 @@ def create_app(state_dir: Path | str | None = None, runner: Runner | None = None
     def contract_in_force(dataset_id: str) -> S.ContractInForce:
         return S.ContractInForce(**ds.contract_in_force(dataset_id))
 
+    @app.get("/datasets/{dataset_id}/analyses", response_model=S.AnalysisList,
+             responses={**R, 409: ERR}, tags=["tools"])
+    def analyses(dataset_id: str) -> S.AnalysisList:
+        return S.AnalysisList(**ds.analyses(dataset_id))
+
+    @app.post("/datasets/{dataset_id}/reports", response_model=S.Report,
+              responses={**R, 409: ERR}, tags=["tools"])
+    def report(dataset_id: str, body: S.ReportRequest) -> S.Report:
+        return S.Report(**ds.report(dataset_id, body.playbook, body.slots))
+
     @app.get("/datasets/{dataset_id}/results", response_model=S.ResultList, responses=R,
              tags=["results"])
     def list_results(dataset_id: str) -> S.ResultList:

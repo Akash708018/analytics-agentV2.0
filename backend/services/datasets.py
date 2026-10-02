@@ -586,9 +586,12 @@ class DatasetService:
                                {"needs_domain": st.needs_domain,
                                 "missing_concepts": st.missing_concepts})
         if st.pack == "core":   # before m.tools: core analyses are not pack tools (C11: was a 500)
+            name = tool_id.split(".", 1)[1]
+            if name in {f["name"] for f in analysis_catalogue()}:
+                return self.run_analysis(dataset_id, name, params, run_id)   # D-B11-1
             raise ServiceError(422, "not_a_domain_tool",
                                "core steps run through their own endpoints (profile, cleaning, "
-                               "contract); core analyses run through a turn")
+                               "contract)")
         if m.tools[tool_id].kind == "pipeline":
             got = self.keywords.run(dataset_id, params.get("column"))
             n = len(got["groups"])
@@ -683,9 +686,110 @@ class DatasetService:
         result["grain"] = c.grain
         return self._store_result(d, result, clean, snap, sc.version, run_id)
 
+    # --- direct analyses and reports (B11, issue #22) ----------------------------------------
+    def analyses(self, dataset_id: str) -> dict:
+        """The core analyses a person can run, each field with the contract's own choices."""
+        d = self._get(dataset_id)
+        c = self._contract(d).contract
+        measures = [m.name for m in c.measures]
+        dims = list(c.dimensions)
+        cols = sorted(self._columns(d))
+        choices = {"measure": measures, "dimension": dims, "column": cols,
+                   "grain": list(GRAINS)}
+        out = []
+        for a in analysis_catalogue():
+            out.append({**a, "fields": [{**f, "choices": choices.get(f["kind"])}
+                                        for f in a["fields"]]})
+        return {"dataset_id": dataset_id, "analyses": out}
+
+    def run_analysis(self, dataset_id: str, name: str, params: dict,
+                     run_id: str | None = None) -> dict:
+        """A person's direct run: required fields present, nothing unknown, never `where`."""
+        spec = next((a for a in analysis_catalogue() if a["name"] == name), None)
+        if spec is None:
+            raise ServiceError(404, "not_found", f"no core analysis {name!r}")
+        fields = {f["name"]: f for f in spec["fields"]}
+        given = {k: v for k, v in (params or {}).items() if v not in (None, "")}
+        unknown = sorted(set(given) - set(fields))
+        if unknown:
+            raise ServiceError(422, "unknown_params", f"{name} takes {sorted(fields)}; not "
+                               f"{unknown}", {"unknown": unknown, "fields": sorted(fields)})
+        missing = [f for f, x in fields.items() if x["required"] and f not in given]
+        if missing:
+            raise ServiceError(422, "param_required", f"{name} needs {missing}",
+                               {"missing": missing})
+        return self.run_core(dataset_id, name, given, run_id=run_id)
+
+    def report(self, dataset_id: str, playbook_id: str, slots: dict) -> dict:
+        """A playbook the person chose, run step by step with no model call (D-B11-1)."""
+        from backend.playbooks.agent import Agent
+        d = self._get(dataset_id)
+        usable, blocked, _ = Agent(self, None).playbooks_split(d)
+        if playbook_id in blocked:
+            b, missing = blocked[playbook_id]
+            raise ServiceError(422, "playbook_blocked", f"{playbook_id} needs: "
+                               + "; ".join(missing), {"missing": missing,
+                                                      "recovery": b.recovery})
+        pb = usable.get(playbook_id)
+        if pb is None:
+            raise ServiceError(404, "not_found", f"no playbook {playbook_id!r} for this data")
+        missing = [s for s in pb.slots if s not in (slots or {})]
+        if missing:
+            raise ServiceError(422, "param_required", f"{playbook_id} needs slots {missing}",
+                               {"missing": missing, "slots": pb.slots})
+        run_id = f"rep_{secrets.token_hex(8)}"
+        results, skipped = [], []
+        for step in pb.steps[:pb.max_tool_calls]:
+            params = {k: (slots.get(v[6:]) if isinstance(v, str) and v.startswith("@slot:")
+                          else v) for k, v in step.params.items()}
+            try:
+                results.append(self.run_tool(step.tool, dataset_id,
+                                             {k: v for k, v in params.items() if v is not None},
+                                             run_id=run_id))
+            except ServiceError as e:
+                skipped.append({"tool_id": step.tool, "code": e.code, "reason": e.message})
+                if not step.optional:
+                    break
+        return {"dataset_id": dataset_id, "playbook": pb.id, "run_id": run_id,
+                "description": pb.description, "rules": list(pb.rules),
+                "results": results, "skipped": skipped}
+
     def tools_states(self, d: dict):
         bound, sources = self._bound(d)
         return registry.statuses(d["domains"], set(bound), sources)
+
+
+GRAINS = ("day", "week", "month", "quarter", "year")
+_KINDS = {"measure": "measure", "against": "measure", "dimension": "dimension",
+          "second_dimension": "dimension", "rows": "dimension", "columns": "dimension",
+          "column": "column", "entity": "column", "event": "column", "grain": "grain",
+          "period": "period", "baseline": "period", "before_start": "date",
+          "before_end": "date", "after_start": "date", "after_end": "date",
+          "n": "integer", "limit": "integer", "bins": "integer", "groups": "list",
+          "threshold": "number", "confidence": "number", "power": "number",
+          "alpha": "number", "method": "text"}
+
+
+def analysis_catalogue() -> list[dict]:
+    """The v1-surface core analyses with their fields, read from each one's signature."""
+    import inspect
+    from backend.engine.analysis import registry as R
+    import backend.engine.analysis.tools  # noqa: F401 -- registers the analyses
+    out = []
+    for name, tier, summary in R.catalogue("v1"):
+        a = R.REGISTRY[name]
+        ps = [p for p in list(inspect.signature(a.run).parameters.values())[3:]
+              if p.kind not in (p.VAR_KEYWORD, p.VAR_POSITIONAL)]
+        fields = [{"name": p.name, "kind": _KINDS.get(p.name, "text"),
+                   "required": p.default is inspect.Parameter.empty} for p in ps]
+        have = {f["name"] for f in fields}
+        if a.narrows:
+            fields += [{"name": x, "kind": k, "required": False}
+                       for x, k in (("period", "period"), ("grain", "grain")) if x not in have]
+        if a.selects and "groups" not in have:
+            fields.append({"name": "groups", "kind": "list", "required": False})
+        out.append({"name": name, "tier": tier, "summary": summary, "fields": fields})
+    return out
 
 
 CLEANING_SAMPLES = 3

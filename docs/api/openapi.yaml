@@ -3,7 +3,7 @@ info:
   title: analytics-agent v2
   description: Contract-first API. Figures carry provenance; chart series are computed by the backend.
     501 = spec'd, not live yet.
-  version: 0.8.0
+  version: 0.9.0
 paths:
   /health:
     get:
@@ -1024,6 +1024,100 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
           description: Conflict
+  /datasets/{dataset_id}/analyses:
+    get:
+      tags:
+      - tools
+      summary: Analyses
+      operationId: analyses_datasets__dataset_id__analyses_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisList'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Conflict
+  /datasets/{dataset_id}/reports:
+    post:
+      tags:
+      - tools
+      summary: Report
+      operationId: report_datasets__dataset_id__reports_post
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Conflict
   /datasets/{dataset_id}/results:
     get:
       tags:
@@ -1364,6 +1458,100 @@ paths:
           description: Unprocessable Entity
 components:
   schemas:
+    AnalysisField:
+      properties:
+        name:
+          type: string
+          title: Name
+        kind:
+          type: string
+          title: Kind
+          description: measure | dimension | column | grain | period | date | integer | number | list
+            | text
+        required:
+          type: boolean
+          title: Required
+        choices:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Choices
+          description: The contract's own options (measures, dimensions, columns, grains); none for free
+            values
+      type: object
+      required:
+      - name
+      - kind
+      - required
+      title: AnalysisField
+    AnalysisList:
+      properties:
+        dataset_id:
+          type: string
+          title: Dataset Id
+        analyses:
+          items:
+            $ref: '#/components/schemas/AnalysisSpec'
+          type: array
+          title: Analyses
+      type: object
+      required:
+      - dataset_id
+      - analyses
+      title: AnalysisList
+      examples:
+      - analyses:
+        - fields:
+          - choices:
+            - cost
+            - clicks
+            kind: measure
+            name: measure
+            required: true
+          - kind: period
+            name: period
+            required: true
+          - kind: period
+            name: baseline
+            required: true
+          - choices:
+            - day
+            - week
+            - month
+            - quarter
+            - year
+            kind: grain
+            name: grain
+            required: false
+          name: period_compare
+          summary: One measure, two periods.
+          tier: 3
+        dataset_id: ds_ads_2026q3
+    AnalysisSpec:
+      properties:
+        name:
+          type: string
+          title: Name
+        tier:
+          type: integer
+          title: Tier
+        summary:
+          type: string
+          title: Summary
+        fields:
+          items:
+            $ref: '#/components/schemas/AnalysisField'
+          type: array
+          title: Fields
+      type: object
+      required:
+      - name
+      - tier
+      - summary
+      - fields
+      title: AnalysisSpec
     ApprovalResult:
       properties:
         applied:
@@ -2699,6 +2887,103 @@ components:
         rows: 18240
         warnings:
         - 'ctr is a per-row rate: never sum it'
+    Report:
+      properties:
+        dataset_id:
+          type: string
+          title: Dataset Id
+        playbook:
+          type: string
+          title: Playbook
+        run_id:
+          type: string
+          title: Run Id
+        description:
+          type: string
+          title: Description
+        rules:
+          items:
+            type: string
+          type: array
+          title: Rules
+          default: []
+        results:
+          items:
+            $ref: '#/components/schemas/ToolResult'
+          type: array
+          title: Results
+        skipped:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Skipped
+          default: []
+      type: object
+      required:
+      - dataset_id
+      - playbook
+      - run_id
+      - description
+      - results
+      title: Report
+      examples:
+      - dataset_id: ds_ads_2026q3
+        description: Where SLA breaches concentrate.
+        playbook: sla_where_and_why
+        results:
+        - caveats:
+          - 3 spend rows with 0 impressions flagged, not dropped
+          dataset_id: ds_ads_2026q3
+          figure_check:
+            notes: []
+            status: passed
+          figures:
+          - name: ROAS google
+            provenance: contract
+            unit: x
+            value: 3.8
+          forks:
+            roas_revenue_basis: net_excl_gst
+          pack_rules_applied:
+          - no_sum_of_rate
+          series:
+          - chart: bar
+            name: ROAS by channel
+            points:
+            - x: google
+              y: 3.8
+            - x: meta
+              y: 2.4
+            x_label: channel
+            y_label: ROAS
+          summary: Google ROAS 3.8 vs Meta 2.4 on net-of-GST revenue
+          tool_id: marketing.channel_efficiency
+          validity_filters_applied:
+          - exclude_test_campaigns
+          - roas_spend_positive
+        rules:
+        - sla_on_delivered_only
+        run_id: rep_0a1b2c3d4e5f6a7b
+        skipped: []
+    ReportRequest:
+      properties:
+        playbook:
+          type: string
+          title: Playbook
+        slots:
+          additionalProperties:
+            type: string
+          type: object
+          title: Slots
+          default: {}
+      type: object
+      required:
+      - playbook
+      title: ReportRequest
+      examples:
+      - playbook: sla_where_and_why
+        slots: {}
     ResultInspection:
       properties:
         result_id:
@@ -3745,5 +4030,5 @@ components:
       - engine
       title: VersionInfo
       examples:
-      - api_version: 0.8.0
+      - api_version: 0.9.0
         engine: v1@0ba324b

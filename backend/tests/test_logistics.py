@@ -221,11 +221,15 @@ def test_sla_where_and_why_playbook(env):
         workspace.reset(ws)
 
 
-@pytest.mark.parametrize("tool", ["core.summary_stats", "core.trend"])
-def test_a_core_analysis_is_refused_as_a_tool_run_not_a_500(api, tool):
-    """C11 (F4 probe): GET /tools lists core analyses as active, but they run through a turn.
-    POST /tools/core.*/run hit m.tools[tool_id] before the core check: KeyError, HTTP 500."""
+@pytest.mark.parametrize("tool,status,code", [("core.summary_stats", 200, None),
+                                               ("core.trend", 422, "param_required")])
+def test_a_core_analysis_tool_run_is_never_a_500(api, tool, status, code):
+    """C11 (F4 probe): POST /tools/core.*/run once hit a KeyError (HTTP 500). Since B11
+    (D-B11-1) a person runs core analyses directly: with its required fields it runs, without
+    them it answers 422 param_required."""
     c, did, _, _ = api
     assert {t["tool_id"]: t["status"] for t in c.get(f"/datasets/{did}/tools").json()["tools"]}[tool] == "active"
     r = c.post(f"/tools/{tool}/run", json={"dataset_id": did, "params": {}})
-    assert r.status_code == 422 and r.json()["error"]["code"] == "not_a_domain_tool"
+    assert r.status_code == status, r.text
+    if code:
+        assert r.json()["error"]["code"] == code

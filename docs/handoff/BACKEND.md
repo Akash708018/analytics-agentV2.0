@@ -1,9 +1,9 @@
 ## Status (date, branch, last commit)
 
 2026-10-02 · working on `main` (user's instruction; other branches merged, deletion left to
-the user — the proxy refuses branch deletes). Done: B0–B10. **B10** = the frontend's
-api-request issues #16, #17, #20, #21, #23 (closed). API **0.8.0** (additive). Open: #22
-(direct core analyses + report) needs the user's product decision; D-B7-3 keyword gold.
+the user — the proxy refuses branch deletes). Done: B0–B11. B10 = api-request issues #16,
+#17, #20, #21, #23; **B11** = #22 (direct core analyses + reports, D-B11-1). API **0.9.0**
+(additive). No api-request issue is open. Open for the user: D-B7-3 keyword gold.
 
 ## API: spec version — live | stubbed (501) | changed since last handoff
 
@@ -61,14 +61,25 @@ None (checked 2026-09-26).
 
     cd backend && uv run pytest -q -rs
     SKIPPED [1] tests/test_agent.py:580: v2 B0 (D-B0-2): the v1 Streamlit app ui/app.py is not seeded; v2 screens belong to the frontend
-    2384 passed, 1 skipped, 1 warning in 409.46s (0:06:49)
-    eval: SCORE: 76/76 (100%) · sla_bench: 19/19 checks right · frontend: 267 passed
+    2388 passed, 1 skipped, 1 warning in 431.80s (0:07:11)
+    eval: SCORE: 76/76 (100%) · sla_bench: 19/19 checks right · frontend: 271 passed
 
 2026-10-02, F8 on main (no backend change): the frontend consumes 0.7.0 (results, lineage,
 inspect, routing/blocked plans, joins, prefill, value errors). api-request
 [#23](https://github.com/Akash708018/analytics-agentV2.0/issues/23): `logistics.sla_drivers`
 reads `focus` but its spec doesn't declare it; the frontend reads `filter[].focus_param` until
 it does.
+
+## B11 for the frontend (0.9.0, additive)
+
+- Explore: `GET /datasets/{id}/analyses` (client `list_analyses`) lists each analysis's
+  fields with the contract's choices; run with `POST /tools/core.<name>/run` (existing
+  `run_tool`) — 422 `param_required` / `unknown_params` name the field. The results view and
+  `/results/{id}/inspect` work as for pack tools.
+- Report: `POST /datasets/{id}/reports {playbook, slots}` (client `run_report`) — no model;
+  `playbook_blocked` carries `recovery`. `frontend/tests/fake_backend.py` still answers
+  core runs with `not_a_domain_tool` (F7 recorded Explore as "changed: via Ask"); update it
+  when the Explore screen is built.
 
 ## B10 for the frontend (0.8.0, additive)
 

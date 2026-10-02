@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-API_VERSION = "0.8.0"
+API_VERSION = "0.9.0"
 
 
 def _ex(*examples: dict) -> ConfigDict:
@@ -532,6 +532,57 @@ class UploadAnswers(BaseModel):
     name: str | None = Field(None, description="Dataset name")
     columns: list[ColumnAnswer] | None = None
     model_config = _ex({"header_rows": [1, 2], "header_join": "space"})
+
+
+class AnalysisField(BaseModel):
+    name: str
+    kind: str = Field(description="measure | dimension | column | grain | period | date | "
+                      "integer | number | list | text")
+    required: bool
+    choices: list[str] | None = Field(None, description="The contract's own options (measures,"
+                                      " dimensions, columns, grains); none for free values")
+
+
+class AnalysisSpec(BaseModel):
+    name: str
+    tier: int
+    summary: str
+    fields: list[AnalysisField]
+
+
+class AnalysisList(BaseModel):
+    dataset_id: str
+    analyses: list[AnalysisSpec]
+    model_config = _ex({"dataset_id": "ds_ads_2026q3", "analyses": [
+        {"name": "period_compare", "tier": 3, "summary": "One measure, two periods.",
+         "fields": [{"name": "measure", "kind": "measure", "required": True,
+                     "choices": ["cost", "clicks"]},
+                    {"name": "period", "kind": "period", "required": True},
+                    {"name": "baseline", "kind": "period", "required": True},
+                    {"name": "grain", "kind": "grain", "required": False,
+                     "choices": ["day", "week", "month", "quarter", "year"]}]}]})
+
+
+class ReportRequest(BaseModel):
+    playbook: str
+    slots: dict[str, str] = {}
+    model_config = _ex({"playbook": "sla_where_and_why", "slots": {}})
+
+
+class Report(BaseModel):
+    dataset_id: str
+    playbook: str
+    run_id: str
+    description: str
+    rules: list[str] = []
+    results: list[ToolResult]
+    skipped: list[dict[str, Any]] = []
+    model_config = _ex({
+        "dataset_id": "ds_ads_2026q3", "playbook": "sla_where_and_why",
+        "run_id": "rep_0a1b2c3d4e5f6a7b", "description": "Where SLA breaches concentrate.",
+        "rules": ["sla_on_delivered_only"],
+        "results": [ToolResult.model_config["json_schema_extra"]["examples"][0]],
+        "skipped": []})
 
 
 class ForkAnswers(BaseModel):

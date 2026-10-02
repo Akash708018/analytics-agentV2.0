@@ -573,3 +573,15 @@ Whether the frontend is complete was answered in chat; the handoff stands as aft
 - The reference steps are re-ordered with orange first; all gates pass on `#FBF7F2`.
 - Slot 1 is 3.0:1. Sub-3:1 slots are relieved by every result's figures table.
 - Text pairs are ≥ 4.5:1 (captions are un-dimmed for this).
+
+## B11 — direct analyses and reports (issue #22, 2026-10-02)
+
+**D-B11-1. Core analyses run directly, and reports run playbooks without the model.** The user
+asked for the industry-standard option. Self-serve BI tools (Looker Explore, Mode, Metabase)
+let a person run any governed analysis directly; the AI assistant is an extra, not the only
+door. Here every direct run still passes the contract gate, the approved validity filters and
+the engine (`_produce`), so nothing the rules protect is bypassed. The person picks each field
+(no defaults are invented: an optional field left empty uses the analysis's own documented
+behaviour); `where` is never accepted. A "report" is a playbook the PERSON chooses, run step
+by step with no LLM call; its results share one `run_id`. Fields are read from each analysis's
+own signature, so the declaration cannot drift from the code.
