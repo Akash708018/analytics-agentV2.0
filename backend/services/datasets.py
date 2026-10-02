@@ -15,6 +15,7 @@ from backend.engine.util import db
 from backend.engine.webapp.real_backend import RealBackend
 from backend.packs.detector import bind, detect, normalise
 from backend.packs.loader import load_all, merge
+from backend.services import results
 from backend.services.sessions import ServiceError
 from backend.sessions.store import Store
 from backend.engine.contract import store as contract_store
@@ -47,6 +48,7 @@ class DatasetService:
     def __init__(self, store: Store, backend: RealBackend | None = None):
         self.store = store
         self.be = backend or V2Backend()
+        self.results = results.ResultStore(store)
 
     # --- datasets ----------------------------------------------------------------------------
     def _get(self, dataset_id: str) -> dict:
@@ -89,6 +91,15 @@ class DatasetService:
         con = db.connect_read_only(d["workspace_id"])
         try:
             return gather(con, d["name"], probe_pairs=False)
+        finally:
+            con.close()
+
+    def _columns(self, d: dict) -> set[str]:
+        con = db.connect_read_only(d["workspace_id"])
+        try:
+            return {r[0] for r in con.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = ?",
+                [d["name"]]).fetchall()}
         finally:
             con.close()
 
@@ -199,7 +210,48 @@ class DatasetService:
                 "date": c.date_column, "measures": measures, "dimensions": c.dimensions,
                 "caveats": list(c.caveats) + list(c.measured_caveats),
                 "provisional": list(c.provisional), "questions": list(c.questions),
-                "forks": self._forks(d)}
+                "forks": self._forks(d), "prefill": self._prefill(d)}
+
+    PREFILL_MIN_SIMILARITY = 0.8
+
+    def _prefill(self, d: dict) -> dict | None:
+        """Answers from the most similar dataset with a confirmed contract in the SAME workspace
+        (B9 concept 13, D-B9-3): a suggestion the person confirms, never applied here."""
+        cols = self._columns(d)
+        best = None
+        for o in self.store.list_datasets(d["workspace_id"]):
+            if o["dataset_id"] == d["dataset_id"]:
+                continue
+            try:
+                other = self._columns(o)
+                sc = self._contract(o)
+            except (ServiceError, Exception):  # noqa: BLE001 -- no contract / gone: skip it
+                continue
+            sim = len(cols & other) / len(cols | other) if cols | other else 0.0
+            if sim >= self.PREFILL_MIN_SIMILARITY and (best is None or sim > best[0]):
+                best = (sim, o, sc)
+        if best is None:
+            return None
+        sim, o, sc = best
+        kw = self._contract_kwargs(sc.contract)
+        measures = [m for m in kw["measures"] if m in cols]
+        dims = [x for x in kw["dimensions"] if x in cols]
+        contract = {"grain": kw["grain"], "primary_key": [k for k in kw["primary_key"]
+                                                          if k in cols],
+                    "date_column": kw["date_column"] if kw["date_column"] in cols else None,
+                    "measures": measures, "dimensions": dims,
+                    "aggregations": {m: a for m, a in kw["aggregations"].items()
+                                     if m in measures},
+                    "measure_definitions": {m: t for m, t in kw["measure_definitions"].items()
+                                            if m in measures}}
+        return {"from_dataset_id": o["dataset_id"], "from_name": o["name"],
+                "similarity": round(sim, 3), "contract_version": sc.version,
+                "contract": contract, "fork_choices": o["fork_choices"],
+                "domains": o["domains"], "metrics": sorted(o["metrics"]),
+                "validity_rules": o["validity"],
+                "note": "Suggested from a similar file; nothing is applied until you confirm. "
+                        "Set this file's analysis window; approve metrics again after the "
+                        "contract (they are versions of this file's contract)."}
 
     def contract_confirm(self, dataset_id: str, contract: dict, fork_choices: dict) -> dict:
         d = self._get(dataset_id)
@@ -439,7 +491,8 @@ class DatasetService:
         return {"ok": True, "version": 1, "approved": keep}
 
     # --- tool runs -----------------------------------------------------------------------------
-    def run_tool(self, tool_id: str, dataset_id: str, params: dict) -> dict:
+    def run_tool(self, tool_id: str, dataset_id: str, params: dict,
+                 run_id: str | None = None) -> dict:
         d = self._get(dataset_id)
         packs = load_all()
         m = merge(packs, d["domains"])
@@ -476,10 +529,36 @@ class DatasetService:
             con = db.connect(d["workspace_id"])
             try:
                 result = self._run(con, d, m, c, bound, tool_id, params)
+                snap = results.snapshot(con, d["name"])
             finally:
                 con.close()
         result["dataset_id"] = dataset_id
-        return result
+        result["grain"] = c.grain
+        return self._store_result(d, result, params, snap, sc.version, run_id)
+
+    def _store_result(self, d, result, params, snap, version, run_id) -> dict:
+        tables = result.pop("_tables", [])
+        return self.results.save(d, result, tables, params=params, snap=snap,
+                                 contract_version=version, run_id=run_id)
+
+    def current_state(self, dataset_id: str):
+        """(snapshot, contract version, metrics) now -- what staleness compares against."""
+        d = self.store.get_dataset(dataset_id)
+        if d is None:
+            return None
+        try:
+            version = self._contract(d).version
+        except ServiceError:
+            version = None
+        with self.be._workspace(d["workspace_id"]):
+            con = db.connect(d["workspace_id"])
+            try:
+                snap = results.snapshot(con, d["name"])
+            except Exception:  # noqa: BLE001 -- the table is gone
+                return None
+            finally:
+                con.close()
+        return snap, version, d["metrics"]
 
     def _run(self, con, d, m, c, bound, tool_id, params) -> dict:
         ctx = runner.Ctx(
@@ -491,7 +570,8 @@ class DatasetService:
             festivals=m.festivals, params=dict(params))
         return runner.run(ctx, m.tools[tool_id], m.min_group_size)
 
-    def run_core(self, dataset_id: str, analysis: str, params: dict) -> dict:
+    def run_core(self, dataset_id: str, analysis: str, params: dict,
+                 run_id: str | None = None) -> dict:
         """A core (v1-surface) analysis as a one-step tool, for the fallback's `core_analyze`.
         The model supplies column names only: `where` is dropped (the LLM never writes SQL) and
         no value may start with '@' (bindings are the packs' and the runner's)."""
@@ -505,7 +585,8 @@ class DatasetService:
                     base_analysis=analysis, steps=[Step(analysis=analysis, params=clean)])
         d = self._get(dataset_id)
         m = merge(load_all(), d["domains"])
-        c = self._contract(d).contract
+        sc = self._contract(d)
+        c = sc.contract
         bound, _ = self._bound(d)
         with self.be._workspace(d["workspace_id"]):
             con = db.connect(d["workspace_id"])
@@ -517,10 +598,12 @@ class DatasetService:
                     window=(c.analysis_window.start, c.analysis_window.end)
                     if c.analysis_window else None, festivals=m.festivals, params={})
                 result = runner.run(ctx, tool, m.min_group_size)
+                snap = results.snapshot(con, d["name"])
             finally:
                 con.close()
         result["dataset_id"] = dataset_id
-        return result
+        result["grain"] = c.grain
+        return self._store_result(d, result, clean, snap, sc.version, run_id)
 
     def tools_states(self, d: dict):
         bound, sources = self._bound(d)

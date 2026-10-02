@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import csv
 import secrets
-from collections import defaultdict
 from pathlib import Path
 
 import pytest

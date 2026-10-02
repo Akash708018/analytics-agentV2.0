@@ -180,6 +180,54 @@ def compare_within_zone(text: str, trace: list[dict]) -> Violation | None:
     return None
 
 
+# --- claim validation (B9 concept 6): a number can match a figure and still be claimed wrongly
+
+UP = r"(rose|risen|increased|grew|grown|gained|climbed|jumped|went up|up by|higher by)"
+DOWN = r"(fell|fallen|dropped|decreased|declined|shrank|went down|down by|lower by)"
+SHARE_UNITS = {"share", "percent", "pct", "%"}
+
+
+def _figures(trace: list[dict]) -> list[dict]:
+    return [f for r in trace for f in r.get("figures", [])
+            if isinstance(f.get("value"), (int, float))]
+
+
+def claim_unit(text: str, trace: list[dict]) -> Violation | None:
+    """A fraction written as a percent: the engine's rate 0.638 claimed as '0.638%'."""
+    figs = _figures(trace)
+    for m in re.finditer(r"(?<![\d.])(0?\.\d+)\s*%", text):
+        v = float(m.group(1))
+        hit = [f for f in figs if 0 < abs(f["value"]) < 1 and abs(f["value"] - v) < 0.0051
+               and str(f.get("unit") or "").lower() not in SHARE_UNITS]
+        if hit and not any(abs(f["value"] - v) < 1e-9 and str(f.get("unit") or "").lower()
+                           in SHARE_UNITS for f in figs):
+            return Violation("claim_unit", f"'{m.group(0)}' writes the fraction {hit[0]['value']}"
+                             f" ({hit[0]['name']}) as a percent",
+                             f"a rate of {hit[0]['value']} is {hit[0]['value'] * 100:.1f}%")
+    return None
+
+
+def claim_direction(text: str, trace: list[dict]) -> Violation | None:
+    """A change claimed in the wrong direction: 'rose 12%' on a figure of -12."""
+    changes = [f for f in _figures(trace)
+               if re.search(r"change|delta|diff|growth|vs|lift", f["name"] + " " +
+                            str(f.get("unit") or ""), re.I) and f["value"] != 0]
+    for sent in re.split(r"(?<=[.!?])\s+", text):
+        for words, sign in ((UP, -1), (DOWN, 1)):
+            if not re.search(rf"\b{words}\b", sent, re.I):
+                continue
+            for m in re.finditer(r"(?<![\d.])(\d[\d,]*\.?\d*)", sent):
+                v = float(m.group(1).replace(",", ""))
+                for f in changes:
+                    if abs(abs(f["value"]) - v) < 0.0051 * max(1, v) and \
+                            (f["value"] < 0 if sign == -1 else f["value"] > 0):
+                        return Violation("claim_direction", f"'{sent.strip()[:80]}' says "
+                                         f"{'up' if sign == -1 else 'down'} but {f['name']} "
+                                         f"is {f['value']}", "state the direction the figure "
+                                         "shows (its sign)")
+    return None
+
+
 RULES = {
     "no_sum_of_rate": no_sum_of_rate,
     "no_cross_source_conversion_sum": no_cross_source_conversion_sum,
@@ -193,8 +241,11 @@ RULES = {
     "drivers_are_associations": drivers_are_associations,
     "sla_on_delivered_only": sla_on_delivered_only,
     "compare_within_zone": compare_within_zone,
+    "claim_unit": claim_unit,
+    "claim_direction": claim_direction,
 }
-ALWAYS = ("no_sum_of_rate", "bounds", "measurement_change", "small_sample", "festival_confound")
+ALWAYS = ("no_sum_of_rate", "bounds", "measurement_change", "small_sample", "festival_confound",
+          "claim_unit", "claim_direction")
 
 
 def check(text: str, trace: list[dict], rule_ids: set[str] | None = None) -> list[Violation]:

@@ -165,6 +165,11 @@ class Playbook(Strict):
     steps: list[PlaybookStep]
     rules: list[str] = Field([], description="Interpretation rules always enforced")
     max_tool_calls: int = 6
+    # boundary-aware procedure (B9, concept 9): what must hold before it runs, and what to do
+    requires_metrics: list[str] = Field([], description="Metric templates that must be approved")
+    requires_concepts: list[str] = Field([], description="Concepts the data must hold")
+    recovery: str = Field("", max_length=300, description="What the person does when a "
+                          "requirement is missing or the lead step fails")
 
 
 class Step(Strict):
@@ -255,6 +260,8 @@ class Pack(Strict):
     dq_checks: list[DqCheck] = []
     privacy: Privacy = Privacy()
     festivals: list[Festival] = []
+    value_aliases: dict[str, str] = Field({}, description="What people say -> what data says "
+                                          "(lower-case): bombay -> mumbai (B9 concept 14)")
     sources_cited: list[Citation] = []
     changelog: list[ChangelogEntry] = []
 

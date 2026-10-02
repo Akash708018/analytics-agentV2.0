@@ -72,6 +72,7 @@ class SessionService:
         s = {"sid": str(uuid.uuid4()), "version": 1,
              "workspace_id": workspace_id or f"ws_{secrets.token_hex(6)}",
              "ui_state": {}, "created_at": now, "updated_at": now, "expires_at": exp}
+        self.store.purge_expired(now)       # expired sessions answer 404; drop their rows too
         self.store.insert_session(s)
         return s
 

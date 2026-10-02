@@ -20,6 +20,7 @@ from backend.packs.models import Tool
 from backend.services.sessions import ServiceError
 
 MAX_FIGURES_PER_STEP = 25
+ROWS_KEPT = 500                    # engine rows kept per step for inspection (B9)
 _TERM = re.compile(r"^[a-z0-9][a-z0-9 &'._-]{0,40}$")
 _WORDS = re.compile(r"^[a-z0-9 _-]+(\|[a-z0-9 _-]+)*$")
 OPS = (">", ">=", "<", "<=", "=", "<>")
@@ -197,66 +198,103 @@ def compile_filters(ctx: Ctx, tool: Tool, step) -> list[str]:
 
 def _step_filter(ctx: Ctx, tool: Tool, f: dict, before: list[str]) -> list[str]:
     preds = []
-    if True:
-        concept = f["concept"]
-        if f.get("exclude_truthy"):
-            try:
-                col = column_for(ctx, concept)
-            except Skip:
-                ctx.notes.append(f"No '{concept}' column: those rows could not be removed, so "
-                                 f"the figures still include them.")
-                return []
-            preds.append(f"NOT coalesce(lower(trim(CAST({q(col)} AS VARCHAR))) IN "
-                         f"('1', 'true', 't', 'yes', 'y'), false)")
-            if f"exclude:{concept}" not in ctx.filters_applied:
-                ctx.filters_applied.append(f"exclude:{concept}")
-            return preds
-        col = _slot(ctx, tool, concept[1:]) if concept.startswith("@") else column_for(
-            ctx, concept)
-        if "between" in f:
-            lo, hi = (float(x) for x in f["between"])
-            preds.append(f"{q(col)} BETWEEN {lo:g} AND {hi:g}")
-        if "date_range" in f:
-            lo, hi = resolve(ctx, tool, f["date_range"]).split("/")
-            lo, hi = date.fromisoformat(lo), date.fromisoformat(hi)
-            ctx.spans.append((lo, hi))
-            preds.append(f"CAST({q(col)} AS DATE) BETWEEN DATE '{lo}' AND DATE '{hi}'")
-        if "keep_matching" in f:
-            words = f["keep_matching"]
-            if not _WORDS.match(words):
-                raise ServiceError(500, "pack_error", f"keep_matching {words!r}: plain words")
-            preds.append(f"coalesce(regexp_matches(lower(trim(CAST({q(col)} AS VARCHAR))), "
-                         f"'^({words})$'), false)")
-        if "compare" in f:
-            if f["compare"] not in OPS:
-                raise ServiceError(500, "pack_error", f"compare {f['compare']!r}: one of {OPS}")
-            other = column_for(ctx, f["other"])
-            preds.append(f"{q(col)} {f['compare']} {q(other)}")
-        if "older_than" in f:
-            o = f["older_than"]
-            as_of, days = ctx.params.get(o["as_of_param"]), ctx.params.get(o["days_param"], 3)
-            try:
-                as_of, days = date.fromisoformat(str(as_of)), int(days)
-            except (TypeError, ValueError):
-                raise ServiceError(422, "param_required", f"params.{o['as_of_param']} must be "
-                                   f"a date (YYYY-MM-DD) and params.{o['days_param']} a whole "
-                                   f"number of days") from None
-            preds.append(f"TRY_CAST({q(col)} AS TIMESTAMP) < TIMESTAMP '{as_of}' - INTERVAL "
-                         f"{days} DAY")
-            ctx.notes.append(f"Open {days}+ days before {as_of} (the as-of date you entered).")
-        if "focus_param" in f:
-            preds.append(_focus(ctx, tool, f, col, before + preds))
-        if "terms_param" in f:
-            alt = "|".join(re.escape(t).replace("'", "''") for t in _terms(ctx, f["terms_param"]))
-            p = f"coalesce(regexp_matches(lower(CAST({q(col)} AS VARCHAR)), '({alt})'), false)"
-            preds.append(f"NOT {p}" if f.get("negate") else p)
+    concept = f["concept"]
+    if f.get("exclude_truthy"):
+        try:
+            col = column_for(ctx, concept)
+        except Skip:
+            ctx.notes.append(f"No '{concept}' column: those rows could not be removed, so "
+                             f"the figures still include them.")
+            return []
+        preds.append(f"NOT coalesce(lower(trim(CAST({q(col)} AS VARCHAR))) IN "
+                     f"('1', 'true', 't', 'yes', 'y'), false)")
+        if f"exclude:{concept}" not in ctx.filters_applied:
+            ctx.filters_applied.append(f"exclude:{concept}")
+        return preds
+    col = _slot(ctx, tool, concept[1:]) if concept.startswith("@") else column_for(
+        ctx, concept)
+    if "between" in f:
+        lo, hi = (float(x) for x in f["between"])
+        preds.append(f"{q(col)} BETWEEN {lo:g} AND {hi:g}")
+    if "date_range" in f:
+        lo, hi = resolve(ctx, tool, f["date_range"]).split("/")
+        lo, hi = date.fromisoformat(lo), date.fromisoformat(hi)
+        ctx.spans.append((lo, hi))
+        preds.append(f"CAST({q(col)} AS DATE) BETWEEN DATE '{lo}' AND DATE '{hi}'")
+    if "keep_matching" in f:
+        words = f["keep_matching"]
+        if not _WORDS.match(words):
+            raise ServiceError(500, "pack_error", f"keep_matching {words!r}: plain words")
+        preds.append(f"coalesce(regexp_matches(lower(trim(CAST({q(col)} AS VARCHAR))), "
+                     f"'^({words})$'), false)")
+    if "compare" in f:
+        if f["compare"] not in OPS:
+            raise ServiceError(500, "pack_error", f"compare {f['compare']!r}: one of {OPS}")
+        other = column_for(ctx, f["other"])
+        preds.append(f"{q(col)} {f['compare']} {q(other)}")
+    if "older_than" in f:
+        o = f["older_than"]
+        as_of, days = ctx.params.get(o["as_of_param"]), ctx.params.get(o["days_param"], 3)
+        try:
+            as_of, days = date.fromisoformat(str(as_of)), int(days)
+        except (TypeError, ValueError):
+            raise ServiceError(422, "param_required", f"params.{o['as_of_param']} must be "
+                               f"a date (YYYY-MM-DD) and params.{o['days_param']} a whole "
+                               f"number of days") from None
+        preds.append(f"TRY_CAST({q(col)} AS TIMESTAMP) < TIMESTAMP '{as_of}' - INTERVAL "
+                     f"{days} DAY")
+        ctx.notes.append(f"Open {days}+ days before {as_of} (the as-of date you entered).")
+    if "focus_param" in f:
+        preds.append(_focus(ctx, tool, f, col, before + preds))
+    if "terms_param" in f:
+        alt = "|".join(re.escape(t).replace("'", "''") for t in _terms(ctx, f["terms_param"]))
+        p = f"coalesce(regexp_matches(lower(CAST({q(col)} AS VARCHAR)), '({alt})'), false)"
+        preds.append(f"NOT {p}" if f.get("negate") else p)
     return preds
+
+
+def _canon(v: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", v.lower())
+
+
+def match_value(ctx: Ctx, col: str, raw: str, param: str) -> str:
+    """A value a person typed, matched to the column's own values (B9 concept 14): exact, then
+    ignoring case/spaces/underscores, then a pack alias (bombay -> mumbai), then a unique
+    containment. Two candidates -> 422 with both; none -> 422 with what the column holds."""
+    vals = [str(r[0]) for r in ctx.con.execute(
+        f"SELECT DISTINCT CAST({q(col)} AS VARCHAR) FROM {q(ctx.table)} WHERE {q(col)} IS NOT "
+        f"NULL LIMIT 5000").fetchall()]
+    if raw in vals:
+        return raw
+    want = _canon(raw)
+    alias = (ctx.merged.value_aliases if ctx.merged else {}).get(raw.lower().strip())
+    for cand in (want, _canon(alias) if alias else None):
+        if not cand:
+            continue
+        hits = sorted({v for v in vals if _canon(v) == cand})
+        if hits:
+            return hits[0]       # spellings of one value ('Pune_South', 'PUNE_SOUTH') are one
+    hits = sorted({v for v in vals if want and (want in _canon(v) or _canon(v) in want)},
+                  key=_canon)
+    canon_hits = {_canon(h) for h in hits}
+    if len(canon_hits) == 1:
+        ctx.notes.append(f"'{raw}' read as {col} = {hits[0]}.")
+        return hits[0]
+    if canon_hits:
+        raise ServiceError(422, "ambiguous_value", f"'{raw}' could be several {col} values: "
+                           f"{hits[:10]}; pass one exactly in params.{param}",
+                           {"param": param, "column": col, "candidates": hits[:20]})
+    raise ServiceError(422, "unknown_value", f"no {col} value matches '{raw}'",
+                       {"param": param, "column": col, "values": sorted(vals)[:30]})
 
 
 def _focus(ctx: Ctx, tool: Tool, f: dict, col: str, preds: list[str]) -> str:
     """The person's `focus` value, or the engine's highest-rate group (D-B8-2)."""
     key = f["focus_param"]
     chosen = ctx.params.get(key)
+    if chosen is not None and not ctx.params.get(f"_{key}_resolved"):
+        chosen = match_value(ctx, col, str(chosen), key)
+        ctx.params[key], ctx.params[f"_{key}_resolved"] = chosen, True
     if chosen is None:
         measure = resolve(ctx, tool, f["worst_by"])
         params = {"dimension": col, "measure": measure}
@@ -332,7 +370,7 @@ def context_caveats(ctx: Ctx, spans: list[tuple[date, date]]) -> list[str]:
     out = []
     spans = spans or ([ctx.window] if ctx.window else [])
     for f in ctx.festivals.values():
-        for y, (s, e) in f.dates.items():
+        for s, e in f.dates.values():
             fs, fe = date.fromisoformat(s), date.fromisoformat(e)
             if any(fs <= b and a <= fe for a, b in spans):
                 out.append(f"festival_confound: {f.name} ({s} to {e}) falls in the period; "
@@ -370,7 +408,7 @@ def run(ctx: Ctx, tool: Tool, min_group: int) -> dict:
         forks = [{"fork_id": f, "question": ctx.merged.forks[f].question} for f in unanswered]
         raise ServiceError(422, "forks_unanswered", "Answer these before this tool runs; none "
                            "is defaulted.", {"missing": unanswered, "forks": forks})
-    figures, series, caveats, spans, ran = [], [], [], [], 0
+    figures, series, caveats, spans, ran, tables = [], [], [], [], 0, []
     caveats += flags(ctx)
     for step in tool.steps:
         title = step.title or step.analysis
@@ -399,6 +437,9 @@ def run(ctx: Ctx, tool: Tool, min_group: int) -> dict:
                 continue
             raise ServiceError(422, "engine_refused", text) from None
         ran += 1
+        tables.append({"title": title, "headers": list(out.headers),
+                       "rows": [list(r) for r in out.rows[:ROWS_KEPT]],
+                       "rows_kept": min(len(out.rows), ROWS_KEPT), "rows_total": len(out.rows)})
         provisional = any("PROVISIONAL" in s for s in out.summary)
         caveats += [s for s in out.summary[1:] if s not in caveats]
         vi = _value_index(out.headers, out.rows)
@@ -448,7 +489,9 @@ def run(ctx: Ctx, tool: Tool, min_group: int) -> dict:
             "pack_rules_applied": interp,
             "forks": {f: ctx.fork_choices[f] for f in tool.forks if f in ctx.fork_choices},
             "caveats": caveats, "figure_check": {"status": "not_run", "notes": [
-                "figures come straight from the engine; the figure check runs on LLM text (B5)"]}}
+                "figures come straight from the engine; the figure check runs on LLM text (B5)"]},
+            "grain": getattr(ctx, "grain", None), "metrics_used": sorted(ctx.used_metrics),
+            "_tables": tables}
 
 
 def _fork_relevant(ctx: Ctx, fork_id: str) -> bool:

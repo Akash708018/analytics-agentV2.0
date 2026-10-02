@@ -2,6 +2,32 @@
 
 Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry here.
 
+## 0.7.0 — 2026-10-02 (B9, additive)
+
+- `ContractProposal.prefill`: answers suggested from the most similar dataset (same workspace,
+  column-name Jaccard >= 0.8) with a confirmed contract; never applied until confirmed.
+- Turn events: `plan.routed_by` (`rules` | `planner`); a playbook whose requirements are
+  missing answers with `plan.blocked` + `plan.recovery` and runs nothing (`answer.blocked`).
+- Keyword groups: `KeywordRun.backend` (auto | chargram | ollama); `KeywordGroup.generation`
+  (the embedding generation it was proposed under) and `KeywordGroup.joins` (carry-forward: new
+  keywords proposed to join that APPROVED group — accept by `merge` with the approved group's
+  id first); `run.embedding_version` and `run.carry_forward` (`disabled` with a reason when
+  the approved groups were built under another generation).
+- Typed result contract: every `ToolResult` from a domain tool or a turn now carries
+  `result_id`, `run_id` (the turn id inside a turn), `status` (ok | partial |
+  insufficient_data), `snapshot` {hash, rows}, `contract_version`, `grain`, `metrics_used`.
+- New, results are stored: `GET /datasets/{id}/results` (each with `stale` +
+  `stale_reasons`: data changed, contract version changed, a metric's approval changed),
+  `GET /results/{id}` (`StoredResult`), `GET /results/{id}/inspect?step&sort_by&descending&
+  group&limit&offset` (stored engine rows, up to 500 per step; sorted/filtered, never
+  recomputed). The fallback model has an `inspect_result` tool over the same.
+- Value matching: `params.focus` (logistics.sla_drivers) accepts how people say it — case,
+  spaces and underscores ignored, pack aliases (`value_aliases` in the core pack: bombay ->
+  mumbai, insta -> instagram), a unique partial match; new 422 codes `ambiguous_value`
+  (`candidates`) and `unknown_value` (`values`).
+- Answers are checked for two more claim errors (`interpretation_check.rule`): `claim_unit`
+  (a fraction written as a percent) and `claim_direction` (up/down against the figure's sign).
+
 ## 0.6.0 — 2026-10-01 (B8)
 
 Second domain: **logistics** (`GET /packs` now lists `core, logistics, marketing`; confirm with

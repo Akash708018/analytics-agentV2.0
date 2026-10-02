@@ -97,7 +97,7 @@ def funnel(con, gate, scope, entity: str, step_column: str, steps: list | str,
            f"AND {ent} IS NOT NULL GROUP BY 1) SELECT {', '.join(reach)} FROM e")
     counts = list(con.execute(sql).fetchone())
     rows = []
-    for i, (s, n) in enumerate(zip(steps, counts)):
+    for i, (s, n) in enumerate(zip(steps, counts, strict=True)):
         prev = counts[i - 1] if i else None
         rows.append([s, number(n), _pct(n / prev) if prev else None,
                      _pct(n / counts[0]) if counts[0] else None,
@@ -136,7 +136,7 @@ def source_reconciliation(con, gate, scope, measures: list | str, reference: str
         group = qi(dimension)
     sel = ", ".join(exprs)
     q = (f"SELECT {group + ', ' if group else ''}{sel} FROM {scope.source} WHERE {scope.where}"
-         + (f" GROUP BY 1 ORDER BY 1" if group else ""))
+         + (" GROUP BY 1 ORDER BY 1" if group else ""))
     out = con.execute(q).fetchall()
     rows = []
     for r in out:

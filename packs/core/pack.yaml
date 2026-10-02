@@ -76,6 +76,23 @@ privacy:
     government_id: [aadhaar, pan, gstin]
   min_group_size: 5
 
+value_aliases:
+  # what people type -> what exports usually say; used to match a value named in a request
+  bombay: mumbai
+  bangalore: bengaluru
+  gurgaon: gurugram
+  poona: pune
+  calcutta: kolkata
+  madras: chennai
+  insta: instagram
+  ig: instagram
+  fb: facebook
+  yt: youtube
+  gads: google ads
+  adwords: google ads
+  cod: cod
+  cash on delivery: cod
+
 festivals:
   # Stored as data. Lunar-calendar dates move every year: the person confirms each year's dates
   # before a festival comparison uses them (confirm_yearly). Sale-event dates are the retailers'.

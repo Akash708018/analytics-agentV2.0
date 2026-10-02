@@ -54,7 +54,7 @@ def embed_ollama(texts: list[str], cache: Cache) -> np.ndarray:
         r = httpx.post(f"{OLLAMA_URL}/api/embed", json={"model": OLLAMA_MODEL, "input": todo},
                        timeout=120)
         r.raise_for_status()
-        for t, v in zip(todo, r.json()["embeddings"]):
+        for t, v in zip(todo, r.json()["embeddings"], strict=True):
             cache.put(tag, t, v)
     m = np.array([cache.get(tag, t) for t in texts], dtype=float)
     return m / np.clip(np.linalg.norm(m, axis=1, keepdims=True), 1e-12, None)
@@ -64,6 +64,21 @@ def embed_chargram(texts: list[str]) -> np.ndarray:
     from sklearn.feature_extraction.text import TfidfVectorizer
     vec = TfidfVectorizer(analyzer="char_wb", ngram_range=(2, 4), sublinear_tf=True)
     return vec.fit_transform(texts).toarray()      # rows are L2-normalised by default
+
+
+#: What goes into the vector besides the model (B9 concept 1). Any change here, or in the model
+#: or its dimensions, is a new GENERATION: groups of different generations are never compared.
+INPUT_SPEC = "topic words of the keyword (facet words removed), lower-case; L2-normalised"
+
+
+def version_of(used: str, dims: int) -> dict:
+    """The embedding version contract: backend/model, dimensions, normalisation, input."""
+    gen = hashlib.sha256(f"{used}|{dims if used.startswith('ollama') else 'vocab'}|"
+                         f"{INPUT_SPEC}".encode()).hexdigest()[:12]
+    return {"embedding": used, "dims": dims if used.startswith("ollama") else None,
+            "dims_note": None if used.startswith("ollama") else "chargram vectors are fit per "
+            "run; comparable only within one run", "normalisation": "l2",
+            "input": INPUT_SPEC, "generation": gen}
 
 
 def embed(texts: list[str], backend: str = "auto", cache: Cache | None = None

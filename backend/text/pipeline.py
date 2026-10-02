@@ -13,7 +13,7 @@ from typing import Callable
 
 import yaml
 
-from backend.text.embed import Cache, embed
+from backend.text.embed import Cache, embed, version_of
 
 FACETS_FILE = Path(__file__).resolve().parents[2] / "packs" / "marketing" / "keyword_facets.yaml"
 THRESHOLD = 0.6          # cosine DISTANCE for average linkage; stated before scoring (B7.md)
@@ -35,7 +35,7 @@ def spelling_map(keywords: list[str], protected: set[str]) -> dict[str, str]:
     counts = Counter(t for k in keywords for t in set(k.split()))
     anchors = {t for t, n in counts.items() if n >= 2} | protected
     out = {}
-    for tok, n in counts.items():
+    for tok in counts:
         if tok in anchors or len(tok) < 4:
             continue
         best = max(((difflib.SequenceMatcher(None, tok, a).ratio(), a) for a in anchors
@@ -90,7 +90,8 @@ def cluster(topics: list[str], backend: str = "auto", cache: Cache | None = None
     X, used = embed(uniq, backend, cache)
     labels = AgglomerativeClustering(n_clusters=None, metric="cosine", linkage="average",
                                      distance_threshold=threshold).fit_predict(X)
-    return {t: int(c) for t, c in zip(uniq, labels)}, used
+    cluster.last_dims = int(X.shape[1])
+    return {t: int(c) for t, c in zip(uniq, labels, strict=True)}, used
 
 
 def intent_of(facets: dict) -> str:
@@ -138,7 +139,7 @@ def group_keywords(raw: list[str], *, backend: str = "auto", cache: Cache | None
         sig = tuple(f for f in FACET_ORDER if f in k.facets)[:1]
         buckets[(cmap.get(k.topic, -1), sig)].append(t)
     groups = []
-    for i, ((cid, sig), texts) in enumerate(sorted(buckets.items(), key=lambda x: -len(x[1]))):
+    for i, ((_, sig), texts) in enumerate(sorted(buckets.items(), key=lambda x: -len(x[1]))):
         members = [r for t in texts for r in merged[t]]
         fac = {f: sorted({kws[t].facets[f] for t in texts if f in kws[t].facets})
                for f in (*FACET_ORDER, "dish") if any(f in kws[t].facets for t in texts)}
@@ -159,8 +160,45 @@ def group_keywords(raw: list[str], *, backend: str = "auto", cache: Cache | None
                             sorted(members), {k: v for k, v in fac.items() if v},
                             proposal["by"]))
     return {"groups": groups, "embedding": used, "threshold": threshold,
+            "embedding_version": version_of(used, getattr(cluster, "last_dims", 0)),
             "typos_merged": {k: v for k, v in sorted(fix.items())},
             "input": len(raw), "distinct": len(cleaned), "after_merge": len(merged)}
+
+
+def _sig(k: Keyword) -> tuple:
+    return tuple(f for f in FACET_ORDER if f in k.facets)[:1]
+
+
+def carry_forward(new: list[str], approved: dict[str, list[str]], *, backend: str = "auto",
+                  cache: Cache | None = None, facets_file: Path = FACETS_FILE,
+                  threshold: float = THRESHOLD) -> tuple[dict[str, tuple[str, float]], dict]:
+    """New keywords that belong to an APPROVED group (B9 concept 16): same leading facet, and
+    the keyword's topic within `threshold` cosine distance of the group's centroid. Approved
+    and new texts are embedded in ONE call, so they share one vector space. Proposes only."""
+    import numpy as np
+    F = load_facets(facets_file)
+    newk = {k: facet(normalise(k), F) for k in new if normalise(k)}
+    grp = {g: [facet(normalise(k), F) for k in ks if normalise(k)] for g, ks in approved.items()}
+    grp = {g: ks for g, ks in grp.items() if ks}
+    texts = sorted({k.topic or k.text for k in newk.values()} |
+                   {k.topic or k.text for ks in grp.values() for k in ks})
+    if not newk or not grp:
+        return {}, version_of("none", 0)
+    X, used = embed(texts, backend, cache)
+    row = {t: X[i] for i, t in enumerate(texts)}
+    cents, sigs = {}, {}
+    for g, ks in grp.items():
+        c = np.mean([row[k.topic or k.text] for k in ks], axis=0)
+        cents[g] = c / max(float(np.linalg.norm(c)), 1e-12)
+        sigs[g] = Counter(_sig(k) for k in ks).most_common(1)[0][0]
+    out = {}
+    for raw, k in newk.items():
+        v = row[k.topic or k.text]
+        best = min(((1 - float(v @ c), g) for g, c in cents.items() if sigs[g] == _sig(k)),
+                   default=None)
+        if best is not None and best[0] <= threshold:
+            out[raw] = (best[1], round(best[0], 3))
+    return out, version_of(used, int(X.shape[1]))
 
 
 def score(groups: list[list[str]], gold: dict[str, str]) -> dict:

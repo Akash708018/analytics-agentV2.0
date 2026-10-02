@@ -154,6 +154,11 @@ class Store:
             d[k] = json.loads(d[k])
         return d
 
+    def list_datasets(self, workspace_id: str) -> list[dict]:
+        rows = self._q("SELECT dataset_id FROM datasets WHERE workspace_id=? ORDER BY "
+                       "created_at DESC", (workspace_id,))
+        return [self.get_dataset(r[0]) for r in rows]
+
     def set_dataset_choices(self, dataset_id: str, *, domains: list | None = None,
                             fork_choices: dict | None = None, validity: list | None = None,
                             metrics: dict | None = None) -> None:

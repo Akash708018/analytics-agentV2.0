@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-API_VERSION = "0.6.0"
+API_VERSION = "0.7.0"
 
 
 def _ex(*examples: dict) -> ConfigDict:
@@ -200,6 +200,17 @@ class ToolResult(BaseModel):
     forks: dict[str, str] = Field({}, description="fork id -> the option the person chose")
     caveats: list[str] = []
     figure_check: FigureCheck
+    # 0.7.0 typed result contract (B9): identity, what it was computed on, and its status
+    result_id: str | None = Field(None, description="Stored result id (GET /results/{id})")
+    run_id: str | None = Field(None, description="The turn that ran it, else its own id")
+    status: Literal["ok", "partial", "insufficient_data"] | None = Field(
+        None, description="partial: a step was skipped or refused; insufficient_data: no "
+        "reportable figure")
+    snapshot: dict[str, Any] | None = Field(None, description="{hash, rows} of the table it "
+                                            "was computed on")
+    contract_version: int | None = None
+    grain: str | None = None
+    metrics_used: dict[str, Any] = Field({}, description="template id -> {measure}")
     model_config = _ex({
         "tool_id": "marketing.channel_efficiency", "dataset_id": "ds_ads_2026q3",
         "summary": "Google ROAS 3.8 vs Meta 2.4 on net-of-GST revenue",
@@ -213,6 +224,48 @@ class ToolResult(BaseModel):
         "forks": {"roas_revenue_basis": "net_excl_gst"},
         "caveats": ["3 spend rows with 0 impressions flagged, not dropped"],
         "figure_check": {"status": "passed", "notes": []}})
+
+
+class StoredResult(ToolResult):
+    stale: bool = Field(description="The data, contract or a metric it read changed since")
+    stale_reasons: list[str] = []
+    created_at: str
+
+
+class ResultSummary(BaseModel):
+    result_id: str
+    tool_id: str
+    run_id: str
+    status: str
+    created_at: str
+    stale: bool
+    stale_reasons: list[str] = []
+
+
+class ResultList(BaseModel):
+    dataset_id: str
+    results: list[ResultSummary]
+    model_config = _ex({"dataset_id": "ds_ads_2026q3", "results": [
+        {"result_id": "r_0a1b2c3d4e5f6a7b", "tool_id": "logistics.sla_compliance",
+         "run_id": "r_0a1b2c3d4e5f6a7b", "status": "ok", "created_at": "2026-10-02T09:00:00+00:00",
+         "stale": True, "stale_reasons": ["the data changed (cleaning or a new upload) since "
+                                          "this result"]}]})
+
+
+class ResultInspection(BaseModel):
+    result_id: str
+    step: str
+    steps: list[str]
+    headers: list[str]
+    rows: list[list[Any]] = Field(description="Engine rows as computed: sorted / filtered "
+                                  "here, never recomputed")
+    total_rows: int = Field(description="Rows matching the group filter among those kept")
+    rows_kept: int
+    rows_in_engine_output: int
+    model_config = _ex({"result_id": "r_0a1b2c3d4e5f6a7b", "step": "Breach rate",
+                        "steps": ["Breach rate"], "headers": ["hub", "n", "total"],
+                        "rows": [["Pune_South", 94, "63.8%"]], "total_rows": 1,
+                        "rows_kept": 5, "rows_in_engine_output": 5})
 
 
 class ToolRunRequest(BaseModel):
@@ -386,6 +439,11 @@ class ContractProposal(BaseModel):
                                    "answer; confirm is refused (422) while non-empty")
     questions: list[str] = []
     forks: list[ForkQuestion]
+    prefill: dict[str, Any] | None = Field(None, description=(
+        "0.7.0: answers suggested from the most similar dataset with a confirmed contract in "
+        "the same workspace (column-name Jaccard >= 0.8): from_dataset_id, similarity, contract "
+        "(fields of this file's columns, no window), fork_choices, domains, metrics, "
+        "validity_rules. Never applied until the person confirms."))
     model_config = _ex({
         "dataset_id": "ds_ads_2026q3", "grain": "one row per campaign per day",
         "key": ["date", "campaign"], "date": "date",
@@ -520,6 +578,11 @@ class KeywordGroup(BaseModel):
     facets: dict[str, Any] = {}
     approved: bool
     proposed_by: str = Field("rules", description="rules | llm | person")
+    generation: str | None = Field(None, description="0.7.0: the embedding generation it was "
+                                   "proposed under (model, dims, normalisation, input)")
+    joins: str | None = Field(None, description="0.7.0: carry-forward -- these new keywords "
+                              "look like they belong to this APPROVED group; merge [that "
+                              "group, this one] to accept")
     model_config = _ex({"group_id": "g1", "label": "sushi delivery", "intent": "transactional",
                         "keywords": ["sushi delivery pune", "sushi home delivery"],
                         "facets": {"delivery": ["delivery"], "area": ["baner"]},
@@ -537,6 +600,8 @@ class KeywordGroups(BaseModel):
 class KeywordRun(BaseModel):
     column: str | None = Field(None, description="Text column; default: the search term / "
                                                  "query / keyword column")
+    backend: Literal["auto", "chargram", "ollama"] = Field("auto", description="0.7.0: the "
+                                                           "embedding backend for this run")
     model_config = _ex({"column": "search_term"})
 
 

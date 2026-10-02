@@ -63,3 +63,19 @@ Marketing: equal on every v1 check (identical outputs), and v2 answers marketing
 cannot. Calls and tokens: fewer than v1 everywhere measured — 2 LLM calls vs 7, 3.9k vs 33k
 tokens on the shared question. Caveat: a scripted model measures the machinery; a live model's
 wording and tool choices are not measured here (keys needed; B6 is offline by design).
+
+## B9 re-run (2026-10-02) — `bench/results/2026-10-02.json`
+Rule routing (Future Concepts rank 10) skips the planner when a question names one playbook
+unambiguously. Same scripted model, same checks:
+
+| question | LLM calls 09-28 → 10-02 | tokens sent | checks |
+|---|---|---|---|
+| why_roas_dropped | 2 → 2 (months not pinned in the question: planner runs) | 2,348 → 2,432 | pass |
+| where_is_spend_wasted | 2 → **1** | 2,156 → 1,963 | pass |
+| did_the_campaign_work | 3 → 3 (needs a launch date: planner runs) | 1,155 → 1,169 | pass |
+| funnel_leak | 2 → **1** | 569 → 418 | pass |
+| email_health | 2 → **1** | 1,051 → 992 | pass |
+| why_organic_traffic_dropped | 2 → 2 | 1,987 → 2,016 | pass |
+
+Small token rises: each result's heading now carries its `result_id` (for inspection).
+Retail (A), SLA (C: 19/19, identical to v1) and interpretation (D: 9/9) unchanged.

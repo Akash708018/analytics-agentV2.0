@@ -198,10 +198,32 @@ def create_app(state_dir: Path | str | None = None, runner: Runner | None = None
     def run_tool(tool_id: str, body: S.ToolRunRequest) -> S.ToolResult:
         return S.ToolResult(**ds.run_tool(tool_id, body.dataset_id, body.params))
 
+    @app.get("/datasets/{dataset_id}/results", response_model=S.ResultList, responses=R,
+             tags=["results"])
+    def list_results(dataset_id: str) -> S.ResultList:
+        ds._get(dataset_id)
+        return S.ResultList(dataset_id=dataset_id,
+                            results=ds.results.list(dataset_id, ds.current_state))
+
+    @app.get("/results/{result_id}", response_model=S.StoredResult, responses=R,
+             tags=["results"])
+    def get_result(result_id: str) -> S.StoredResult:
+        return S.StoredResult(**ds.results.get(result_id, ds.current_state))
+
+    @app.get("/results/{result_id}/inspect", response_model=S.ResultInspection, responses=R,
+             tags=["results"])
+    def inspect_result(result_id: str, step: str | None = None, sort_by: str | None = None,
+                       descending: bool = True, limit: int = 20, offset: int = 0,
+                       group: str | None = None) -> S.ResultInspection:
+        return S.ResultInspection(**ds.results.inspect(
+            result_id, step=step, sort_by=sort_by, descending=descending, limit=limit,
+            offset=offset, group=group))
+
     @app.post("/datasets/{dataset_id}/keyword-groups/run", response_model=S.KeywordGroups,
               responses=R, tags=["keywords"])
     def keyword_run(dataset_id: str, body: S.KeywordRun | None = None) -> S.KeywordGroups:
-        return S.KeywordGroups(**ds.keywords.run(dataset_id, (body or S.KeywordRun()).column))
+        body = body or S.KeywordRun()
+        return S.KeywordGroups(**ds.keywords.run(dataset_id, body.column, body.backend))
 
     @app.get("/datasets/{dataset_id}/keyword-groups", response_model=S.KeywordGroups,
              responses=R, tags=["keywords"])

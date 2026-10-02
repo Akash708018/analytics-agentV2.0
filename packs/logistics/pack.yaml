@@ -66,6 +66,9 @@ playbooks:
       - {tool: logistics.rto_analysis, optional: true}
     rules: [sla_on_delivered_only, drivers_are_associations]
     max_tool_calls: 3
+    requires_metrics: [sla_breach]
+    requires_concepts: [delivery_minutes, promised_minutes, delivery_status]
+    recovery: "Approve the SLA breach metric (metrics screen: sla_breach = delivery minutes > promised minutes); it needs delivery-minutes, promised-minutes and status columns."
   - id: courier_scorecard
     description: Which courier is late more often, read within zone, with RTO alongside.
     patterns: [courier, carrier, partner, 3pl, compare, scorecard]
@@ -74,6 +77,9 @@ playbooks:
       - {tool: logistics.rto_analysis, params: {by: courier}, optional: true}
     rules: [compare_within_zone]
     max_tool_calls: 2
+    requires_metrics: [sla_breach]
+    requires_concepts: [courier, zone]
+    recovery: "Approve the SLA breach metric; a courier comparison also needs courier and zone columns."
 
 tools:
   - id: logistics.sla_compliance
