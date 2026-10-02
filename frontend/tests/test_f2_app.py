@@ -149,7 +149,8 @@ def test_every_navigation_link_keeps_the_sid(fake):
     sid = fake.new_session()
     app = open_app(sid)
     assert links(app) == {title: f"sid={sid}" for title in
-                          ("Session", "Data", "Clean", "Domain", "Contract", "Ask")}
+                          ("Session", "Data", "Clean", "Domain", "Contract", "Metrics",
+                                    "Tools", "Ask")}
 
 
 def test_a_conflict_waits_for_a_choice_then_load_latest_shows_theirs(fake):

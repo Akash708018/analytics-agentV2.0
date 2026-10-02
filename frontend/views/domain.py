@@ -29,7 +29,8 @@ def _confirm(dataset_id: str, chosen: list[str]) -> None:
         return
     held["results"][("domain", dataset_id)] = {"confirmed": chosen}
     state.drop_path(held_draft, ("drafts", dataset_id, "domains"))
-    datasets.invalidate(held, dataset_id, ("detect", "proposal"))   # forks follow domains
+    # forks, templates, rules and tool states all follow the confirmed domains
+    datasets.invalidate(held, dataset_id, ("detect", "proposal", "templates", "rules", "tools"))
     held["reseed"] += [f"ui.domain.{dataset_id}.", f"ui.contract.{dataset_id}."]
 
 

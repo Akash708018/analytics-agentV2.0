@@ -29,7 +29,7 @@ from typing import Any
 from frontend.api_client import APIClient, APIError, VersionConflict
 
 SCHEMA = 2
-PAGES = ("session", "data", "clean", "domain", "contract", "ask")
+PAGES = ("session", "data", "clean", "domain", "contract", "metrics", "tools", "ask")
 DEFAULT_PAGE = "session"
 LABEL_MAX = 120
 TEXT_MAX = 2000
@@ -113,6 +113,24 @@ def _contract(raw: Any) -> dict:
     return out
 
 
+def _tool_params(raw: Any) -> dict:
+    """A tool's typed params: scalars only, plus `bindings` {concept: column}."""
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, Any] = {}
+    for k, v in raw.items():
+        if not isinstance(k, str):
+            continue
+        if k == "bindings":
+            if b := _str_map(v, NAME_MAX):
+                out[k] = b
+        elif isinstance(v, str):
+            out[k[:NAME_MAX]] = v[:500]
+        elif isinstance(v, (int, float)) and not isinstance(v, bool) or isinstance(v, bool):
+            out[k[:NAME_MAX]] = v
+    return out
+
+
 def _dataset_draft(raw: Any) -> dict:
     """One dataset's half-done preparation. Only these fields, only these types."""
     raw = raw if isinstance(raw, dict) else {}
@@ -128,6 +146,20 @@ def _dataset_draft(raw: Any) -> dict:
         out["contract"] = contract
     if forks := _str_map(raw.get("forks"), NAME_MAX):
         out["forks"] = forks
+    rules = raw.get("rules") if isinstance(raw.get("rules"), dict) else {}
+    if rules := {k[:NAME_MAX]: v for k, v in rules.items()
+                 if isinstance(k, str) and isinstance(v, bool)}:
+        out["rules"] = rules
+    if isinstance(raw.get("tool"), str):
+        out["tool"] = raw["tool"][:NAME_MAX]
+    params = raw.get("params") if isinstance(raw.get("params"), dict) else {}
+    if params := {t[:NAME_MAX]: p for t, v in params.items()
+                  if isinstance(t, str) and (p := _tool_params(v))}:
+        out["params"] = params
+    bindings = raw.get("bindings") if isinstance(raw.get("bindings"), dict) else {}
+    if bindings := {t[:NAME_MAX]: b for t, v in bindings.items()
+                    if isinstance(t, str) and (b := _str_map(v, NAME_MAX))}:
+        out["bindings"] = bindings
     version = raw.get("confirmed_version")
     if isinstance(version, int) and not isinstance(version, bool):
         out["confirmed_version"] = version

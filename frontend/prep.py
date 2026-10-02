@@ -99,3 +99,72 @@ def contract_body(form: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, st
                            if line.strip()]
     forks = {k: v for k, v in form.get("forks", {}).items() if v}
     return contract, forks
+
+
+# --- tool params -----------------------------------------------------------------------------
+
+# How to ask for a required param. Formats are the runner's (backend/tools/runner.py
+# `_period_bounds`, `_terms`); kinds only choose the input widget and the JSON type.
+PARAMS: dict[str, tuple[str, str, str]] = {
+    "period": ("Period", "text", "A month (2026-09), a day (2026-09-05) or a range "
+                                "(2026-09-01/2026-09-15)."),
+    "baseline": ("Compared with", "text", "Same format as the period: 2026-08, or a range."),
+    "month": ("Month", "text", "The month to pace, e.g. 2026-09."),
+    "budget": ("Budget", "number", "The month's budget, in the data's currency."),
+    "brand_terms": ("Brand terms", "text", "Words that mark a search as brand, comma-separated."),
+    "festival": ("Festival", "festival", "Dates are stored per year and confirmed before use."),
+    "year": ("Year", "text", "e.g. 2026; compared with the year before."),
+    "start": ("Campaign start", "text", "The first day of the campaign, e.g. 2026-09-01."),
+    "as_of": ("As of", "text", "The day to measure from, e.g. 2026-09-30."),
+    "days": ("Days", "number", "How many days counts as stuck."),
+}
+
+
+def param_spec(name: str) -> tuple[str, str, str]:
+    return PARAMS.get(name, (name.replace("_", " ").capitalize(), "text",
+                             "As the tool's description says."))
+
+
+def coerce(name: str, raw: Any) -> Any:
+    """A typed value in the JSON type the runner expects; None when left blank."""
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return None
+    if param_spec(name)[1] == "number":
+        return raw if isinstance(raw, (int, float)) else float(str(raw).strip())
+    return raw.strip() if isinstance(raw, str) else raw
+
+
+def run_params(required: Iterable[str], values: Mapping[str, Any], slots: Mapping[str, Any],
+               bindings: Mapping[str, str], dates_confirmed: bool) -> dict[str, Any]:
+    """The params a run sends: what the person filled, nothing guessed."""
+    out = {k: v for k in required if (v := coerce(k, values.get(k))) is not None}
+    out.update({k: v for k, v in slots.items() if v})
+    if bindings:
+        out["bindings"] = dict(bindings)
+    if dates_confirmed:
+        out["dates_confirmed"] = True
+    return out
+
+
+# --- results ---------------------------------------------------------------------------------
+
+PROVENANCE = {
+    "contract": "from the confirmed contract",
+    "provisional": "from a provisional metric: not yet in the contract",
+    "derived": "worked out by the tool from contract figures",
+}
+
+
+def shown(value: Any) -> str:
+    """A figure exactly as returned; null is a suppressed figure (small group, privacy)."""
+    return "suppressed" if value is None else str(value)
+
+
+def figure_rows(figures: Iterable[Mapping[str, Any]]) -> list[dict[str, str]]:
+    return [{"figure": f["name"], "value": shown(f.get("value")), "unit": f.get("unit") or "",
+             "source": f.get("provenance", "")} for f in figures]
+
+
+def series_data(series: Mapping[str, Any]) -> dict[str, list]:
+    """The points as two columns, in the backend's order, values untouched."""
+    return {"x": [p["x"] for p in series["points"]], "y": [p["y"] for p in series["points"]]}

@@ -12,7 +12,7 @@ from typing import Any
 from frontend import state
 from frontend.api_client import APIError
 
-KINDS = ("record", "profile", "clean", "detect", "proposal")
+KINDS = ("record", "profile", "clean", "detect", "proposal", "templates", "rules", "tools")
 
 
 def cached(ss: MutableMapping[str, Any], kind: str, dataset_id: str | None,

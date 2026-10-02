@@ -87,12 +87,46 @@ class FakeBackend:
          "options": [{"id": "platform", "label": "What the ad platform reports"},
                      {"id": "net_excl_gst", "label": "Order revenue excluding GST"}],
          "suggested": None, "suggested_reason": None},
+        {"fork_id": "conversion_source", "question": "Which conversions count?",
+         "options": [{"id": "backend_orders", "label": "Orders in your backend"},
+                     {"id": "platform", "label": "What the ad platform reports"}],
+         "suggested": "backend_orders", "suggested_reason": "Platforms over-count."},
     ]
+    TEMPLATES = [
+        {"template_id": "ctr", "label": "CTR (%)", "shape": "ratio_of_sums",
+         "required_concepts": ["clicks", "impressions"], "forks": [], "available": True},
+        {"template_id": "cpa", "label": "CPA", "shape": "ratio_of_sums",
+         "required_concepts": ["spend", "conversions"], "forks": ["conversion_source"],
+         "available": True},
+        {"template_id": "roas", "label": "ROAS", "shape": "ratio_of_sums",
+         "required_concepts": ["spend"], "forks": ["roas_revenue_basis"], "available": True},
+        {"template_id": "delivered_roas", "label": "Delivered ROAS", "shape": "ratio_of_sums",
+         "required_concepts": ["order_revenue", "gst", "spend"], "forks": [], "available": False},
+    ]
+    RULES = [
+        {"rule_id": "exclude_test_campaigns", "description": "Leave out test campaigns.",
+         "rows_affected": 3},
+        {"rule_id": "roas_spend_positive", "description": "ROAS only where spend > 0.",
+         "rows_affected": None},
+    ]
+    TOOLS = {   # tool_id: (ui_label, needs domain, missing concepts, params_required, slots)
+        "marketing.channel_efficiency": ("Which channels pay back", "marketing", [], [],
+                                         {"by": ["channel", "campaign"]}),
+        "marketing.roas_change_explainer": ("Why ROAS changed", "marketing", [],
+                                            ["period", "baseline"], {}),
+        "marketing.budget_pacing": ("Budget pacing", "marketing", [], ["budget", "month"], {}),
+        "marketing.festive_compare": ("This festival vs last year", "marketing", [],
+                                      ["festival", "year"], {}),
+        "marketing.creative_fatigue": ("Creative fatigue", "marketing", ["frequency"], [], {}),
+        "logistics.otif": ("On time, in full", "logistics", [], [], {}),
+        "core.trend": ("Trend", None, [], [], {}),
+    }
 
     def _prep(self, dataset_id: str) -> dict:
         return self.prep.setdefault(dataset_id, {
             "pool": [dict(a) for a in self.CLEANING], "plan": None, "applied": [],
-            "domains": [], "contract": None, "version": 0, "confirms": []})
+            "domains": [], "contract": None, "version": 0, "confirms": [], "fork_choices": {},
+            "metrics": {}, "rules": [], "runs": []})
 
     def _plan(self, dataset_id: str) -> list[dict]:
         state = self._prep(dataset_id)
@@ -157,14 +191,98 @@ class FakeBackend:
                           provisional=provisional,
                           questions=[f"Please answer: {f}" for f in provisional])
         state["contract"], state["version"] = c, state["version"] + 1
+        state["fork_choices"] = {**state["fork_choices"], **choices}
         return httpx.Response(200, json={"ok": True, "version": state["version"],
                                          "measure": None, "provisional": None})
+
+    def _tool_status(self, dataset_id: str, tool_id: str) -> dict:
+        label, domain, missing, _, _ = self.TOOLS[tool_id]
+        status = ("needs_domain" if domain and domain not in self._prep(dataset_id)["domains"]
+                  else "needs_data" if missing else "active")
+        return {"tool_id": tool_id, "ui_label": label, "status": status,
+                "needs_domain": domain if status == "needs_domain" else None,
+                "missing_concepts": missing}
+
+    def _approve_metric(self, dataset_id: str, body: dict) -> httpx.Response:
+        state = self._prep(dataset_id)
+        template = next((t for t in self.TEMPLATES if t["template_id"] == body["template_id"]), None)
+        if template is None:
+            return _error(404, "not_found", f"metric template {body['template_id']} not found")
+        if state["contract"] is None:
+            return _error(409, "contract_required", "Confirm the dataset contract first.")
+        if not template["available"]:
+            return _error(422, "needs_data", f"{template['label']}: no column is bound to 'gst'")
+        bindings = body.get("bindings", {})
+        if template["template_id"] == "roas" and "conv_value" not in bindings:
+            return _error(422, "needs_data", "ROAS: no column is bound to 'conv_value'")
+        if template["template_id"] == "cpa" and "conversions" not in bindings:
+            return _error(422, "ambiguous_binding", "2 columns could be 'conversions'",
+                          concept="conversions", columns=["conversions", "platform_conversions"])
+        state["metrics"][template["template_id"]] = template["template_id"]
+        state["version"] += 1
+        return httpx.Response(200, json={"ok": True, "version": state["version"],
+                                         "measure": template["template_id"], "provisional": None})
+
+    def _run_tool(self, tool_id: str, body: dict) -> httpx.Response:
+        dataset_id, params = body["dataset_id"], body.get("params", {})
+        state = self._prep(dataset_id)
+        state["runs"].append((tool_id, params))
+        if tool_id not in self.TOOLS:
+            return _error(404, "not_found", f"tool {tool_id} not found")
+        if tool_id.startswith("core."):
+            return _error(422, "not_a_domain_tool", "core analyses run through a turn")
+        status = self._tool_status(dataset_id, tool_id)
+        if status["status"] != "active":
+            return _error(409, status["status"], f"{tool_id} cannot run",
+                          needs_domain=status["needs_domain"],
+                          missing_concepts=status["missing_concepts"])
+        required = self.TOOLS[tool_id][3]
+        if missing := [k for k in required if k not in params]:
+            return _error(422, "param_required", f"{tool_id} needs params {missing}",
+                          missing=missing)
+        if tool_id == "marketing.festive_compare" and params.get("dates_confirmed") is not True:
+            return _error(422, "festival_dates_unconfirmed",
+                          "Festival dates move every year: confirm them, then re-run.",
+                          dates={"2026": ["2026-11-08", "2026-11-08"],
+                                 "2025": ["2025-10-20", "2025-10-21"]})
+        if tool_id == "marketing.channel_efficiency" and "conversion_source" not in state["fork_choices"]:
+            return _error(422, "forks_unanswered", "Answer these before this tool runs.",
+                          missing=["conversion_source"],
+                          forks=[{"fork_id": "conversion_source",
+                                  "question": "Which conversions count?"}])
+        return httpx.Response(200, json={
+            "tool_id": tool_id, "dataset_id": dataset_id,
+            "summary": f"{self.TOOLS[tool_id][0]}: 1 step(s) run",
+            "figures": [{"name": "Spend by group: social", "value": 449.0, "unit": "cost (sum)",
+                         "provenance": "contract"},
+                        {"name": "Spend by group: search", "value": 560.0, "unit": "cost (sum)",
+                         "provenance": "contract"},
+                        {"name": "CPA: tiny group", "value": None, "unit": None,
+                         "provenance": "derived"}],
+            "series": [{"chart": "bar", "name": "Spend by group", "x_label": "channel",
+                        "y_label": "cost (sum)",
+                        "points": [{"x": "social", "y": 449.0}, {"x": "search", "y": 560.0}]}],
+            "validity_filters_applied": list(state["rules"]),
+            "pack_rules_applied": ["no_sum_of_rate"],
+            "forks": {k: v for k, v in state["fork_choices"].items() if k == "conversion_source"},
+            "caveats": ["CTR: skipped -- metric 'ctr' is not approved for this dataset"],
+            "figure_check": {"status": "not_run", "notes": ["figures come straight from the engine"]}})
 
     def _prep_route(self, method: str, parts: list[str], body) -> httpx.Response | None:
         if parts[0] == "packs" and method == "GET" and len(parts) == 1:
             return httpx.Response(200, json={"packs": [
                 {"pack_id": p, "version": "0.1.0", "extends": [] if p == "core" else ["core"],
                  "tools": n} for p, n in (("core", 0), ("logistics", 6), ("marketing", 34))]})
+        if parts[0] == "packs" and method == "GET" and len(parts) == 2:
+            pack_id = parts[1]
+            tools = [{"id": t, "ui_label": v[0], "description": f"{v[0]} (fake description).",
+                      "params_required": v[3], "slots": v[4]}
+                     for t, v in self.TOOLS.items() if t.startswith(pack_id + ".")]
+            pack = {"pack": {"id": pack_id}, "tools": tools, "forks": [],
+                    "festivals": [{"id": "diwali", "name": "Diwali"}] if pack_id == "core" else []}
+            return httpx.Response(200, json={"pack_id": pack_id, "version": "0.1.0", "pack": pack})
+        if parts[0] == "tools" and method == "POST" and parts[2:] == ["run"]:
+            return self._run_tool(parts[1], body)
         if parts[0] != "datasets" or len(parts) < 3 or parts[1] not in self.datasets:
             return None
         dataset_id, rest = parts[1], parts[2:]
@@ -210,6 +328,28 @@ class FakeBackend:
             return httpx.Response(200, json=self._proposal(dataset_id))
         if method == "POST" and rest == ["contract", "confirm"]:
             return self._confirm_contract(dataset_id, body)
+        if method == "GET" and rest == ["metrics", "templates"]:
+            return httpx.Response(200, json={"templates": [
+                {**t, "approved": t["template_id"] in state["metrics"],
+                 "measure": state["metrics"].get(t["template_id"])} for t in self.TEMPLATES]})
+        if method == "POST" and rest == ["metrics", "approve"]:
+            return self._approve_metric(dataset_id, body)
+        if method == "GET" and rest == ["validity-rules"]:
+            return httpx.Response(200, json={"rules": [
+                {**r, "suggested": True, "approved": r["rule_id"] in state["rules"]}
+                for r in self.RULES]})
+        if method == "POST" and rest == ["validity-rules", "approve"]:
+            keep = [r for r in state["rules"] if r not in body.get("reject", [])]
+            state["rules"] = keep + [r for r in body["approve"] if r not in keep]
+            return httpx.Response(200, json={"ok": True, "version": 1, "measure": None,
+                                             "provisional": None})
+        if method == "GET" and rest == ["tools"]:
+            return httpx.Response(200, json={"tools": [self._tool_status(dataset_id, t)
+                                                       for t in self.TOOLS]})
+        if method == "POST" and rest == ["forks"]:
+            state["fork_choices"] = {**state["fork_choices"], **body["fork_choices"]}
+            return httpx.Response(200, json={"ok": True, "version": 1, "measure": None,
+                                             "provisional": None})
         return None
 
     def finish_turn(self, turn_id: str, text: str = "ROAS fell from 4.1 to 3.2.") -> None:
