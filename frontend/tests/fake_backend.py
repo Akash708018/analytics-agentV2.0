@@ -66,11 +66,22 @@ class FakeBackend:
                ("cost", "BIGINT"), ("clicks", "BIGINT"), ("ctr", "DOUBLE")]
     CLEANING = [
         {"kind": "DROP_DUPLICATE_ROWS", "column": None, "rows_affected": 1, "lossy": True,
-         "suggested": False, "description": "keep one of each of the 1 exactly duplicated row(s)"},
+         "suggested": False, "description": "keep one of each of the 1 exactly duplicated row(s)",
+         "values_lost": 1, "loss_unit": "row",          # API 0.8.0 (#21), shapes from the B10 probe
+         "samples": [{"row": {"date": "2026-09-01", "campaign": "brand", "utm_source": "google",
+                              "cost": 120, "clicks": 40, "ctr": 0.02}, "copies": 2}],
+         "sql": 'CREATE OR REPLACE TABLE "ads" AS SELECT DISTINCT * FROM "ads"'},
         {"kind": "TRIM_WHITESPACE", "column": "utm_source", "rows_affected": 1, "lossy": False,
-         "suggested": True, "description": "strip padding from 1 value(s) in utm_source"},
+         "suggested": True, "description": "strip padding from 1 value(s) in utm_source",
+         "values_lost": 0, "loss_unit": "value", "samples": [{"value": " google"}],
+         "sql": 'CREATE OR REPLACE TABLE "ads" AS SELECT * REPLACE (trim("utm_source") AS '
+                '"utm_source") FROM "ads"'},
         {"kind": "NORMALISE_CASE", "column": "utm_source", "rows_affected": 11, "lossy": True,
-         "suggested": False, "description": "fold utm_source to one case"},
+         "suggested": False, "description": "fold utm_source to one case",
+         "values_lost": 3, "loss_unit": "distinct value",
+         "samples": [{"value": "Google"}, {"value": "GOOGLE"}, {"value": "google"}],
+         "sql": 'CREATE OR REPLACE TABLE "ads" AS SELECT * REPLACE (lower("utm_source") AS '
+                '"utm_source") FROM "ads"'},
     ]
     CORE_FORKS = [
         {"fork_id": "tax_basis", "question": "Are money columns before or after GST?",
@@ -122,6 +133,7 @@ class FakeBackend:
         "logistics.sla_drivers": ("What goes with breaches", "logistics", [], [],
                                   {"by": ["hub", "courier", "zone"]}),
         "logistics.otif": ("On time, in full", "logistics", [], [], {}),
+        "logistics.stuck_shipments": ("Stuck shipments", "logistics", [], ["as_of"], {}),
         "core.trend": ("Trend", None, [], [], {}),
     }
 
@@ -159,8 +171,8 @@ class FakeBackend:
         state, column = self._prep(dataset_id), (body or {}).get("column")
         if column is None:
             return _error(422, "needs_data", "no search term, query or keyword column")
-        if column not in [n for n, _ in self.COLUMNS]:
-            return httpx.Response(500, text="Internal Server Error")      # as the backend (F6)
+        if column not in [n for n, _ in self.COLUMNS]:                    # 500 until B10 (#20)
+            return _error(422, "needs_data", f"no column {column!r} in this dataset")
         groups = state["kw"]
         kept = {k for g in groups.values() if g["approved"] for k in g["keywords"]}
         for gid in [gid for gid, g in groups.items() if not g["approved"]]:
@@ -190,9 +202,9 @@ class FakeBackend:
         g = {i: {**groups[i], "keywords": list(groups[i]["keywords"]),
                  "facets": dict(groups[i]["facets"])} for i in ids}
         kind = a["action"]
-        if kind == "approve":
+        if kind in ("approve", "unapprove"):                 # unapprove: API 0.8.0 (#20)
             for i in ids:
-                self._kw_save(groups, {**g[i], "approved": True})
+                self._kw_save(groups, {**g[i], "approved": kind == "approve"})
         elif kind == "rename":
             if not a.get("label"):
                 return _error(422, "bad_action", "rename needs label")
@@ -330,10 +342,10 @@ class FakeBackend:
         dataset_id, params = body["dataset_id"], body.get("params", {})
         state = self._prep(dataset_id)
         state["runs"].append((tool_id, params))
+        if tool_id.startswith("core."):                     # API 0.9.0 (#22): direct runs
+            return self._run_analysis(tool_id.split(".", 1)[1], dataset_id, params)
         if tool_id not in self.TOOLS:
             return _error(404, "not_found", f"tool {tool_id} not found")
-        if tool_id.startswith("core."):
-            return _error(422, "not_a_domain_tool", "core analyses run through a turn")
         status = self._tool_status(dataset_id, tool_id)
         if status["status"] != "active":
             return _error(409, status["status"], f"{tool_id} cannot run",
@@ -381,6 +393,213 @@ class FakeBackend:
             "forks": {k: v for k, v in state["fork_choices"].items() if k == "conversion_source"},
             "caveats": ["CTR: skipped -- metric 'ctr' is not approved for this dataset"],
             "figure_check": {"status": "not_run", "notes": ["figures come straight from the engine"]}}))
+
+    # --- API 0.8.0 / 0.9.0 (B10, B11; shapes from the F10 probe of the real backend) --------
+    OPTIONAL = {   # as packs/logistics/pack.yaml declares them
+        "logistics.sla_drivers": [{"name": "focus", "kind": "text", "default": None, "help":
+                                   "Which hub, courier or zone to look inside; spellings and "
+                                   "aliases are matched"}],
+        "logistics.stuck_shipments": [{"name": "days", "kind": "number", "default": "3",
+                                       "help": "Open at least this many days before as_of"}]}
+    PLAYBOOKS = [
+        {"id": "where_is_spend_wasted", "description": "Where ad spend buys nothing.",
+         "patterns": ["wasted"], "slots": {}, "rules": ["no_sum_of_rate"], "max_tool_calls": 6,
+         "steps": [{"tool": "marketing.channel_efficiency", "params": {}, "optional": False},
+                   {"tool": "marketing.creative_fatigue", "params": {}, "optional": True}],
+         "requires_metrics": [], "requires_concepts": [], "recovery": ""},
+        {"id": "why_roas_dropped", "description": "Why ROAS fell between two months.",
+         "patterns": ["roas"], "slots": {"period": "the later month, YYYY-MM",
+                                         "baseline": "the earlier month, YYYY-MM"},
+         "rules": [], "max_tool_calls": 6,
+         "steps": [{"tool": "marketing.roas_change_explainer",
+                    "params": {"period": "@slot:period", "baseline": "@slot:baseline"},
+                    "optional": False}],
+         "requires_metrics": ["roas"], "requires_concepts": [],
+         "recovery": "Approve the ROAS metric on Metrics, then build the report again."},
+        {"id": "sla_where_and_why", "description": "Where SLA breaches concentrate.",
+         "patterns": ["sla"], "slots": {}, "rules": [], "max_tool_calls": 6,
+         "steps": [{"tool": "logistics.sla_drivers", "params": {}, "optional": False}],
+         "requires_metrics": ["sla_breach"], "requires_concepts": [], "recovery": "Approve it."},
+    ]
+    ANALYSES = [   # name, tier, summary, "field:kind[:req]" (the real catalogue, B11)
+        ('cross_tab', 1, 'Rows of one declared dimension against the values of anot...',
+         'rows:dimension:req columns:dimension:req measure:measure'),
+        ('distribution', 1, "The shape of one declared measure over the contract's row...",
+         'measure:measure:req bins:integer'),
+        ('frequency', 1, 'How many rows carry each value of a declared dimension, w...',
+         'column:column:req limit:integer'),
+        ('summary_stats', 1, "Each declared measure over the contract's rows: its total...",
+         ''),
+        ('top_n', 1, 'The largest groups of a declared dimension by a declared...',
+         'dimension:dimension:req measure:measure:req n:integer period:period grain:grain'),
+        ('concentration', 2, 'How much of a declared measure the largest groups of a de...',
+         'dimension:dimension:req measure:measure:req period:period grain:grain'),
+        ('group_compare', 2, 'One declared measure summarised per group of a declared d...',
+         'dimension:dimension:req measure:measure:req groups:list'),
+        ('pareto', 2, 'How few groups of a declared dimension carry most of a de...',
+         'dimension:dimension:req measure:measure:req threshold:number period:period grain:grain'),
+        ('ranking_shift', 2, 'How the ranking of a declared dimension by a declared mea...',
+         'dimension:dimension:req measure:measure:req '
+         'before_start:date:req before_end:date:req after_start:date:req after_end:date:req'),
+        ('calendar_coverage', 3, "Which periods of the contract's date column hold rows and...",
+         'grain:grain'),
+        ('growth_decomposition', 3, 'The change in one declared measure between two named peri...',
+         'measure:measure:req dimension:dimension:req '
+         'period:period:req baseline:period:req grain:grain'),
+        ('period_compare', 3, 'One declared measure in two named periods, with the diffe...',
+         'measure:measure:req period:period:req baseline:period:req grain:grain'),
+        ('seasonality', 3, 'One declared measure folded onto the positions of its cyc...',
+         'measure:measure:req grain:grain'),
+        ('trend', 3, 'One declared measure per period, over a calendar that inc...',
+         'measure:measure:req grain:grain dimension:dimension'),
+        ('bivariate', 4, 'How one declared measure behaves across the range of anot...',
+         'measure:measure:req against:measure:req bins:integer'),
+        ('correlation', 4, 'Two declared measures against each other, Pearson and Spe...',
+         'measure:measure:req against:measure:req'),
+        ('driver_analysis', 4, 'Every declared dimension ranked by how much of one measur...',
+         'measure:measure:req'),
+        ('mix_shift', 4, "A change in one measure's per-row average between two per...",
+         'measure:measure:req dimension:dimension:req '
+         'period:period:req baseline:period:req grain:grain'),
+        ('changepoint', 5, 'Where one declared measure changes level across a calenda...',
+         'measure:measure:req grain:grain'),
+        ('correlated_shift', 5, 'Whether two declared measures change level at the same po...',
+         'measure:measure:req against:measure:req grain:grain'),
+        ('outlier_detection', 5, 'Unusual values in one declared measure by three methods a...',
+         'measure:measure:req dimension:dimension'),
+        ('confidence_interval', 6, 'The range a mean or a share is consistent with, given how...',
+         'dimension:dimension measure:measure confidence:number groups:list'),
+        ('effect_size', 6, 'How large a difference is, in units that do not grow with...',
+         'dimension:dimension:req measure:measure second_dimension:dimension groups:list'),
+        ('hypothesis_test', 6, 'Whether groups of a declared dimension differ by more tha...',
+         'dimension:dimension:req measure:measure '
+         'second_dimension:dimension method:text groups:list'),
+        ('sample_adequacy', 6, 'How large a difference the rows in scope could have detec...',
+         'dimension:dimension:req measure:measure:req power:number alpha:number groups:list'),
+        ('cohort_retention', 7, 'How many people from each starting period came back in ea...',
+         'entity:column:req period:period'),
+        ('repeat_behaviour', 7, 'How many people appear once and how many come back, how o...',
+         'entity:column:req event:column'),
+    ]
+    GRAINS = ["day", "week", "month", "quarter", "year"]
+    MULTIHEADER = [["Identifiers", None, "Dimensions", None, "Measures", None],
+                   ["order_id", "order_date", "region", "channel", "units", "revenue"],
+                   ["ORD-00001", "2024-01-22", "North", "Online", "39", "4133.22"],
+                   ["ORD-00002", "2024-12-26", "South", "Online", "2", "26.7"]]
+
+    def _needs_answers(self, upload_id: str, unresolved=("header_rows",)) -> httpx.Response:
+        names = self.MULTIHEADER[1]
+        guess = {"header_rows": [1, 2], "header_join": "bottom_only", "data_start_row": 3,
+                 "footer_skip_rows": 0, "name": "multiheader",
+                 "columns": [{"source": n, "target": n, "type": None} for n in names]}
+        return _error(422, "ingest_needs_answers",
+                      "The file's layout needs answers before it can be read: answer them with "
+                      "POST /workspaces/{ws}/uploads/{upload_id}/answers.",
+                      upload_id=upload_id, unresolved=list(unresolved),
+                      questions=["Is row 1 part of the header, or a title? Answer decides "
+                                 "whether the column names carry its labels."],
+                      preview={"sheet": None, "sheet_names": [], "first_row_number": 1,
+                               "rows": self.MULTIHEADER, "guess": guess})
+
+    def _answer_upload(self, workspace_id: str, upload_id: str, body: dict) -> httpx.Response:
+        if not upload_id.startswith("multiheader"):
+            return _error(404, "not_found", f"upload {upload_id} not found")
+        if "header_rows" not in (body or {}):           # as probed: still asked, same upload_id
+            return self._needs_answers(upload_id)
+        ds = self.add_dataset(workspace_id, body.get("name") or "multiheader", rows=300,
+                              columns=len(self.MULTIHEADER[1]))
+        ds["assumptions"] = [f"header rows {body['header_rows']} joined "
+                             f"{body.get('header_join') or 'bottom_only'}"]
+        return httpx.Response(201, json=ds)
+
+    def _contract_in_force(self, dataset_id: str) -> httpx.Response:
+        state = self._prep(dataset_id)
+        c = state["contract"]
+        if c is None:
+            return _error(409, "contract_required", "Confirm the dataset contract first.")
+        return httpx.Response(200, json={
+            "dataset_id": dataset_id, "version": state["version"],
+            "confirmed_at": "2026-10-02T09:00:00+00:00", "grain": c["grain"],
+            "primary_key": c["primary_key"], "date_column": c.get("date_column"),
+            "measures": [{"column": m, "agg": c["aggregations"][m],
+                          "definition": (c.get("measure_definitions") or {}).get(m, ""),
+                          "per": (c.get("measure_per") or {}).get(m, []), "ratio": None}
+                         for m in c["measures"]],
+            "dimensions": c["dimensions"],
+            "analysis_window_start": c.get("analysis_window_start"),
+            "analysis_window_end": c.get("analysis_window_end"),
+            "caveats": c.get("caveats", []),
+            "measured_caveats": ["utm_source writes 3 value(s) more than one way"],
+            "fork_choices": dict(state["fork_choices"]), "metrics": dict(state["metrics"]),
+            "validity_rules": list(state["rules"])})
+
+    def _analyses(self, dataset_id: str) -> httpx.Response:
+        c = self._prep(dataset_id)["contract"]
+        if c is None:
+            return _error(409, "contract_required", "Confirm the dataset contract first.")
+        choices = {"measure": c["measures"], "dimension": c["dimensions"],
+                   "column": sorted(n for n, _ in self.COLUMNS), "grain": self.GRAINS}
+        return httpx.Response(200, json={"dataset_id": dataset_id, "analyses": [
+            {"name": name, "tier": tier, "summary": summary, "fields": [
+                {"name": f.split(":")[0], "kind": f.split(":")[1], "required": f.endswith(":req"),
+                 "choices": choices.get(f.split(":")[1])} for f in fields.split()]}
+            for name, tier, summary, fields in self.ANALYSES]})
+
+    def _run_analysis(self, name: str, dataset_id: str, params: dict) -> httpx.Response:
+        spec = next((a for a in self.ANALYSES if a[0] == name), None)
+        if spec is None:
+            return _error(404, "not_found", f"no core analysis {name!r}")
+        state = self._prep(dataset_id)
+        if state["contract"] is None:
+            return _error(409, "contract_required", "Confirm the dataset contract first.")
+        fields = {f.split(":")[0]: f.endswith(":req") for f in spec[3].split()}
+        given = {k: v for k, v in (params or {}).items() if v not in (None, "")}
+        if unknown := sorted(set(given) - set(fields)):
+            return _error(422, "unknown_params", f"{name} takes {sorted(fields)}; not {unknown}",
+                          unknown=unknown, fields=sorted(fields))
+        if missing := [f for f, req in fields.items() if req and f not in given]:
+            return _error(422, "param_required", f"{name} needs {missing}", missing=missing)
+        return httpx.Response(200, json=self._store_result({
+            "tool_id": f"core.{name}", "dataset_id": dataset_id,
+            "summary": f"{name}: 1 step(s) run",
+            "figures": [{"name": f"{name}: campaign brand", "value": 449.0, "unit": "cost (sum)",
+                         "provenance": "contract"}],
+            "series": [], "validity_filters_applied": list(state["rules"]),
+            "pack_rules_applied": [], "forks": {}, "caveats": [],
+            "figure_check": {"status": "not_run", "notes": []}}))
+
+    def _report(self, dataset_id: str, body: dict) -> httpx.Response:
+        """backend/services/datasets.py `report`, rule for rule (B11)."""
+        state = self._prep(dataset_id)
+        pb = next((b for b in self.PLAYBOOKS if b["id"] == body.get("playbook")), None)
+        if pb is None or pb["steps"][0]["tool"].split(".")[0] not in state["domains"]:
+            return _error(404, "not_found", f"no playbook {body.get('playbook')!r} for this data")
+        if missing := [f"the approved metric '{t}'" for t in pb["requires_metrics"]
+                       if t not in state["metrics"]]:
+            return _error(422, "playbook_blocked", f"{pb['id']} needs: " + "; ".join(missing),
+                          missing=missing, recovery=pb["recovery"])
+        slots = body.get("slots") or {}
+        if absent := [s for s in pb["slots"] if s not in slots]:
+            return _error(422, "param_required", f"{pb['id']} needs slots {absent}",
+                          missing=absent, slots=pb["slots"])
+        run_id, results, skipped = f"rep_{uuid.uuid4().hex[:16]}", [], []
+        for step in pb["steps"]:
+            params = {k: (slots.get(v[6:]) if isinstance(v, str) and v.startswith("@slot:") else v)
+                      for k, v in step["params"].items()}
+            reply = self._run_tool(step["tool"], {"dataset_id": dataset_id, "params": params})
+            if reply.status_code == 200:
+                results.append(reply.json())
+                continue
+            error = reply.json()["error"]
+            skipped.append({"tool_id": step["tool"], "code": error["code"],
+                            "reason": error["message"]})
+            if not step["optional"]:
+                break
+        return httpx.Response(200, json={"dataset_id": dataset_id, "playbook": pb["id"],
+                                         "run_id": run_id, "description": pb["description"],
+                                         "rules": pb["rules"], "results": results,
+                                         "skipped": skipped})
+
 
     # --- stored results (API 0.7.0; shapes from the F8 probe) ------------------------------
     HUBS = ["PUNE_CENTRAL", "PUNE_EAST", "PUNE_SOUTH", "PUNE_WEST"]
@@ -449,11 +668,14 @@ class FakeBackend:
             pack_id = parts[1]
             tools = [{"id": t, "ui_label": v[0], "description": f"{v[0]} (fake description).",
                       "params_required": v[3], "slots": v[4],
+                      "params_optional": self.OPTIONAL.get(t, []),
                       "steps": [{"analysis": "group_compare", "filter": [
                           {"concept": "@by", "focus_param": "focus"}]}]
                       if t == "logistics.sla_drivers" else []}
                      for t, v in self.TOOLS.items() if t.startswith(pack_id + ".")]
             pack = {"pack": {"id": pack_id}, "tools": tools, "forks": [],
+                    "playbooks": [b for b in self.PLAYBOOKS if b["steps"][0]["tool"].startswith(
+                        pack_id + ".")],
                     "festivals": [{"id": "diwali", "name": "Diwali"}] if pack_id == "core" else []}
             return httpx.Response(200, json={"pack_id": pack_id, "version": "0.1.0", "pack": pack})
         if parts[0] == "tools" and method == "POST" and parts[2:] == ["run"]:
@@ -499,6 +721,12 @@ class FakeBackend:
             state["domains"] = sorted(set(body["domains"]))
             return httpx.Response(200, json={"ok": True, "version": 1, "measure": None,
                                              "provisional": None})
+        if method == "GET" and rest == ["contract"]:
+            return self._contract_in_force(dataset_id)
+        if method == "GET" and rest == ["analyses"]:
+            return self._analyses(dataset_id)
+        if method == "POST" and rest == ["reports"]:
+            return self._report(dataset_id, body)
         if method == "GET" and rest == ["contract", "proposal"]:
             return httpx.Response(200, json=self._proposal(dataset_id))
         if method == "POST" and rest == ["contract", "confirm"]:
@@ -674,7 +902,12 @@ class FakeBackend:
                                                                 f"turn {parts[1]} not found")
         if method == "POST" and parts[0] == "workspaces" and parts[2:] == ["uploads"]:
             filename = re.search(rb'filename="([^"]+)"', request.content).group(1).decode()
+            if filename.startswith("multiheader"):            # API 0.8.0 (#16): refused, asked
+                return self._needs_answers(filename)
             return httpx.Response(201, json=self.add_dataset(parts[1], filename.rsplit(".", 1)[0]))
+        if method == "POST" and parts[0] == "workspaces" and len(parts) == 5 \
+                and parts[2] == "uploads" and parts[4] == "answers":
+            return self._answer_upload(parts[1], parts[3], body)
         if method == "GET" and parts[0] == "datasets" and len(parts) == 2:
             ds = self.datasets.get(parts[1])
             return httpx.Response(200, json=ds) if ds else _error(

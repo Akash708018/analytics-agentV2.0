@@ -125,12 +125,24 @@ PARAMS: dict[str, tuple[str, str, str]] = {
 }
 
 
-def optional_params(spec: Mapping[str, Any]) -> list[str]:
-    """Params a pack tool reads without requiring them: the `focus_param` its step filters
-    name (F8: `logistics.sla_drivers` reads `focus`, but its spec does not list it)."""
-    found = {f["focus_param"] for step in spec.get("steps", []) or []
-             for f in (step.get("filter") or []) if isinstance(f, Mapping) and f.get("focus_param")}
-    return sorted(found - set(spec.get("params_required", [])))
+def optional_params(spec: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """A tool's declared optional params, [{name, kind, help, default}] (API 0.8.0, #23).
+    F8 read them from the steps' `focus_param`; the spec declares them now."""
+    required = set(spec.get("params_required", []))
+    return [p for p in spec.get("params_optional") or []
+            if isinstance(p, Mapping) and p.get("name") and p["name"] not in required]
+
+
+def blank_means(declared: Mapping[str, Any]) -> str:
+    """What leaving an optional param blank does, as the pack declares it."""
+    default = declared.get("default")
+    return ("Blank: the engine's choice." if default is None
+            else f"Blank: the tool uses {default}.")
+
+
+def optional_help(declared: Mapping[str, Any]) -> str:
+    said = (declared.get("help") or "").strip().rstrip(".")
+    return (f"{said}. " if said else "") + blank_means(declared)
 
 
 def param_spec(name: str) -> tuple[str, str, str]:
@@ -142,6 +154,8 @@ def coerce(name: str, raw: Any) -> Any:
     """A typed value in the JSON type the runner expects; None when left blank."""
     if raw is None or (isinstance(raw, str) and not raw.strip()):
         return None
+    if isinstance(raw, dt.date):                    # a declared date param (F10): YYYY-MM-DD
+        return date_text(raw)
     if param_spec(name)[1] == "number":
         return raw if isinstance(raw, (int, float)) else float(str(raw).strip())
     return raw.strip() if isinstance(raw, str) else raw
@@ -247,3 +261,104 @@ def figures_csv(figures: Iterable[Mapping[str, Any]]) -> str:
 def series_data(series: Mapping[str, Any]) -> dict[str, list]:
     """The points as two columns, in the backend's order, values untouched."""
     return {"x": [p["x"] for p in series["points"]], "y": [p["y"] for p in series["points"]]}
+
+
+# --- a refused upload's answers (API 0.8.0, #16) ---------------------------------------------
+
+HEADER_JOINS = {"space": "the header rows' words joined with a space",
+                "underscore": "the header rows' words joined with _",
+                "bottom_only": "the lowest header row only",
+                "top_only": "the top header row only"}
+COLUMN_TYPES = ("VARCHAR", "BIGINT", "DOUBLE", "DATE", "TIMESTAMP", "BOOLEAN")
+
+
+def guess_answers(guess: Mapping[str, Any]) -> dict[str, Any]:
+    """The reader's guess in the form's names: what "Use the reader's guess" offers."""
+    return {"header_rows": list(guess.get("header_rows") or []),
+            "header_join": guess.get("header_join"),
+            "data_start": guess.get("data_start_row"),
+            "footer_rows": guess.get("footer_skip_rows"),
+            "name": guess.get("name") or "",
+            "columns": {c["source"]: (c.get("target") or "", c.get("type"))
+                        for c in guess.get("columns") or [] if c.get("source")}}
+
+
+def upload_answers(form: Mapping[str, Any]) -> dict[str, Any]:
+    """The filled answers only, in the API's names (UploadAnswers). A blank stays unanswered,
+    so the reader keeps asking it rather than receiving ''."""
+    body: dict[str, Any] = {}
+    if form.get("sheet"):
+        body["sheet"] = form["sheet"]
+    if form.get("header_rows"):
+        body["header_rows"] = sorted(int(r) for r in form["header_rows"])
+    if form.get("header_join"):
+        body["header_join"] = form["header_join"]
+    for name in ("data_start", "footer_rows"):
+        if form.get(name) is not None:
+            body[name] = int(form[name])
+    if (name := (form.get("name") or "").strip()):
+        body["name"] = name
+    columns = []
+    for source, (target, kind) in (form.get("columns") or {}).items():
+        answer = {"source": source}
+        if (target or "").strip():
+            answer["target"] = target.strip()
+        if kind:
+            answer["type"] = kind
+        if len(answer) > 1:
+            columns.append(answer)
+    if columns:
+        body["columns"] = columns
+    return body
+
+
+# --- Explore: core analyses run directly (API 0.9.0, #22) ------------------------------------
+
+TIERS = {1: "Descriptive", 2: "Comparative", 3: "Temporal", 4: "Relational", 5: "Anomaly",
+         6: "Inferential", 7: "Cohort"}
+# Formats are the engine's: a period is a label of the calendar at the analysis's grain
+# (backend/engine/analysis/temporal.py GRAINS), a list is the groups to keep.
+FIELD_HELP = {
+    "period": "A period as the calendar labels it at the chosen grain: 2026-07-06 (a day, or "
+              "the day a week starts), 2026-07 (a month), 2026-Q3, 2026.",
+    "date": "A day.",
+    "list": "Values separated by commas, written as the data writes them.",
+    "integer": "A whole number.",
+    "number": "A number.",
+    "text": "As the analysis names it.",
+}
+
+
+def analysis_label(spec: Mapping[str, Any]) -> str:
+    tier = TIERS.get(spec.get("tier"), f"Tier {spec.get('tier')}")
+    return f"{tier} · {spec['name'].replace('_', ' ')}"
+
+
+def field_label(field: Mapping[str, Any]) -> str:
+    name = field["name"].replace("_", " ").capitalize()
+    return f"{name}" + ("" if field.get("required") else " (optional)")
+
+
+def analysis_params(fields: Iterable[Mapping[str, Any]], values: Mapping[str, Any]) -> dict[str, Any]:
+    """The filled fields only, typed as the engine reads them: whole numbers as integers, a list
+    split on commas, a date as YYYY-MM-DD. Raises ValueError for a number field holding text."""
+    out: dict[str, Any] = {}
+    for field in fields:
+        name, kind, raw = field["name"], field["kind"], values.get(field["name"])
+        if raw is None or (isinstance(raw, str) and not raw.strip()):
+            continue
+        if kind == "integer":
+            number = float(raw)
+            if not number.is_integer():
+                raise ValueError(f"{name} takes a whole number")
+            out[name] = int(number)
+        elif kind == "number":
+            out[name] = float(raw)
+        elif kind == "list":
+            if items := [x.strip() for x in str(raw).split(",") if x.strip()]:
+                out[name] = items
+        elif kind == "date":
+            out[name] = date_text(raw) if isinstance(raw, dt.date) else str(raw).strip()
+        else:
+            out[name] = raw.strip() if isinstance(raw, str) else raw
+    return out

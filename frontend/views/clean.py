@@ -75,6 +75,25 @@ def _result(dataset_id: str) -> None:
                        "engine's new plan.")
 
 
+def _losses(proposal: dict) -> None:
+    """API 0.8.0 (#21): what a step loses, the engine's own examples, and its SQL."""
+    lost, unit = proposal.get("values_lost"), proposal.get("loss_unit")
+    if lost:
+        st.caption(f"Loses {lost} {unit or 'value'}(s).")
+    samples = proposal.get("samples") or []
+    rows = [s for s in samples if isinstance(s.get("row"), dict)]
+    values = [s["value"] for s in samples if "value" in s]
+    if rows:
+        st.caption("Rows that are duplicated (examples, as the engine found them):")
+        st.dataframe([{**{k: str(v) for k, v in s["row"].items()}, "copies": str(s.get("copies"))}
+                      for s in rows], hide_index=True, use_container_width=True)
+    if values:
+        st.caption("Values it changes (examples): " + ", ".join(f"`{v}`" for v in values))
+    if proposal.get("sql"):
+        with st.expander("SQL"):
+            st.code(proposal["sql"], language="sql")
+
+
 def main() -> None:
     st.title("Clean")
     dataset_id = draft["dataset_id"]
@@ -107,6 +126,7 @@ def main() -> None:
         if proposal.get("lossy"):
             st.caption(":orange[Loses data: rows or values change and the originals are "
                        "not kept in the table (the ledger records the step).]")
+        _losses(proposal)
         if proposal.get("suggested"):
             st.caption("Suggested: lossless and conflict-free. It still needs your tick.")
             if not ss[key]:

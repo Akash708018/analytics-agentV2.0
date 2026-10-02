@@ -119,7 +119,55 @@ def _confirm(dataset_id: str, columns: list[str], measures: list[str], fork_ids:
         return
     held["results"][("contract", dataset_id)] = {"confirmed": reply}
     state.dataset_draft(held_draft, dataset_id)["confirmed_version"] = reply["version"]
-    datasets.invalidate(held, dataset_id, ("proposal",))   # it now reflects the contract in force
+    # the proposal now reflects the contract in force; the analyses offer its measures
+    datasets.invalidate(held, dataset_id, ("proposal", "contract", "analyses"))
+
+
+def _ratio(ratio: dict | None) -> str:
+    if not ratio:
+        return ""
+    line = f"{ratio.get('numerator', '?')} / {ratio.get('denominator', '?')}"
+    return line + (f" × {ratio['scale']}" if ratio.get("scale") not in (None, 1) else "")
+
+
+def _in_force(dataset_id: str) -> None:
+    """API 0.8.0 (#17): the contract analyses run under now, exactly as the engine holds it."""
+    current = datasets.cached(ss, "contract", dataset_id, lambda: api.get_contract(dataset_id))
+    if isinstance(current, APIError):
+        if current.code == "contract_required":
+            st.info("No contract confirmed yet. Analyses wait for one; the form below starts "
+                    "from the engine's proposal.")
+        else:
+            show_error(current, "Could not read the contract in force")
+        return
+    with st.expander(f"The contract in force: version {current['version']}, confirmed "
+                     f"{current['confirmed_at']}"):
+        window = (f"{current.get('analysis_window_start') or 'the first row'} to "
+                  f"{current.get('analysis_window_end') or 'the last row'}")
+        st.markdown(f"- One row: {current['grain']}\n"
+                    f"- Key: {', '.join(current['primary_key']) or '—'}\n"
+                    f"- Date column: {current.get('date_column') or '—'}\n"
+                    f"- Analysis window: {window}\n"
+                    f"- Dimensions: {', '.join(current['dimensions']) or '—'}")
+        st.dataframe([{"measure": m["column"], "combines as": m["agg"],
+                       "what it means": m.get("definition") or "",
+                       "one value per": ", ".join(m.get("per") or []),
+                       "ratio of": _ratio(m.get("ratio"))} for m in current["measures"]],
+                     hide_index=True, use_container_width=True)
+        st.markdown("**Your caveats**")
+        for caveat in current.get("caveats") or ["none declared"]:
+            st.caption(f"• {caveat}")
+        st.markdown("**What the engine counted in the table**")
+        for caveat in current.get("measured_caveats") or ["nothing found"]:
+            st.caption(f"• {caveat}")
+        answers = current.get("fork_choices") or {}
+        st.caption("Your answers: " + (", ".join(f"{k} = {v}" for k, v in answers.items())
+                                       or "none"))
+        metrics = current.get("metrics") or {}
+        st.caption("Approved metrics: " + (", ".join(f"{t} → {m}" for t, m in metrics.items())
+                                           or "none"))
+        st.caption("Validity rules: " + (", ".join(current.get("validity_rules") or [])
+                                         or "none approved"))
 
 
 def _result(dataset_id: str, forks: list[dict]) -> None:
@@ -275,6 +323,7 @@ def main() -> None:
             return
     forks = proposal["forks"]
     _result(dataset_id, forks)
+    _in_force(dataset_id)
     version = state.get_path(draft, ("drafts", dataset_id, "confirmed_version"))
     if version is not None:
         st.caption(f"Confirmed from this session: version {version}. Changing the form and "

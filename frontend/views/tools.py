@@ -1,7 +1,8 @@
 """Tools page: run one domain tool and see every figure with its source.
 
-Only domain tools are offered: core analyses run through a question (Ask). The params a
-tool needs come from its pack (`GET /packs/{id}`); nothing is guessed. When the engine
+Only domain tools are offered: core analyses run on Explore (F10). The params a tool needs
+come from its pack (`GET /packs/{id}`), its optional ones too (`params_optional`, API 0.8.0);
+nothing is guessed. When the engine
 needs an answer (a fork, a column, festival dates), it is asked here and the person runs
 again. Results stay in the browser: they are data, not saved work. See docs/steps/F4.md.
 """
@@ -76,7 +77,7 @@ def _answer_forks(dataset_id: str, fork_ids: list[str]) -> None:
         held["results"][("forks", dataset_id)] = {"error": error}
         return
     held["results"][("forks", dataset_id)] = {"saved": answers}
-    datasets.invalidate(held, dataset_id, ("tools",))
+    datasets.invalidate(held, dataset_id, ("tools", "contract"))   # forks are in the contract
 
 
 def _param_input(dataset_id: str, tool_id: str, name: str, festivals: list[dict]) -> None:
@@ -92,6 +93,37 @@ def _param_input(dataset_id: str, tool_id: str, name: str, festivals: list[dict]
         st.selectbox(label, list(names), key=key, format_func=names.get, placeholder="choose…",
                      help=help_text, on_change=state.on_change, args=args)
     else:
+        state.bind(ss, key, path, "")
+        st.text_input(label, key=key, help=help_text, on_change=state.on_change, args=args)
+
+
+def _optional_input(dataset_id: str, tool_id: str, declared: dict, columns: list[str]) -> None:
+    """A param the pack declares optional (#23): its own help and what a blank means."""
+    name, kind = declared["name"], declared.get("kind")
+    label = prep.param_spec(name)[0]
+    label = label if "(optional)" in label else f"{label} (optional)"
+    key, path = k(dataset_id, tool_id, "p", name), p(dataset_id, tool_id, name)
+    args = (ss, key, path)
+    help_text = prep.optional_help(declared)
+    if kind in ("number", "integer"):
+        # The runner reads counts (days, n, months) as whole numbers; a fractional default
+        # is the pack's sign that the number takes decimals.
+        whole = kind == "integer" or "." not in str(declared.get("default") or "")
+        state.bind(ss, key, path, None)
+        st.number_input(label, key=key, step=1 if whole else 0.01, help=help_text,
+                        on_change=state.on_change, args=args)
+    elif kind == "date":
+        state.bind(ss, key, path, None, to_widget=prep.text_date, from_widget=prep.date_text)
+        st.date_input(label, key=key, min_value=prep.text_date("1900-01-01"),
+                      max_value=prep.text_date("2100-12-31"), format="YYYY-MM-DD", help=help_text,
+                      on_change=state.on_change, args=(ss, key, path, prep.date_text))
+    elif kind == "column":
+        state.bind(ss, key, path, None)
+        if ss[key] is not None and ss[key] not in columns:
+            ss[key] = None
+        st.selectbox(label, columns, key=key, placeholder="the tool's own choice", help=help_text,
+                     on_change=state.on_change, args=args)
+    else:                                       # text, list (comma-separated, as the runner reads)
         state.bind(ss, key, path, "")
         st.text_input(label, key=key, help=help_text, on_change=state.on_change, args=args)
 
@@ -173,8 +205,8 @@ def main() -> None:
         return
     tools = [t for t in listed["tools"] if not t["tool_id"].startswith("core.")]
     active = {t["tool_id"]: t for t in tools if t["status"] == "active"}
-    st.caption(f"{len(active)} of {len(tools)} domain tools can run on this data. Core "
-               "analyses run through a question on Ask.")
+    st.caption(f"{len(active)} of {len(tools)} domain tools can run on this data. The "
+               "engine's core analyses run on Explore.")
     _unavailable(tools)
     if not active:
         st.info("No tool can run yet: confirm a domain whose data this is.")
@@ -204,12 +236,13 @@ def main() -> None:
     required = list(spec.get("params_required", []))
     for name in required:
         _param_input(dataset_id, tool_id, name, festivals)
-    optional = prep.optional_params(spec)               # F8: read by the tool, not required
-    for name in optional:
-        _param_input(dataset_id, tool_id, name, festivals)
-    slots = list(spec.get("slots", {}))
     profile = datasets.cached(ss, "profile", dataset_id, lambda: api.get_profile(dataset_id))
     columns = [] if isinstance(profile, APIError) else [c["name"] for c in profile["columns"]]
+    declared = prep.optional_params(spec)               # #23: the pack declares them
+    optional = [d["name"] for d in declared]
+    for d in declared:
+        _optional_input(dataset_id, tool_id, d, columns)
+    slots = list(spec.get("slots", {}))
     for slot in slots:
         key, path = k(dataset_id, tool_id, "slot", slot), p(dataset_id, tool_id, slot)
         state.bind(ss, key, path, None)

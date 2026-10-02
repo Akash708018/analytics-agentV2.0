@@ -19,7 +19,8 @@ api = connection.get_client()
 draft = ss[state.DRAFT]
 
 WHAT = {"run": "No groups were proposed", "approve": "Not approved", "merge": "Not merged",
-        "rename": "Not renamed", "split": "Not split", "move_keyword": "Not moved"}
+        "rename": "Not renamed", "split": "Not split", "move_keyword": "Not moved",
+        "unapprove": "Approval not withdrawn"}
 
 
 def k(dataset_id: str, *parts: str) -> str:
@@ -40,7 +41,7 @@ def _send(dataset_id: str, action: str, call, done: str, reseed: tuple[str, ...]
         return
     held["cache"][("keywords", dataset_id)] = reply
     held["results"][("kw", dataset_id)] = {"done": done}
-    if action in ("run", "approve", "merge"):            # ticks were spent or their ids replaced
+    if action in ("run", "approve", "merge", "unapprove"):   # ticks spent or ids replaced
         state.drop_path(held_draft, p(dataset_id, "ticks"))
         held["reseed"].append(k(dataset_id, "tick") + ".")
     held["reseed"].extend(reseed)
@@ -55,6 +56,13 @@ def _run(dataset_id: str) -> None:
 def _approve(dataset_id: str, ids: list[str]) -> None:
     _send(dataset_id, "approve", lambda: api.apply_keyword_group_action(dataset_id, "approve", ids),
           f"Approved {len(ids)} group(s).")
+
+
+def _withdraw(dataset_id: str, ids: list[str]) -> None:
+    # API 0.8.0 (#20): each group returns to a proposal; the engine stops reading it.
+    _send(dataset_id, "unapprove",
+          lambda: api.apply_keyword_group_action(dataset_id, "unapprove", ids),
+          f"Withdrew the approval of {len(ids)} group(s); they are proposals again.")
 
 
 def _merge(dataset_id: str, ids: list[str]) -> None:
@@ -162,9 +170,15 @@ def _ticked_actions(dataset_id: str, groups: list[dict], ids: list[str]) -> None
     by_id = {g["group_id"]: g for g in groups}
     proposals = [i for i in ids if not by_id[i]["approved"]]
     st.markdown(f"**{len(ids)} ticked**" + (f" ({len(proposals)} not yet approved)" if ids else ""))
-    st.button(f"Approve the {len(proposals)} ticked" if proposals else "Approve the ticked",
-              key=k(dataset_id, "approve"), type="primary", disabled=not proposals,
-              on_click=_approve, args=(dataset_id, proposals))
+    approved = [i for i in ids if by_id[i]["approved"]]
+    left, right = st.columns(2)
+    left.button(f"Approve the {len(proposals)} ticked" if proposals else "Approve the ticked",
+                key=k(dataset_id, "approve"), type="primary", disabled=not proposals,
+                on_click=_approve, args=(dataset_id, proposals))
+    right.button(f"Withdraw approval of the {len(approved)} ticked" if approved
+                 else "Withdraw approval of the ticked", key=k(dataset_id, "withdraw"),
+                 disabled=not approved, on_click=_withdraw, args=(dataset_id, approved),
+                 help="Each returns to a proposal; the tools stop counting it.")
     if len(ids) < 2:
         st.caption("Tick two or more groups to merge them.")
         return
@@ -276,7 +290,7 @@ def main() -> None:
         return
     st.subheader("Groups")
     st.caption(kw.summary(groups))
-    st.caption("An approval can't be withdrawn yet, so approve only the groups you are sure of.")  # no such action yet: issue #20
+    st.caption("An approval can be withdrawn: tick the group and use Withdraw approval.")
     st.page_link("views/tools.py", label="Tools: keyword group performance, page targeting",
                  icon="🧰", query_params={"sid": ss[state.SID]})
     ids = kw.ticked(state.get_path(draft, p(dataset_id, "ticks"), {}), groups)

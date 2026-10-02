@@ -29,7 +29,7 @@ def _approve(dataset_id: str, template_id: str) -> None:
         held["results"][("metric", dataset_id, template_id)] = {"error": error}
         return
     held["results"][("metric", dataset_id, template_id)] = {"approved": reply}
-    datasets.invalidate(held, dataset_id, ("templates", "proposal"))
+    datasets.invalidate(held, dataset_id, ("templates", "proposal", "contract"))
 
 
 def _apply_rules(dataset_id: str, approve: list[str], reject: list[str]) -> None:
@@ -41,7 +41,7 @@ def _apply_rules(dataset_id: str, approve: list[str], reject: list[str]) -> None
         return
     held["results"][("rules", dataset_id)] = {"approved": approve, "rejected": reject}
     state.drop_path(held_draft, ("drafts", dataset_id, "rules"))
-    datasets.invalidate(held, dataset_id, ("rules",))
+    datasets.invalidate(held, dataset_id, ("rules", "contract"))
     held["reseed"].append(f"ui.rules.{dataset_id}.")
 
 

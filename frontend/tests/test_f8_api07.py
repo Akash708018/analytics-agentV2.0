@@ -11,13 +11,17 @@ DRIVERS = "logistics.sla_drivers"
 
 # --- helpers ---------------------------------------------------------------------------------
 
-def test_optional_params_are_the_ones_a_tools_steps_read():
-    spec = {"params_required": ["period"], "steps": [
-        {"analysis": "group_compare", "filter": [{"concept": "@by", "focus_param": "focus"}]},
-        {"analysis": "group_compare", "filter": [{"concept": "x", "focus_param": "period"}]}]}
-    assert prep.optional_params(spec) == ["focus"]                 # required ones excluded
+def test_optional_params_are_the_ones_the_pack_declares():
+    # F8 scanned the steps' focus_param; API 0.8.0 (#23) declares them (F10).
+    focus = {"name": "focus", "kind": "text", "help": "One hub.", "default": None}
+    spec = {"params_required": ["period"], "params_optional": [
+        focus, {"name": "period", "kind": "text", "help": "", "default": None}],
+        "steps": [{"analysis": "group_compare", "filter": [{"concept": "x", "focus_param": "zone"}]}]}
+    assert prep.optional_params(spec) == [focus]          # required ones excluded; steps not read
     assert prep.optional_params({"params_required": [], "steps": []}) == []
     assert prep.optional_params({}) == []
+    assert prep.blank_means(focus) == "Blank: the engine's choice."
+    assert prep.blank_means({"default": "3"}) == "Blank: the tool uses 3."
 
 
 PREFILL = {"from_dataset_id": "ds_aaaaaaaaaaaa", "from_name": "ads_august", "similarity": 1.0,

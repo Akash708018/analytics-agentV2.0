@@ -30,7 +30,7 @@ from frontend.api_client import APIClient, APIError, VersionConflict
 
 SCHEMA = 2
 PAGES = ("session", "data", "clean", "domain", "contract", "metrics", "keywords", "tools",
-         "results", "ask")
+         "explore", "results", "ask")
 DEFAULT_PAGE = "session"
 LABEL_MAX = 120
 TEXT_MAX = 2000
@@ -144,6 +144,24 @@ def _keywords(raw: Any) -> dict:
     return out
 
 
+def _explore(raw: Any) -> dict:
+    """Explore (F10): the analysis and the playbook chosen, and each one's answers."""
+    raw = raw if isinstance(raw, dict) else {}
+    out: dict[str, Any] = {}
+    for field in ("analysis", "playbook"):
+        if isinstance(raw.get(field), str):
+            out[field] = raw[field][:NAME_MAX]
+    fields = raw.get("fields") if isinstance(raw.get("fields"), dict) else {}
+    if fields := {a[:NAME_MAX]: p for a, v in fields.items()
+                  if isinstance(a, str) and (p := _tool_params(v))}:
+        out["fields"] = fields
+    slots = raw.get("slots") if isinstance(raw.get("slots"), dict) else {}
+    if slots := {b[:NAME_MAX]: m for b, v in slots.items()
+                 if isinstance(b, str) and (m := _str_map(v, 500))}:
+        out["slots"] = slots
+    return out
+
+
 def _dataset_draft(raw: Any) -> dict:
     """One dataset's half-done preparation. Only these fields, only these types."""
     raw = raw if isinstance(raw, dict) else {}
@@ -177,6 +195,8 @@ def _dataset_draft(raw: Any) -> dict:
         out["keywords"] = keywords
     if isinstance(raw.get("result"), str):          # F8: the stored result chosen on Results
         out["result"] = raw["result"][:NAME_MAX]
+    if explore := _explore(raw.get("explore")):     # F10
+        out["explore"] = explore
     version = raw.get("confirmed_version")
     if isinstance(version, int) and not isinstance(version, bool):
         out["confirmed_version"] = version
