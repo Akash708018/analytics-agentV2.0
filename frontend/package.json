@@ -2,9 +2,11 @@
   "name": "analytics-agent-frontend-mock",
   "private": true,
   "scripts": {
-    "mock": "prism mock ../docs/api/openapi.yaml --host 127.0.0.1 --port 4010"
+    "mock": "prism mock ../docs/api/openapi.yaml --host 127.0.0.1 --port 4010",
+    "e2e": "playwright test -c e2e/playwright.config.js"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "@stoplight/prism-cli": "5.16.0"
   }
 }

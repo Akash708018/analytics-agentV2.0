@@ -60,6 +60,28 @@ listing and what each action does to approval), `datasets.py` (cached server rea
 `pages/`, see D-F2-2).
 Nothing here imports the backend; `api_client.py` is the only HTTP boundary.
 
+## End-to-end browser suite (F11)
+
+`frontend/e2e/` drives the real app in headless Chromium against the real backend. The backend
+runs with a scripted model (`e2e/scripted_backend.py`); only the model's words are fixed. Each
+test makes its own session through the API and checks every value the page shows against the
+API's own reply.
+
+```sh
+npm ci --prefix frontend                       # once; elsewhere also: npx --prefix frontend playwright install chromium
+npm run e2e --prefix frontend                  # 17 tests, about 2 minutes, 3 workers
+npm run e2e --prefix frontend -- f10.spec.js -g "Explore"     # one file / one test
+```
+
+`e2e/servers.js` starts both servers on free ports, on an empty state directory, and stops them
+afterwards. It also removes the workspaces the run made. Settings:
+- `E2E_KEEP=1` keeps the logs and workspaces;
+- `E2E_APP` and `E2E_API` reuse servers already running;
+- `E2E_WORKERS` sets the number of workers;
+- `E2E_LARGE_ROWS` sizes the large-file test (default 300,000 rows).
+
+Failures keep a trace and a screenshot in `e2e/test-results/`. See [F11](../docs/steps/F11.md).
+
 ## API client and mock (F1)
 
 The client reads `ANALYTICS_API_URL` (required). Its methods map to all 30

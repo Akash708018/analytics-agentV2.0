@@ -1,0 +1,12 @@
+date,campaign,channel,utm_source,cost,clicks,impressions,conversions,revenue,ctr
+2026-08-01,Brand Search,search,Google,100,50,1000,5,400,0.05
+2026-08-01,Prospecting,social,facebook,80,40,2000,2,150,0.02
+2026-08-02,Brand Search,search,google,110,52,1050,6,420,0.0495
+2026-08-02,Prospecting,social,Facebook,85,41,2100,2,160,0.0195
+2026-08-03,Brand Search,search,google ,105,49,990,5,390,0.0495
+2026-08-03,Prospecting,social,facebook,90,45,2200,3,200,0.0205
+2026-09-01,Brand Search,search,Google,120,55,1100,6,420,0.05
+2026-09-01,Prospecting,social,facebook,95,30,2100,1,90,0.0143
+2026-09-02,Brand Search,search,google,125,57,1150,7,460,0.0496
+2026-09-02,Prospecting,social,Facebook,99,33,2050,1,80,0.0161
+2026-09-02,Prospecting,social,Facebook,99,33,2050,1,80,0.0161
