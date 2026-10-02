@@ -86,6 +86,10 @@ def _edit(dataset_id: str, gid: str, action: str) -> None:
           done, (k(dataset_id, "edit") + ".",))
 
 
+def _choose(dataset_id: str) -> None:
+    ss[k(dataset_id, "chosen")] = ss[k(dataset_id, "group")]
+
+
 def _propose(dataset_id: str, columns: list[str] | None, listing: dict | None) -> None:
     st.subheader("Propose groups")
     key, path = k(dataset_id, "column"), p(dataset_id, "column")
@@ -145,11 +149,13 @@ def _ticked_actions(dataset_id: str, groups: list[dict], ids: list[str]) -> None
 def _edit_one(dataset_id: str, groups: list[dict]) -> None:
     by_id = {g["group_id"]: g for g in groups}
     with st.expander("Edit one group: rename, split, move a keyword"):
-        key = k(dataset_id, "group")
-        if ss.get(key) not in by_id:
-            ss[key] = None
+        # The browser hands a selectbox's choice back as its shown text, which a rename, split
+        # or move changes, so the choice was lost after each edit (C12). The id is the choice.
+        key, chosen = k(dataset_id, "group"), ss.get(k(dataset_id, "chosen"))
+        ss[key] = chosen if chosen in by_id else None
         st.selectbox("Group", list(by_id), key=key, placeholder="choose…",
-                     format_func=lambda i: f"{by_id[i]['label']} ({len(by_id[i]['keywords'])})")
+                     format_func=lambda i: f"{by_id[i]['label']} ({len(by_id[i]['keywords'])})",
+                     on_change=_choose, args=(dataset_id,))
         gid = ss[key]
         if gid is None:
             return
@@ -230,7 +236,7 @@ def main() -> None:
         return
     st.subheader("Groups")
     st.caption(kw.summary(groups))
-    st.caption("An approval cannot be withdrawn here: API 0.6.0 has no action for it.")
+    st.caption("An approval cannot be withdrawn here: API 0.6.0 has no action for it (#20).")
     st.page_link("views/tools.py", label="Tools: keyword group performance, page targeting",
                  icon="🧰", query_params={"sid": ss[state.SID]})
     ids = kw.ticked(state.get_path(draft, p(dataset_id, "ticks"), {}), groups)

@@ -431,3 +431,30 @@ shown as returned; tokens are labelled as estimates, as the backend labels them.
 container has no model keys. `create_app(llm=ScriptedLLM(...))` (the backend tests' seam)
 gives real playbook runs, tool results, skips, checks and usage with scripted wording. The
 harness lives in the scratchpad, not the repo; its code is in `docs/steps/F5.md`.
+
+## F6 — keyword groups (2026-10-02)
+
+**D-F6-1. The person chooses the search-term column; the run always sends it.** No endpoint says
+which column the pack binds to the search-term concept before a run, and `run {}` uses that
+binding silently. So the column box starts empty, Propose is disabled until a column is chosen,
+and the run's own record (column, embedding, threshold, keywords read, proposals, spellings
+merged) is shown as returned.
+
+**D-F6-2. What an action does to approval is said before it is sent.** Measured: a merge lands
+in the first id and takes its approval; a keyword takes the approval of the group it lands in;
+split-off keywords become a proposal; proposing again drops every unapproved group with the
+person's edits. The person picks the merge target (no default), the request is sent as
+`[target, others…]`, and the screen warns when an approved group would lose its approval and
+when a new proposal run would replace edits. There is no withdraw action (#20); the screen
+says so.
+
+**D-F6-3. Saved: the column and ticked group ids.** Keywords, typed names and view filters
+stay in the browser. Ticks are cleared after approve, merge and a new run (their ids are
+spent or replaced); ticks for ids that no longer exist are ignored.
+
+**C12. The "Edit one group" choice was lost after every edit (browser check).** The browser
+hands a selectbox's choice back as its shown text ("Sushi local (21)"). A split, move or rename
+changes that text, so after the edit the choice matched no option and the edit controls
+vanished. AppTest re-sends with the current labels and passed. The chosen group id is now held
+in a plain session key and set on the selector each run. Before: the browser check failed at
+step 12 in two runs. After: 18 of 18 steps.

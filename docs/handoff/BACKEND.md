@@ -17,6 +17,12 @@ answered 500 (KeyError at `m.tools[tool_id]`); the `not_a_domain_tool` check now
 concept named while approving a metric (`bindings`, e.g. `conv_value` → `revenue`) is not reused
 by tool runs on the same dataset; the person names it again in `params.bindings`.
 
+2026-10-02, F6 (same branch, no backend change): api-request
+[#20](https://github.com/Akash708018/analytics-agentV2.0/issues/20). (1) Keyword groups have no
+action that withdraws an approval. (2) `POST .../keyword-groups/run {"column": "nope"}` answers 500
+(DuckDB binder error escapes `KeywordService.run`). The screen only offers the profile's
+columns, so (2) is unreachable from the UI. Neither blocks the frontend.
+
 ## API: spec version — live | stubbed (501) | changed since last handoff
 
 **0.4.0** (additive; `docs/api/CHANGELOG.md`). Turns are now answered by the playbook agent
