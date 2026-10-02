@@ -260,6 +260,66 @@ def pacing(con, gate, scope, measure: str, budget: float, month: str,
     return Output(headers=["item", "value"], rows=rows, summary=summary, label="pacing")
 
 
+# --- marginal_returns (B12 QA: diminishing returns) ---------------------------------------------
+
+MIN_DAYS_PER_BAND = 5
+
+
+@register("marginal_returns", tier=TIER, surface="v2", summary="Days grouped into bands by "
+          "spend: cost per outcome in each band, and the MARGINAL cost of the extra outcomes "
+          "each step up in spend bought; the band where it crosses a target, if one is given.")
+def marginal_returns(con, gate, scope, spend: str, outcome: str, bands: int = 5,
+                     target_cost: float | None = None, **params) -> Output:
+    if params:
+        raise TypeError(f"marginal_returns takes spend, outcome, bands, target_cost; got "
+                        f"{', '.join(sorted(params))}.")
+    bands = int(bands)
+    if not 2 <= bands <= 10:
+        raise ParamsInvalid("bands must be 2 to 10.")
+    s_sql, o_sql = _additive(gate, spend), _additive(gate, outcome)
+    dt = qi(_date_col(gate))
+    q = (f"WITH d AS (SELECT CAST({dt} AS DATE) AS day, {s_sql} AS s, {o_sql} AS o "
+         f"FROM {scope.source} WHERE {scope.where} GROUP BY 1), "
+         f"b AS (SELECT *, ntile({bands}) OVER (ORDER BY s) AS band FROM d), "
+         f"g AS (SELECT band, count(*) AS days, min(s) AS lo, max(s) AS hi, avg(s) AS s, "
+         f"avg(o) AS o, sum(s) / nullif(sum(o), 0) AS avg_cost FROM b GROUP BY band) "
+         f"SELECT band, days, lo, hi, s, o, avg_cost, "
+         f"(s - lag(s) OVER (ORDER BY band)) / nullif(o - lag(o) OVER (ORDER BY band), 0) "
+         f"AS marginal, o - lag(o) OVER (ORDER BY band) AS d_o FROM g ORDER BY band")
+    out = con.execute(q).fetchall()
+    if not out:
+        raise ValueError("no days with data in scope.")
+    rows, crossed = [], None
+    for band, days, lo, hi, avg_s, avg_o, avg_cost, marginal, d_o in out:
+        if band > 1 and d_o is not None and d_o <= 0:
+            marginal = None                      # more spend bought no more outcome
+        rows.append([f"band {band}: {number(lo)} to {number(hi)} per day", days,
+                     number(avg_s), number(avg_o), number(avg_cost), number(marginal)])
+        if target_cost is not None and crossed is None and band > 1 and (
+                marginal is None or marginal > float(target_cost)):
+            crossed = (band, lo)
+    summary = _head(scope, gate) + [
+        f"Days are banded by their own total {spend} ({bands} bands of near-equal day "
+        f"counts). Cost per outcome = sum({spend}) / sum({outcome}) in the band; MARGINAL = extra "
+        f"average daily {spend} / extra average daily {outcome} over the band below. A blank "
+        f"marginal means the extra spend bought no extra {outcome}.",
+        "This is an association across days: other things that move with spend (season, "
+        "creative, audience) are in it too."]
+    small = [r[0] for r in rows if r[1] < MIN_DAYS_PER_BAND]
+    if small:
+        summary.append(f"NOT ENOUGH DATA in {len(small)} band(s) (under {MIN_DAYS_PER_BAND} "
+                       f"days): read their figures as indicative.")
+    if target_cost is not None:
+        summary.append(
+            f"Marginal cost first exceeds the target {number(float(target_cost))} in band "
+            f"{crossed[0]} (days spending {number(crossed[1])} or more)." if crossed else
+            f"Marginal cost stays at or under the target {number(float(target_cost))} in every "
+            f"band.")
+    return Output(headers=["spend band", "days", f"avg daily {spend}", f"avg daily {outcome}",
+                           "cost per outcome", "marginal cost per outcome"], rows=rows,
+                  summary=summary, label="marginal_returns")
+
+
 # --- text_ngrams -------------------------------------------------------------------------------
 
 @register("text_ngrams", tier=TIER, surface="v2", summary="Words or word pairs of a text column, with a "

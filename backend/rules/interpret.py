@@ -228,6 +228,20 @@ def claim_direction(text: str, trace: list[dict]) -> Violation | None:
     return None
 
 
+def offsetting_shift(text: str, trace: list[dict]) -> Violation | None:
+    """A rise reported as growth when another group fell by about as much (cannibalization)."""
+    if not any(c.startswith("offsetting_shift:") for c in _caveats(trace)):
+        return None
+    if re.search(r"offset|shift|cannibal|net (change|effect)|at the expense|took .{0,20}from|"
+                 r"flat|unchanged|no net", text, re.I):
+        return None
+    if re.search(rf"\b{UP}\b|\bgrowth\b|\badded\b", text, re.I):
+        return Violation("offsetting_shift", "a gain is reported while another group fell by "
+                         "about as much", "say the gains offset each other (net change), not "
+                         "that the total grew")
+    return None
+
+
 RULES = {
     "no_sum_of_rate": no_sum_of_rate,
     "no_cross_source_conversion_sum": no_cross_source_conversion_sum,
@@ -243,9 +257,10 @@ RULES = {
     "compare_within_zone": compare_within_zone,
     "claim_unit": claim_unit,
     "claim_direction": claim_direction,
+    "offsetting_shift": offsetting_shift,
 }
 ALWAYS = ("no_sum_of_rate", "bounds", "measurement_change", "small_sample", "festival_confound",
-          "claim_unit", "claim_direction")
+          "claim_unit", "claim_direction", "offsetting_shift")
 
 
 def check(text: str, trace: list[dict], rule_ids: set[str] | None = None) -> list[Violation]:

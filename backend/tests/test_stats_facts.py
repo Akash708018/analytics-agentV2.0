@@ -449,11 +449,11 @@ def test_number_renders_a_float_to_four_places_and_a_decimal_to_its_own_scale():
         say(f"number({value!r})", repr(number(value)))
         assert number(value) == expected, f"number({value!r}) rendered {number(value)!r}"
 
-    # A float small enough to round away still has to fill a cell: rounding to four places
-    # gives 0.0000, the rstrips leave "", and base.py's `text or "0"` makes it "0". So a
-    # reader sees zero where the value was not zero. Pinned because it is invisible.
+    # A float small enough to round away used to render "0": a reader saw zero where the value
+    # was not zero (pinned here as "invisible"). B12 QA found it as a real defect -- a $0.00001
+    # programmatic CPC reported as 0 -- so below 1e-4 four SIGNIFICANT digits are kept (C8).
     say("number(1e-07)", repr(number(1e-07)))
-    assert number(1e-07) == "0"
+    assert number(1e-07) == "0.0000001"
 
     say("number(Decimal('10.50'))", repr(number(Decimal("10.50"))))
     assert number(Decimal("10.50")) == "10.50", "a declared scale is not the float's to round"

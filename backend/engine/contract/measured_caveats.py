@@ -209,6 +209,12 @@ def _negatives(con, t: str, numeric: list[str], ev: DatasetEvidence) -> list[str
         if n and n <= NEGATIVE_SHARE * nn:
             out.append(f"{c} is below zero in {n:,} row(s) (as low as {lo:g}) -- a return, a "
                        f"correction or an entry error; every total includes them.")
+        elif n:
+            # B12 QA: above the share this was silent; refunds beating sales on a few days of a
+            # short file went unmentioned. A signed column is said, not assumed.
+            out.append(f"{c} is below zero in {n:,} row(s) ({_pct(n, nn)}, as low as {lo:g}) "
+                       f"-- a signed measure (refunds, corrections, losses); every total nets "
+                       f"them.")
     return out
 
 

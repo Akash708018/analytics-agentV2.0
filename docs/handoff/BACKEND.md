@@ -61,14 +61,21 @@ None (checked 2026-09-26).
 
     cd backend && uv run pytest -q -rs
     SKIPPED [1] tests/test_agent.py:580: v2 B0 (D-B0-2): the v1 Streamlit app ui/app.py is not seeded; v2 screens belong to the frontend
-    2388 passed, 1 skipped, 1 warning in 431.80s (0:07:11)
-    eval: SCORE: 76/76 (100%) · sla_bench: 19/19 checks right · frontend: 271 passed
+    2402 passed, 1 skipped in 482.27s (0:08:02)
+    eval: SCORE: 76/76 (100%) · sla_bench: 19/19 checks right · frontend: 289 passed
 
 2026-10-02, F8 on main (no backend change): the frontend consumes 0.7.0 (results, lineage,
 inspect, routing/blocked plans, joins, prefill, value errors). api-request
 [#23](https://github.com/Akash708018/analytics-agentV2.0/issues/23): `logistics.sla_drivers`
 reads `focus` but its spec doesn't declare it; the frontend reads `filter[].focus_param` until
 it does.
+
+## B12 QA (no API schema change) — `docs/steps/B12.md`
+
+- New tool `marketing.diminishing_returns` (params_optional: bands, target_cpa).
+- New caveat prefixes to show: `offsetting_shift:` (gains that offset each other) and
+  `suspicious_label:` (a data label that reads like an instruction).
+- Numbers below 0.0001 now arrive with their significant digits (0.00001, not 0).
 
 ## B11 for the frontend (0.9.0, additive)
 

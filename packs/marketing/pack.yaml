@@ -618,6 +618,17 @@ tools:
     forks: [cac_scope]
     params_optional: [{name: min_months, kind: number, help: "Cohorts younger than this are marked, not judged", default: "6"}]
     output: {shape: cohorts, chart: table}
+  - id: marketing.diminishing_returns
+    description: Where extra spend stops paying -- cost per conversion and MARGINAL cost per conversion by daily spend band.
+    ui_label: Where spend stops paying
+    base_analysis: marginal_returns
+    required_concepts: [spend, conversions, date]
+    steps:
+      - {analysis: marginal_returns, params: {spend: "@spend", outcome: "@conversions", bands: "@param:bands=5", target_cost: "@param?:target_cpa"}}
+    params_optional: [{name: bands, kind: number, help: "How many daily-spend bands (2 to 10)", default: "5"}, {name: target_cpa, kind: number, help: "Your break-even cost per conversion: the band where the marginal cost crosses it is named"}]
+    forks: [conversion_source]
+    rules: [exclude_test_campaigns, correlational_only]
+    output: {shape: table, chart: table}
   # --- keyword grouping (B7) ---
   - id: marketing.keyword_grouping
     kind: pipeline

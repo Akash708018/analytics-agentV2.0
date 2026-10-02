@@ -615,3 +615,14 @@ fractional default.
   them.
 - Its cache drops on everything that changes it: confirm, metric approval, rule approval and
   answered forks.
+
+## B12 — QA suite (2026-10-02)
+
+**C8. The engine rounded every float to 4 places, so a $0.00001 CPC read as 0 — and a v1 test
+pinned that ("a reader sees zero where the value was not zero"; pinned as "invisible").** The QA
+suite showed it as a reporting defect. Below 1e-4 a value now keeps four significant digits,
+never scientific notation; values of 1e-4 and above are unchanged. The v1 pin was updated.
+
+**D-B12-1. A label is data, never evidence.** The figure check masks the digits of free-text
+group labels wherever they appear, so a number planted in a campaign name cannot vouch for a
+claim. Pure-number labels (an attempt count) and dates keep their digits.

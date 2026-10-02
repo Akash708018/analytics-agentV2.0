@@ -81,8 +81,14 @@ def number(value: Any) -> Any:
             # P8-D1: inf and nan reach a cell as text unless somebody stops
             # them. Nothing here divides, but a measure can already hold one.
             return str(value)
-        rounded = round(value, _PLACES)
-        text = f"{rounded:,.{_PLACES}f}".rstrip("0").rstrip(".")
+        places = _PLACES
+        if value and abs(value) < 10 ** -_PLACES:
+            # B12 QA: a programmatic CPC of 0.00001 printed as "0" -- four places erase a real
+            # micro value. Below 0.0001 keep four SIGNIFICANT digits, still never scientific.
+            import math
+            places = min(-math.floor(math.log10(abs(value))) + _PLACES - 1, 20)
+        rounded = round(value, places)
+        text = f"{rounded:,.{places}f}".rstrip("0").rstrip(".")
         return text or "0"
     return value
 

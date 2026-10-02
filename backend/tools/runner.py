@@ -325,6 +325,45 @@ def _focus(ctx: Ctx, tool: Tool, f: dict, col: str, preds: list[str]) -> str:
     return f"lower(trim(CAST({q(col)} AS VARCHAR))) = '{v}'"
 
 
+_INSTRUCTION = re.compile(r"ignore[ _-]*(all|previous|prior|the)?[ _-]*instructions|disregard|"
+                          r"system[ _-]*prompt|you are (now )?a|act as|jailbreak|<\s*script",
+                          re.I)
+
+
+OFFSET_NET_SHARE = 0.2
+
+
+def offsetting_shift(headers: list[str], rows: list[list], title: str) -> str | None:
+    """Groups moving in opposite directions while the total barely moves (B12 QA:
+    cannibalization): one group's gain may be another's loss, not new growth."""
+    i = headers.index("change")
+    vals = [(str(r[0]), num(r[i])) for r in rows if str(r[0]) not in ("(all)", "(null)")]
+    vals = [(g, v) for g, v in vals if isinstance(v, (int, float))]
+    up = [(g, v) for g, v in vals if v > 0]
+    down = [(g, v) for g, v in vals if v < 0]
+    gross = sum(abs(v) for _, v in vals)
+    if not up or not down or not gross:
+        return None
+    net = sum(v for _, v in vals)
+    if abs(net) > OFFSET_NET_SHARE * gross:
+        return None
+    big_up, big_down = max(up, key=lambda x: x[1]), min(down, key=lambda x: x[1])
+    return (f"offsetting_shift: {title}: {big_up[0]} rose by {big_up[1]:,.0f} while "
+            f"{big_down[0]} fell by {abs(big_down[1]):,.0f}; the net change is {net:,.0f}. One "
+            f"group's gain may be shifted from another (e.g. paid taking organic's sales), not "
+            f"new growth -- associated, not proven.")
+
+
+def suspicious_labels(figures: list[dict]) -> list[str]:
+    """Group labels that read like instructions to a model (B12 QA): said, never obeyed."""
+    hits = sorted({f["name"].split(": ", 1)[-1].split(" [")[0] for f in figures
+                   if _INSTRUCTION.search(f["name"].split(": ", 1)[-1])})
+    if not hits:
+        return []
+    return [f"suspicious_label: {len(hits)} group label(s) in the data read like instructions "
+            f"({'; '.join(repr(h[:60]) for h in hits[:3])}). They are treated as data only."]
+
+
 def flags(ctx: Ctx) -> list[str]:
     out = []
     for rid in ctx.validity:
@@ -437,6 +476,10 @@ def run(ctx: Ctx, tool: Tool, min_group: int) -> dict:
                 continue
             raise ServiceError(422, "engine_refused", text) from None
         ran += 1
+        if "change" in out.headers:
+            shift = offsetting_shift(out.headers, out.rows, title)
+            if shift:
+                caveats.append(shift)
         tables.append({"title": title, "headers": list(out.headers),
                        "rows": [list(r) for r in out.rows[:ROWS_KEPT]],
                        "rows_kept": min(len(out.rows), ROWS_KEPT), "rows_total": len(out.rows)})
@@ -481,6 +524,7 @@ def run(ctx: Ctx, tool: Tool, min_group: int) -> dict:
     if not ran:
         raise ServiceError(422, "needs_data", f"{tool.id}: no step could run -- "
                            + "; ".join(caveats[-3:]))
+    caveats += suspicious_labels(figures)
     caveats = list(dict.fromkeys(caveats + ctx.notes + context_caveats(ctx, spans)))
     interp = [r for r in tool.rules if r in ctx.merged.interpretation_rules]
     return {"tool_id": tool.id, "summary": f"{tool.ui_label}: {ran} step(s) run",
