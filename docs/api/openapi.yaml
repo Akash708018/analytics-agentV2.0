@@ -930,6 +930,50 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
           description: Conflict
+  /datasets/{dataset_id}/contract:
+    get:
+      tags:
+      - contract
+      summary: Contract In Force
+      operationId: contract_in_force_datasets__dataset_id__contract_get
+      parameters:
+      - name: dataset_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dataset Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractInForce'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Conflict
   /datasets/{dataset_id}/results:
     get:
       tags:
@@ -1525,6 +1569,148 @@ components:
           - campaign
         fork_choices:
           roas_revenue_basis: net_excl_gst
+    ContractInForce:
+      properties:
+        dataset_id:
+          type: string
+          title: Dataset Id
+        version:
+          type: integer
+          title: Version
+        confirmed_at:
+          type: string
+          title: Confirmed At
+        grain:
+          type: string
+          title: Grain
+        primary_key:
+          items:
+            type: string
+          type: array
+          title: Primary Key
+        date_column:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Date Column
+        measures:
+          items:
+            $ref: '#/components/schemas/ContractMeasure'
+          type: array
+          title: Measures
+        dimensions:
+          items:
+            type: string
+          type: array
+          title: Dimensions
+        analysis_window_start:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Analysis Window Start
+        analysis_window_end:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Analysis Window End
+        caveats:
+          items:
+            type: string
+          type: array
+          title: Caveats
+          description: Declared by the person
+          default: []
+        measured_caveats:
+          items:
+            type: string
+          type: array
+          title: Measured Caveats
+          description: Counted by the engine from the table
+          default: []
+        fork_choices:
+          additionalProperties:
+            type: string
+          type: object
+          title: Fork Choices
+          default: {}
+        metrics:
+          additionalProperties:
+            type: string
+          type: object
+          title: Metrics
+          description: Approved template id -> measure
+          default: {}
+        validity_rules:
+          items:
+            type: string
+          type: array
+          title: Validity Rules
+          description: Approved validity rule ids
+          default: []
+      type: object
+      required:
+      - dataset_id
+      - version
+      - confirmed_at
+      - grain
+      - primary_key
+      - date_column
+      - measures
+      - dimensions
+      title: ContractInForce
+      examples:
+      - analysis_window_end: '2026-09-30'
+        analysis_window_start: '2026-07-01'
+        caveats: []
+        confirmed_at: '2026-10-02T09:00:00+00:00'
+        dataset_id: ds_ads_2026q3
+        date_column: date
+        dimensions:
+        - campaign
+        fork_choices:
+          tax_basis: net_excl_gst
+        grain: one row per campaign per day
+        measured_caveats: []
+        measures:
+        - agg: sum
+          column: cost
+          definition: Spend in INR
+        metrics: {}
+        primary_key:
+        - date
+        - campaign
+        validity_rules: []
+        version: 1
+    ContractMeasure:
+      properties:
+        column:
+          type: string
+          title: Column
+        agg:
+          type: string
+          title: Agg
+        definition:
+          type: string
+          title: Definition
+        per:
+          items:
+            type: string
+          type: array
+          title: Per
+          default: []
+        ratio:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Ratio
+          description: 'Ratio measures: numerator, denominator, scale'
+      type: object
+      required:
+      - column
+      - agg
+      - definition
+      title: ContractMeasure
     ContractProposal:
       properties:
         dataset_id:

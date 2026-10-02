@@ -11,6 +11,10 @@ Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry h
   default}]` — e.g. `logistics.sla_drivers.focus` (default null: the engine picks the worst
   group and says so), `logistics.stuck_shipments.days` (default "3"). A pack whose step reads an
   undeclared param no longer loads.
+- #17: new `GET /datasets/{id}/contract` (`ContractInForce`): the contract as confirmed —
+  version, confirmed_at, grain, key, date column, measures with agg/definition/per/ratio,
+  dimensions, analysis window, declared `caveats` and engine `measured_caveats` (kept apart),
+  fork choices, approved metrics and validity rules. 409 `contract_required` before a confirm.
 
 ## 0.7.0 — 2026-10-02 (B9, additive)
 

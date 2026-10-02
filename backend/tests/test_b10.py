@@ -39,3 +39,36 @@ def test_every_real_pack_declares_what_its_steps_read():
         for t in m.tools.values():
             declared = set(t.params_required) | {p.name for p in t.params_optional}
             assert step_params(t) <= declared, t.id
+
+
+# --- #17: the contract in force -----------------------------------------------------------------
+
+@pytest.fixture
+def env(tmp_path):
+    from backend.tests.test_playbooks import make_env
+    yield from make_env(tmp_path)
+
+
+def test_contract_in_force_returns_what_the_person_confirmed(env):
+    import secrets
+    from backend.engine import workspace
+    from backend.tests.test_logistics import FIXTURE, _load
+    ws0 = f"ws_{secrets.token_hex(6)}"
+    did0 = env.post(f"/workspaces/{ws0}/uploads", files={"file": (
+        "logistics_sla.csv", FIXTURE.read_bytes())}).json()["dataset_id"]
+    r = env.get(f"/datasets/{did0}/contract")
+    assert r.status_code == 409 and r.json()["error"]["code"] == "contract_required"
+    workspace.reset(ws0)
+    ws, did, _, _ = _load(env, metrics=("sla_breach",))
+    try:
+        c = env.get(f"/datasets/{did}/contract").json()
+        assert c["version"] >= 1 and c["date_column"] == "order_date"
+        m = {x["column"]: x for x in c["measures"]}
+        assert m["distance_km"]["definition"] == "distance km" and m["distance_km"]["agg"] == "mean"
+        assert c["analysis_window_start"] == "2026-08-01"
+        assert c["analysis_window_end"] == "2026-08-31"
+        assert c["fork_choices"] and c["metrics"] == {"sla_breach": "sla_breach"}
+        assert c["validity_rules"] == ["delivered_after_created"]
+        assert c["measured_caveats"] and c["caveats"] == []        # never merged
+    finally:
+        workspace.reset(ws)

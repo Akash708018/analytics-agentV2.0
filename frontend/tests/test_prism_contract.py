@@ -35,6 +35,7 @@ OPERATIONS = [
     Operation("detect_domains", "get", "/datasets/{dataset_id}/domains/detect"),
     Operation("confirm_domains", "post", "/datasets/{dataset_id}/domains/confirm", "DomainConfirm"),
     Operation("get_contract_proposal", "get", "/datasets/{dataset_id}/contract/proposal"),
+    Operation("get_contract", "get", "/datasets/{dataset_id}/contract"),
     Operation("confirm_contract", "post", "/datasets/{dataset_id}/contract/confirm", "ContractConfirm"),
     Operation("answer_forks", "post", "/datasets/{dataset_id}/forks", "ForkAnswers"),
     Operation("list_metric_templates", "get", "/datasets/{dataset_id}/metrics/templates"),

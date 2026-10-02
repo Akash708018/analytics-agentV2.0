@@ -198,6 +198,9 @@ class APIClient:
     def get_contract_proposal(self, dataset_id: str) -> JsonObject:
         return self._request("GET", f"datasets/{_segment(dataset_id)}/contract/proposal")
 
+    def get_contract(self, dataset_id: str) -> JsonObject:
+        return self._request("GET", f"datasets/{_segment(dataset_id)}/contract")
+
     def confirm_contract(self, dataset_id: str, contract: JsonObject, fork_choices: Mapping[str, str]) -> JsonObject:
         return self._request("POST", f"datasets/{_segment(dataset_id)}/contract/confirm", json={"contract": contract, "fork_choices": dict(fork_choices)})
 

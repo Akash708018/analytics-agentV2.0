@@ -212,6 +212,27 @@ class DatasetService:
                 "provisional": list(c.provisional), "questions": list(c.questions),
                 "forks": self._forks(d), "prefill": self._prefill(d)}
 
+    def contract_in_force(self, dataset_id: str) -> dict:
+        """The confirmed contract as stored (B10, issue #17): the server is the record of what
+        the person confirmed, so a fresh browser need not keep its own copy."""
+        d = self._get(dataset_id)
+        sc = self._contract(d)
+        c = sc.contract
+        kw = self._contract_kwargs(c)
+        ratios = kw["ratios"]
+        return {"dataset_id": dataset_id, "version": sc.version,
+                "confirmed_at": sc.confirmed_at.isoformat(), "grain": c.grain or "",
+                "primary_key": kw["primary_key"], "date_column": kw["date_column"],
+                "measures": [{"column": m.name, "agg": m.agg or "",
+                              "definition": m.definition or "", "per": list(m.per or []),
+                              "ratio": ratios.get(m.name)} for m in c.measures],
+                "dimensions": kw["dimensions"],
+                "analysis_window_start": kw.get("analysis_window_start"),
+                "analysis_window_end": kw.get("analysis_window_end"),
+                "caveats": list(c.caveats), "measured_caveats": list(c.measured_caveats),
+                "fork_choices": d["fork_choices"], "metrics": d["metrics"],
+                "validity_rules": d["validity"]}
+
     PREFILL_MIN_SIMILARITY = 0.8
 
     def _prefill(self, d: dict) -> dict | None:

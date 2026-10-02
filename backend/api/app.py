@@ -198,6 +198,11 @@ def create_app(state_dir: Path | str | None = None, runner: Runner | None = None
     def run_tool(tool_id: str, body: S.ToolRunRequest) -> S.ToolResult:
         return S.ToolResult(**ds.run_tool(tool_id, body.dataset_id, body.params))
 
+    @app.get("/datasets/{dataset_id}/contract", response_model=S.ContractInForce,
+             responses={**R, 409: ERR}, tags=["contract"])
+    def contract_in_force(dataset_id: str) -> S.ContractInForce:
+        return S.ContractInForce(**ds.contract_in_force(dataset_id))
+
     @app.get("/datasets/{dataset_id}/results", response_model=S.ResultList, responses=R,
              tags=["results"])
     def list_results(dataset_id: str) -> S.ResultList:

@@ -475,6 +475,41 @@ class Confirmed(BaseModel):
     model_config = _ex({"ok": True, "version": 1}, {"ok": True, "version": 2, "measure": "roas"})
 
 
+class ContractMeasure(BaseModel):
+    column: str
+    agg: str
+    definition: str
+    per: list[str] = []
+    ratio: dict[str, Any] | None = Field(None, description="Ratio measures: numerator, "
+                                         "denominator, scale")
+
+
+class ContractInForce(BaseModel):
+    dataset_id: str
+    version: int
+    confirmed_at: str
+    grain: str
+    primary_key: list[str]
+    date_column: str | None
+    measures: list[ContractMeasure]
+    dimensions: list[str]
+    analysis_window_start: str | None = None
+    analysis_window_end: str | None = None
+    caveats: list[str] = Field([], description="Declared by the person")
+    measured_caveats: list[str] = Field([], description="Counted by the engine from the table")
+    fork_choices: dict[str, str] = {}
+    metrics: dict[str, str] = Field({}, description="Approved template id -> measure")
+    validity_rules: list[str] = Field([], description="Approved validity rule ids")
+    model_config = _ex({
+        "dataset_id": "ds_ads_2026q3", "version": 1,
+        "confirmed_at": "2026-10-02T09:00:00+00:00", "grain": "one row per campaign per day",
+        "primary_key": ["date", "campaign"], "date_column": "date",
+        "measures": [{"column": "cost", "agg": "sum", "definition": "Spend in INR"}],
+        "dimensions": ["campaign"], "analysis_window_start": "2026-07-01",
+        "analysis_window_end": "2026-09-30", "caveats": [], "measured_caveats": [],
+        "fork_choices": {"tax_basis": "net_excl_gst"}, "metrics": {}, "validity_rules": []})
+
+
 class ForkAnswers(BaseModel):
     fork_choices: dict[str, str]
     model_config = _ex({"fork_choices": {"conversion_source": "backend_orders",
