@@ -418,3 +418,16 @@ runs (noted for the backend owner).
 `m.tools[tool_id]` (KeyError) before the existing `not_a_domain_tool` check. The check runs
 first now; 2 tests fail without it. Backend file changed from the frontend session (unattended
 run); full suite 2356 passed, 1 skipped.
+
+## F5 — the evidence behind each answer (2026-10-02)
+
+**D-F5-1. Every answer carries its trail, collapsed by default.** The answer text and its
+unresolved flags are always visible. "How this was answered" (plan, every tool call with its
+skip reason, the checks, usage) and one "Evidence" expander per tool result sit under it. An
+answer with no result says so. The trail is the backend's record (TurnEvent, Turn.answer),
+shown as returned; tokens are labelled as estimates, as the backend labels them.
+
+**D-F5-2. Answered turns for evidence come from the real app with a scripted model.** This
+container has no model keys. `create_app(llm=ScriptedLLM(...))` (the backend tests' seam)
+gives real playbook runs, tool results, skips, checks and usage with scripted wording. The
+harness lives in the scratchpad, not the repo; its code is in `docs/steps/F5.md`.

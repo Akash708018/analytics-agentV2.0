@@ -29,7 +29,8 @@ engine's proposals, then apply), **Domain** (confirm what kind of data it is), *
 (what each column is, how measures add up, the questions only you can answer), **Metrics**
 (approve metrics such as CTR, CPA, ROAS, and validity rules), **Tools** (run a marketing tool;
 every figure with its source, charts as the backend computed them), and **Ask**
-(questions and answers; a running question survives refresh and is never sent twice).
+(questions and answers; a running question survives refresh and is never sent twice; each
+answer shows how it was reached and the tool results behind it).
 Nothing is ticked or chosen for you: suggestions come with reasons and their own buttons.
 
 Everything the person sets is saved to the backend session (`ui_state`, an explicit
