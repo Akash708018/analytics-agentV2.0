@@ -11,6 +11,7 @@ import streamlit as st
 
 from frontend import connection, datasets, keywords as kw, state
 from frontend.api_client import APIError
+from frontend.components import style
 from frontend.components.shell import needs_dataset, show_error
 
 ss = st.session_state
@@ -107,7 +108,7 @@ def _joins(dataset_id: str, groups: list[dict]) -> None:
         return
     st.markdown(f"**New keywords for approved groups ({len(joins)})**")
     for proposal, target in joins:
-        with st.container(border=True):
+        with style.card(f"join-{proposal['group_id']}"):
             st.markdown(f"{', '.join(proposal['keywords'])} → **{target['label']}**")
             st.caption(f"Adding them puts {len(proposal['keywords'])} keyword(s) into "
                        f"'{target['label']}', which is approved, so they count as approved. "
@@ -230,7 +231,7 @@ def _list(dataset_id: str, groups: list[dict]) -> None:
         st.caption(f"Showing {len(shown)} of {len(groups)} groups.")
     for g in shown:
         gid = g["group_id"]
-        with st.container(border=True):
+        with style.card(f"group-{gid}"):
             key, path = k(dataset_id, "tick", gid), p(dataset_id, "ticks", gid)
             state.bind(ss, key, path, False)
             st.checkbox(kw.heading(g), key=key, on_change=state.on_change, args=(ss, key, path))

@@ -11,6 +11,7 @@ import streamlit as st
 
 from frontend import connection, datasets, prep, state
 from frontend.api_client import APIError
+from frontend.components import style
 from frontend.components.shell import needs_dataset, show_error
 
 ss = st.session_state
@@ -57,7 +58,7 @@ def _use_prefill(dataset_id: str, fills: dict, picks: dict[str, str]) -> None:
 def _prefill(dataset_id: str, prefill: dict, columns: list[str], forks: list[dict]) -> None:
     """API 0.7.0: a similar file's confirmed answers, offered; nothing applies until confirm."""
     c = prefill.get("contract") or {}
-    with st.container(border=True):
+    with style.card("prefill"):
         st.markdown(f"**Answers from a similar file: {prefill.get('from_name')}**")
         st.caption(f"{prefill.get('from_dataset_id')} · same workspace · column-name similarity "
                    f"{prefill.get('similarity')} · its contract v{prefill.get('contract_version')}")
@@ -187,7 +188,7 @@ def _measures(dataset_id: str, proposal: dict, columns: list[str], measures: lis
                   on_click=_use_strong, args=(dataset_id, strong),
                   help="Fills only aggregations you have not answered. Definitions stay yours.")
     for m in measures:
-        with st.container(border=True):
+        with style.card(f"measure-{m}"):
             st.markdown(f"**{m}**")
             key, path = k(dataset_id, "agg", m), p(dataset_id, "aggregations", m)
             state.bind(ss, key, path, in_force.get(m))

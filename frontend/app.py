@@ -15,7 +15,7 @@ import streamlit as st  # noqa: E402
 
 from frontend import connection, state  # noqa: E402
 from frontend.api_client import APIError  # noqa: E402
-from frontend.components import shell  # noqa: E402
+from frontend.components import shell, style  # noqa: E402
 
 st.set_page_config(page_title="Analytics agent", page_icon="📊", layout="wide")
 
@@ -28,6 +28,7 @@ PAGES = {
     for page_id, title in TITLES.items()
 }
 current = st.navigation(list(PAGES.values()), position="hidden")
+style.apply()                      # F9: the theme's motion and textures, on every screen
 page_id = next(pid for pid, page in PAGES.items() if page.url_path == current.url_path)
 ss = st.session_state
 

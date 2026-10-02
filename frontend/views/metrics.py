@@ -11,6 +11,7 @@ import streamlit as st
 from frontend import connection, datasets, state
 from frontend.api_client import APIError
 from frontend.components.bindings import binding_form
+from frontend.components import style
 from frontend.components.shell import needs_dataset, show_error
 
 ss = st.session_state
@@ -92,7 +93,7 @@ def _templates(dataset_id: str, columns: list[str]) -> None:
     results = state.work(ss)["results"]
     for t in available:
         tid = t["template_id"]
-        with st.container(border=True):
+        with style.card(f"template-{tid}"):
             st.markdown(f"**{t['label']}** · `{tid}`")
             st.caption(f"{t['shape']} · uses {', '.join(t['required_concepts']) or 'no concept'}"
                        + (f" · asks: {', '.join(t['forks'])}" if t["forks"] else ""))

@@ -9,6 +9,7 @@ import streamlit as st
 
 from frontend import connection, state
 from frontend.api_client import APIError
+from frontend.components import style
 
 TAGLINE = "Understand your digital marketing data, with a source for every figure."
 
@@ -54,6 +55,7 @@ def start_button(label: str, key: str = "shell.start", primary: bool = True) -> 
 
 
 def landing() -> None:
+    style.hero()
     st.title("Analytics agent")
     st.write(TAGLINE)
     st.write(
@@ -88,7 +90,7 @@ def unreachable(error: APIError) -> None:
 def sidebar(pages: Mapping[str, Any], titles: Mapping[str, str], sid: str) -> Any:
     """Links that keep the sid (native navigation drops it, F0). Returns a status slot."""
     with st.sidebar:
-        st.markdown("**Analytics agent**")
+        style.brand()
         label = st.session_state[state.DRAFT].get("label")
         if label:
             st.caption(label)

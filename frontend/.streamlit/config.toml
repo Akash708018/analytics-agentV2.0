@@ -1,0 +1,39 @@
+# "Sunset foundry" theme (F9). Warm paper + graphite, ember/amber/rose/dusk accents.
+# Streamlit reads this as the script-level config of frontend/app.py. Motion, textures
+# and scroll effects live in frontend/components/style.py.
+# Chart colours: the dataviz validator's order with orange first, checked on #fbf7f2
+# (docs/steps/F9.md): every gate passes; slot 1 (the one single-series charts use) is 3.0:1.
+
+[client]
+toolbarMode = "minimal"            # no Deploy button or developer menu for the people using it
+
+[theme]
+base = "light"
+primaryColor = "#C2501E"           # ember: white text 4.71:1
+backgroundColor = "#FBF7F2"        # warm paper
+secondaryBackgroundColor = "#F4EBE1"
+textColor = "#2B2321"              # 14.4:1 on paper
+linkColor = "#B0451A"              # 5.3:1 on paper
+borderColor = "#E7D8C9"
+dataframeBorderColor = "#E7D8C9"
+dataframeHeaderBackgroundColor = "#F1E4D5"
+codeBackgroundColor = "#F3E7DA"
+codeTextColor = "#8A3A14"
+showWidgetBorder = true
+baseRadius = "0.45rem"
+buttonRadius = "0.45rem"
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap, sans-serif"
+headingFont = "Barlow:https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700&display=swap, sans-serif"
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap, monospace"
+headingFontWeights = [700, 600, 600, 600, 600, 600]
+chartCategoricalColors = ["#eb6834", "#4a3aa7", "#e87ba4", "#008300", "#eda100", "#e34948", "#2a78d6", "#1baf7a"]
+
+[theme.sidebar]
+backgroundColor = "#1E1B1A"        # graphite
+secondaryBackgroundColor = "#2A2522"
+textColor = "#F3E9E1"              # 14.3:1 on graphite
+primaryColor = "#F2A541"           # amber: 8.3:1 on graphite
+linkColor = "#F2A541"
+borderColor = "#3A322E"
+codeBackgroundColor = "#2A2522"
+codeTextColor = "#F6C453"
