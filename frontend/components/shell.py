@@ -142,6 +142,8 @@ STEPS = (
                                            "analyses run under it"),
     ("views/metrics.py", "Metrics", "📐", "approve the metrics (CTR, CPA, ROAS…) and the "
                                          "validity rules analyses use"),
+    ("views/keywords.py", "Keyword groups", "🔤", "review the proposed search-term groups; "
+                                                  "only approved groups reach the tools"),
     ("views/tools.py", "Tools", "🧰", "run a marketing tool and see every figure with its source"),
     ("views/ask.py", "Ask", "💬", "ask questions about the data"),
 )

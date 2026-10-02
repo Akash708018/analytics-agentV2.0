@@ -29,7 +29,7 @@ from typing import Any
 from frontend.api_client import APIClient, APIError, VersionConflict
 
 SCHEMA = 2
-PAGES = ("session", "data", "clean", "domain", "contract", "metrics", "tools", "ask")
+PAGES = ("session", "data", "clean", "domain", "contract", "metrics", "keywords", "tools", "ask")
 DEFAULT_PAGE = "session"
 LABEL_MAX = 120
 TEXT_MAX = 2000
@@ -131,6 +131,18 @@ def _tool_params(raw: Any) -> dict:
     return out
 
 
+def _keywords(raw: Any) -> dict:
+    """Keyword groups (F6): the text column chosen, and ticked group ids. Never keywords."""
+    raw = raw if isinstance(raw, dict) else {}
+    out: dict[str, Any] = {}
+    if isinstance(raw.get("column"), str):
+        out["column"] = raw["column"][:NAME_MAX]
+    ticks = raw.get("ticks") if isinstance(raw.get("ticks"), dict) else {}
+    if ticks := {k[:NAME_MAX]: True for k, v in ticks.items() if isinstance(k, str) and v is True}:
+        out["ticks"] = ticks
+    return out
+
+
 def _dataset_draft(raw: Any) -> dict:
     """One dataset's half-done preparation. Only these fields, only these types."""
     raw = raw if isinstance(raw, dict) else {}
@@ -160,6 +172,8 @@ def _dataset_draft(raw: Any) -> dict:
     if bindings := {t[:NAME_MAX]: b for t, v in bindings.items()
                     if isinstance(t, str) and (b := _str_map(v, NAME_MAX))}:
         out["bindings"] = bindings
+    if keywords := _keywords(raw.get("keywords")):
+        out["keywords"] = keywords
     version = raw.get("confirmed_version")
     if isinstance(version, int) and not isinstance(version, bool):
         out["confirmed_version"] = version

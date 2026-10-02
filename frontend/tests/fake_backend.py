@@ -118,15 +118,116 @@ class FakeBackend:
         "marketing.festive_compare": ("This festival vs last year", "marketing", [],
                                       ["festival", "year"], {}),
         "marketing.creative_fatigue": ("Creative fatigue", "marketing", ["frequency"], [], {}),
+        "marketing.keyword_grouping": ("Group keywords", "marketing", [], [], {}),
         "logistics.otif": ("On time, in full", "logistics", [], [], {}),
         "core.trend": ("Trend", None, [], [], {}),
     }
+
+    # Keyword groups (shapes and rules measured on the real backend, docs/steps/F6.md).
+    KEYWORD_GROUPS = [   # what a run proposes: label, intent, keywords, facets
+        ("sushi delivery", "transactional",
+         ["sushi delivery baner", "sushi delivery pune", "sushi home delivery"],
+         {"area": ["baner"], "delivery": ["delivery"]}),
+        ("sushi · near me", "local", ["sushi near me", "sushi nearby"],
+         {"near_me": ["near me"], "dish": ["sushi"]}),
+        ("sushi · info", "informational", ["what is sushi"], {"info": ["what is"], "dish": ["sushi"]}),
+        ("menu · brand", "navigational", ["hana menu"], {"brand": ["hana"]}),
+    ]
 
     def _prep(self, dataset_id: str) -> dict:
         return self.prep.setdefault(dataset_id, {
             "pool": [dict(a) for a in self.CLEANING], "plan": None, "applied": [],
             "domains": [], "contract": None, "version": 0, "confirms": [], "fork_choices": {},
-            "metrics": {}, "rules": [], "runs": []})
+            "metrics": {}, "rules": [], "runs": [], "kw": {}, "kw_run": None})
+
+    def _kw_new_id(self) -> str:
+        self.kw_ids = getattr(self, "kw_ids", 0) + 1
+        return f"p{self.kw_ids:06x}"
+
+    def _kw_save(self, groups: dict, g: dict) -> None:
+        groups[g["group_id"]] = {**g, "keywords": sorted(set(g["keywords"]))}
+
+    def _kw_listing(self, dataset_id: str) -> httpx.Response:
+        state = self._prep(dataset_id)
+        groups = sorted(state["kw"].values(), key=lambda g: (not g["approved"], g["group_id"]))
+        return httpx.Response(200, json={"dataset_id": dataset_id, "groups": groups,
+                                         "run": state["kw_run"]})
+
+    def _kw_run(self, dataset_id: str, body) -> httpx.Response:
+        state, column = self._prep(dataset_id), (body or {}).get("column")
+        if column is None:
+            return _error(422, "needs_data", "no search term, query or keyword column")
+        if column not in [n for n, _ in self.COLUMNS]:
+            return httpx.Response(500, text="Internal Server Error")      # as the backend (F6)
+        groups = state["kw"]
+        kept = {k for g in groups.values() if g["approved"] for k in g["keywords"]}
+        for gid in [gid for gid, g in groups.items() if not g["approved"]]:
+            del groups[gid]
+        n = 0
+        for label, intent, keywords, facets in self.KEYWORD_GROUPS:
+            if kws := [k for k in keywords if k not in kept]:
+                n += 1
+                self._kw_save(groups, {"group_id": self._kw_new_id(), "label": label,
+                                       "intent": intent, "keywords": kws, "facets": facets,
+                                       "approved": False, "proposed_by": "rules"})
+        state["kw_run"] = {"column": column, "embedding": "chargram/tfidf-char2-4",
+                           "threshold": 0.6, "typos_merged": {"sushii": "sushi"},
+                           "keywords": sum(len(g[2]) for g in self.KEYWORD_GROUPS),
+                           "proposed_groups": n}
+        return self._kw_listing(dataset_id)
+
+    def _kw_act(self, dataset_id: str, a: dict) -> httpx.Response:
+        """backend/services/keywords.py KeywordService.act, rule for rule."""
+        groups = self._prep(dataset_id)["kw"]
+        ids = a.get("group_ids") or []
+        missing = [i for i in ids if i not in groups]
+        if missing:
+            return _error(404, "not_found", f"unknown group(s): {missing}")
+        if not ids:
+            return _error(422, "bad_action", "group_ids needed")
+        g = {i: {**groups[i], "keywords": list(groups[i]["keywords"]),
+                 "facets": dict(groups[i]["facets"])} for i in ids}
+        kind = a["action"]
+        if kind == "approve":
+            for i in ids:
+                self._kw_save(groups, {**g[i], "approved": True})
+        elif kind == "rename":
+            if not a.get("label"):
+                return _error(422, "bad_action", "rename needs label")
+            self._kw_save(groups, {**g[ids[0]], "label": a["label"], "proposed_by": "person"})
+        elif kind == "merge":
+            if len(ids) < 2:
+                return _error(422, "bad_action", "merge needs two or more group_ids")
+            into = g[ids[0]]
+            for i in ids[1:]:
+                into["keywords"] += g[i]["keywords"]
+                for f, v in g[i]["facets"].items():
+                    into["facets"][f] = sorted(set(into["facets"].get(f, [])) | set(v))
+                del groups[i]
+            into["label"] = a.get("label") or into["label"]
+            self._kw_save(groups, {**into, "proposed_by": "person"})
+        elif kind == "move_keyword":
+            kw, target = a.get("keyword"), a.get("target_group_id")
+            src = g[ids[0]]
+            if kw not in src["keywords"] or target not in groups:
+                return _error(422, "bad_action", "keyword not in group, or no target group")
+            src["keywords"].remove(kw)
+            self._kw_save(groups, {**groups[target], "keywords": groups[target]["keywords"] + [kw]})
+            if src["keywords"]:
+                self._kw_save(groups, src)
+            else:
+                del groups[src["group_id"]]
+        elif kind == "split":
+            kws = a.get("keywords") or ([a["keyword"]] if a.get("keyword") else [])
+            src = g[ids[0]]
+            if not kws or not set(kws) <= set(src["keywords"]) or set(kws) == set(src["keywords"]):
+                return _error(422, "bad_action", "split needs some (not all) of the group's keywords")
+            self._kw_save(groups, {**src, "keywords": [k for k in src["keywords"] if k not in kws]})
+            self._kw_save(groups, {"group_id": self._kw_new_id(),
+                                   "label": a.get("label") or f"{src['label']} (split)",
+                                   "intent": src["intent"], "keywords": kws, "facets": src["facets"],
+                                   "approved": False, "proposed_by": "person"})
+        return self._kw_listing(dataset_id)
 
     def _plan(self, dataset_id: str) -> list[dict]:
         state = self._prep(dataset_id)
@@ -346,6 +447,12 @@ class FakeBackend:
         if method == "GET" and rest == ["tools"]:
             return httpx.Response(200, json={"tools": [self._tool_status(dataset_id, t)
                                                        for t in self.TOOLS]})
+        if method == "POST" and rest == ["keyword-groups", "run"]:
+            return self._kw_run(dataset_id, body)
+        if method == "GET" and rest == ["keyword-groups"]:
+            return self._kw_listing(dataset_id)
+        if method == "POST" and rest == ["keyword-groups", "actions"]:
+            return self._kw_act(dataset_id, body)
         if method == "POST" and rest == ["forks"]:
             state["fork_choices"] = {**state["fork_choices"], **body["fork_choices"]}
             return httpx.Response(200, json={"ok": True, "version": 1, "measure": None,

@@ -20,7 +20,8 @@ from frontend.components import shell  # noqa: E402
 st.set_page_config(page_title="Analytics agent", page_icon="📊", layout="wide")
 
 TITLES = {"session": "Session", "data": "Data", "clean": "Clean", "domain": "Domain",
-          "contract": "Contract", "metrics": "Metrics", "tools": "Tools", "ask": "Ask"}
+          "contract": "Contract", "metrics": "Metrics", "keywords": "Keyword groups",
+          "tools": "Tools", "ask": "Ask"}
 PAGES = {
     page_id: st.Page(f"views/{page_id}.py", title=title, default=page_id == "session",
                      url_path=None if page_id == "session" else page_id)

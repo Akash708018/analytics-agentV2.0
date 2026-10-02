@@ -18,6 +18,15 @@ ss = st.session_state
 api = connection.get_client()
 draft = ss[state.DRAFT]
 
+# Tools that read or replace keyword groups (D-B7-4; measured in docs/steps/F6.md).
+KEYWORD_NOTES = {
+    "marketing.keyword_grouping": "Running this replaces every keyword group not yet approved "
+                                  "(approved groups stay). Review the proposals on Keyword groups.",
+    "marketing.keyword_group_performance": "Counts approved keyword groups only; every other "
+                                           "keyword is “(ungrouped)”.",
+    "marketing.page_targeting": "Uses approved keyword groups only.",
+}
+
 
 def k(dataset_id: str, tool_id: str, *parts: str) -> str:
     return ".".join(("ui.tools", dataset_id, tool_id, *parts))
@@ -45,6 +54,8 @@ def _run(dataset_id: str, tool_id: str, required: list[str], slots: list[str]) -
         held["results"][("tool", dataset_id, tool_id)] = {"error": error, "params": params}
         return
     held["results"][("tool", dataset_id, tool_id)] = {"result": result, "params": params}
+    if tool_id == "marketing.keyword_grouping":
+        datasets.invalidate(held, dataset_id, ("keywords",))
 
 
 def _answer_forks(dataset_id: str, fork_ids: list[str]) -> None:
@@ -167,6 +178,10 @@ def main() -> None:
     spec = next((t for t in pack["pack"]["tools"] if t["id"] == tool_id), {})
     festivals = [] if isinstance(core, APIError) else core["pack"].get("festivals", [])
     st.write(spec.get("description", ""))
+    if note := KEYWORD_NOTES.get(tool_id):
+        st.info(note)
+        st.page_link("views/keywords.py", label="Keyword groups", icon="🔤",
+                     query_params={"sid": ss[state.SID]})
     required = list(spec.get("params_required", []))
     for name in required:
         _param_input(dataset_id, tool_id, name, festivals)
