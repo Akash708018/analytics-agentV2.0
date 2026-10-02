@@ -242,6 +242,26 @@ def test_a_widget_edit_whose_callback_was_cut_short_is_kept(fake, api):
     assert ss["_draft"]["label"] == "edited"
 
 
+class Recording(dict):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.writes = []
+
+    def __setitem__(self, key, value):
+        self.writes.append((key, value))
+        super().__setitem__(key, value)
+
+
+def test_bind_sends_the_saved_value_on_every_run_not_only_the_first():
+    """C13: a widget the browser rebuilt while the server kept its key showed its empty
+    default over the saved name. Setting the key each run makes the server send the value."""
+    ss = Recording({state.DRAFT: {"label": "F4 check"}})
+    state.bind(ss, "ui.session.label", ("label",), "")
+    state.bind(ss, "ui.session.label", ("label",), "")      # the key is already there
+    assert ss.writes == [("ui.session.label", "F4 check")] * 2
+    assert ss[state.DRAFT]["label"] == "F4 check"
+
+
 def test_submit_sends_once(fake, api):
     sid = fake.new_session()
     out = turns.submit(api, sid, "ds_x", "Why?", [])

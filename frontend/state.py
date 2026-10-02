@@ -283,14 +283,18 @@ def bind(ss: Mapping, key: str, path: Sequence[str], default: Any = None, *,
     """Before the widget is created: give it the draft's value (or `default` when the
     draft has none). If it already holds a different value, that is an edit whose
     callback was cut short: keep the edit. Defaults that change under a widget (a new
-    proposal) are reset by queueing a reseed, never by this."""
+    proposal) are reset by queueing a reseed, never by this.
+
+    The value is set on EVERY run, not only the first: the browser shows a widget's value
+    only when the server sends it, and a widget the browser rebuilt while the server kept
+    its key (a run cut short by a click) showed its empty default over a saved value (C13)."""
     draft = ss[DRAFT]
     stored = get_path(draft, path, MISSING)
     value = to_widget(default if stored is MISSING else stored)
-    if key not in ss:
-        ss[key] = value
-    elif ss[key] != value:
+    if key in ss and ss[key] != value:
         on_change(ss, key, path, from_widget)
+        value = ss[key]
+    ss[key] = value
 
 
 def on_change(ss: Mapping, key: str, path: Sequence[str],
