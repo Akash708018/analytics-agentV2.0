@@ -454,6 +454,10 @@ class DatasetService:
                                f"{tool_id} needs data for: {st.missing_concepts}",
                                {"needs_domain": st.needs_domain,
                                 "missing_concepts": st.missing_concepts})
+        if st.pack == "core":   # before m.tools: core analyses are not pack tools (C11: was a 500)
+            raise ServiceError(422, "not_a_domain_tool",
+                               "core steps run through their own endpoints (profile, cleaning, "
+                               "contract); core analyses run through a turn")
         if m.tools[tool_id].kind == "pipeline":
             got = self.keywords.run(dataset_id, params.get("column"))
             n = len(got["groups"])
@@ -465,10 +469,6 @@ class DatasetService:
                     "caveats": [f"embedding: {got['run']['embedding']}; threshold "
                                 f"{got['run']['threshold']}; groups are PROPOSALS until approved"],
                     "figure_check": {"status": "not_run", "notes": []}}
-        if st.pack == "core":
-            raise ServiceError(422, "not_a_domain_tool",
-                               "core steps run through their own endpoints (profile, cleaning, "
-                               "contract); core analyses run through a turn")
         sc = self._contract(d)
         c = sc.contract
         bound, _ = self._bound(d)
