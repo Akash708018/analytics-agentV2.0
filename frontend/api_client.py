@@ -177,6 +177,20 @@ class APIClient:
     ) -> JsonObject:
         return self._request("POST", f"workspaces/{_segment(workspace_id)}/uploads", files={"file": (filename, content, content_type)})
 
+    def answer_upload(
+        self, workspace_id: str, upload_id: str, *, header_rows: Sequence[int] | None = None,
+        header_join: str | None = None, sheet: str | None = None, data_start: int | None = None,
+        footer_rows: int | None = None, name: str | None = None,
+        columns: Sequence[Mapping[str, Any]] | None = None,
+    ) -> JsonObject:
+        body: JsonObject = {key: value for key, value in (
+            ("header_rows", None if header_rows is None else list(header_rows)),
+            ("header_join", header_join), ("sheet", sheet), ("data_start", data_start),
+            ("footer_rows", footer_rows), ("name", name),
+            ("columns", None if columns is None else [dict(c) for c in columns]),
+        ) if value is not None}
+        return self._request("POST", f"workspaces/{_segment(workspace_id)}/uploads/{_segment(upload_id)}/answers", json=body)
+
     def get_profile(self, dataset_id: str) -> JsonObject:
         return self._request("GET", f"datasets/{_segment(dataset_id)}/profile")
 

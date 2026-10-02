@@ -306,6 +306,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
           description: Unprocessable Entity
+  /workspaces/{ws}/uploads/{upload_id}/answers:
+    post:
+      tags:
+      - datasets
+      summary: Upload Answers
+      operationId: upload_answers_workspaces__ws__uploads__upload_id__answers_post
+      parameters:
+      - name: ws
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Ws
+      - name: upload_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Upload Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadAnswers'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dataset'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Request Entity Too Large
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+          description: Unprocessable Entity
   /datasets/{dataset_id}:
     get:
       tags:
@@ -1477,6 +1527,28 @@ components:
           description: '''Google'' and ''google'' are one source'
           kind: normalise_case
           rows_affected: 311
+    ColumnAnswer:
+      properties:
+        source:
+          type: string
+          title: Source
+          description: The column as the file names it (preview.guess.columns)
+        target:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Target
+          description: The name to load it under
+        type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Type
+          description: A DuckDB type, e.g. VARCHAR, DOUBLE, DATE
+      type: object
+      required:
+      - source
+      title: ColumnAnswer
     ColumnProfile:
       properties:
         name:
@@ -3475,6 +3547,63 @@ components:
           dataset_id: ds_ads_2026q3
           screen: contract
         version: 3
+    UploadAnswers:
+      properties:
+        header_rows:
+          anyOf:
+          - items:
+              type: integer
+            type: array
+          - type: 'null'
+          title: Header Rows
+          description: 1-based rows that form the header; answering this settles `header_rows`
+        header_join:
+          anyOf:
+          - type: string
+            enum:
+            - space
+            - underscore
+            - bottom_only
+            - top_only
+          - type: 'null'
+          title: Header Join
+        sheet:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sheet
+        data_start:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Data Start
+          description: 1-based first data row
+        footer_rows:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Footer Rows
+          description: Rows at the end to leave out (totals)
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+          description: Dataset name
+        columns:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ColumnAnswer'
+            type: array
+          - type: 'null'
+          title: Columns
+      type: object
+      title: UploadAnswers
+      examples:
+      - header_join: space
+        header_rows:
+        - 1
+        - 2
     ValidationError:
       properties:
         loc:

@@ -6,6 +6,7 @@ layer adds v2's parts: dataset ids, domain detection/confirmation, pack forks, t
 from __future__ import annotations
 
 import secrets
+from pathlib import Path
 from dataclasses import asdict
 from datetime import datetime, timezone
 
@@ -66,19 +67,73 @@ class DatasetService:
         if up.verdict == "REFUSE" or not up.path:
             raise _refusal(up, 413 if "limit" in up.message else 422, "upload_refused")
         draft = self.be.draft_ingest(workspace_id, up.path)
+        return self._load_draft(workspace_id, up.path, draft)
+
+    PREVIEW_ROWS = 20
+
+    def _load_draft(self, workspace_id: str, path: str, draft, edits: dict | None = None):
         if draft.refusal is not None:
             raise _refusal(draft)
         if draft.unresolved:
+            g = draft.grid
             raise ServiceError(422, "ingest_needs_answers",
-                               "The file's layout needs answers before it can be read.",
-                               {"questions": draft.questions, "unresolved": draft.unresolved})
-        done = self.be.confirm_ingest(workspace_id, draft.spec)
+                               "The file's layout needs answers before it can be read: answer "
+                               "them with POST /workspaces/{ws}/uploads/{upload_id}/answers.",
+                               {"questions": draft.questions, "unresolved": draft.unresolved,
+                                "upload_id": Path(path).name, "preview": {
+                                    "sheet": g.sheet, "sheet_names": list(g.sheet_names),
+                                    "first_row_number": g.first_row_number,
+                                    "rows": g.rows[:self.PREVIEW_ROWS],
+                                    "guess": {"header_rows": draft.header_rows,
+                                              "header_join": draft.header_join,
+                                              "data_start_row": draft.data_start_row,
+                                              "footer_skip_rows": draft.footer_skip_rows,
+                                              "name": draft.dataset_name,
+                                              "columns": [{"source": c.source_name,
+                                                           "target": c.target_name,
+                                                           "type": c.dtype}
+                                                          for c in draft.columns]}}})
+        spec = dict(draft.spec)
+        for key, field in (("data_start", "data_start_row"), ("footer_rows", "footer_skip_rows")):
+            if (edits or {}).get(key) is not None:
+                spec[field] = int(edits[key])
+        if (edits or {}).get("columns"):
+            by_src = {c["source"]: c for c in edits["columns"]}
+            unknown = sorted(set(by_src) - {c["source_name"] for c in spec["columns"]})
+            if unknown:
+                raise ServiceError(422, "unknown_columns", f"not columns of this file: {unknown}",
+                                   {"unknown": unknown})
+            spec["columns"] = [{**c, **({"target_name": by_src[c["source_name"]]["target"]}
+                                        if by_src.get(c["source_name"], {}).get("target") else {}),
+                                **({"dtype": by_src[c["source_name"]]["type"]}
+                                   if by_src.get(c["source_name"], {}).get("type") else {})}
+                               for c in spec["columns"]]
+        done = self.be.confirm_ingest(workspace_id, spec)
         if not done.ok:
             raise _refusal(done)
         d = self.store.upsert_dataset({"dataset_id": f"ds_{secrets.token_hex(6)}",
                                        "workspace_id": workspace_id,
-                                       "name": draft.dataset_name, "created_at": _now()})
+                                       "name": spec.get("dataset_name") or draft.dataset_name,
+                                       "created_at": _now()})
         return self.summary(d["dataset_id"], assumptions=list(draft.assumptions))
+
+    def answer_upload(self, workspace_id: str, upload_id: str, answers: dict) -> dict:
+        """The person's answers to a refused upload's layout questions (B10, issue #16): the
+        engine drafts the file again with them, then the edits apply and the file loads."""
+        try:
+            validate_workspace_id(workspace_id)
+        except ValueError as e:
+            raise ServiceError(422, "bad_workspace_id", str(e)) from e
+        if "/" in upload_id or "\\" in upload_id or upload_id.startswith("."):
+            raise ServiceError(404, "not_found", f"upload {upload_id} not found")
+        path = str(self.be._uploads(workspace_id) / upload_id)
+        if self.be._own_upload(workspace_id, path) is None:
+            raise ServiceError(404, "not_found", f"upload {upload_id} not found")
+        draft = self.be.draft_ingest(workspace_id, path, dataset_name=answers.get("name"),
+                                     sheet=answers.get("sheet"),
+                                     header_rows=answers.get("header_rows"),
+                                     header_join=answers.get("header_join"))
+        return self._load_draft(workspace_id, path, draft, answers)
 
     def summary(self, dataset_id: str, assumptions: list[str] | None = None) -> dict:
         d = self._get(dataset_id)

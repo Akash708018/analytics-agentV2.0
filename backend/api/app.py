@@ -120,6 +120,11 @@ def create_app(state_dir: Path | str | None = None, runner: Runner | None = None
     async def upload(ws: str, file: UploadFile = File(...)) -> S.Dataset:
         return S.Dataset(**ds.upload(ws, file.filename or "upload.csv", await file.read()))
 
+    @app.post("/workspaces/{ws}/uploads/{upload_id}/answers", response_model=S.Dataset,
+              status_code=201, responses=R, tags=["datasets"])
+    def upload_answers(ws: str, upload_id: str, body: S.UploadAnswers) -> S.Dataset:
+        return S.Dataset(**ds.answer_upload(ws, upload_id, body.model_dump(exclude_none=True)))
+
     @app.get("/datasets/{dataset_id}", response_model=S.Dataset, responses=R, tags=["datasets"])
     def get_dataset(dataset_id: str) -> S.Dataset:
         return S.Dataset(**ds.summary(dataset_id))

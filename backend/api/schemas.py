@@ -510,6 +510,24 @@ class ContractInForce(BaseModel):
         "fork_choices": {"tax_basis": "net_excl_gst"}, "metrics": {}, "validity_rules": []})
 
 
+class ColumnAnswer(BaseModel):
+    source: str = Field(description="The column as the file names it (preview.guess.columns)")
+    target: str | None = Field(None, description="The name to load it under")
+    type: str | None = Field(None, description="A DuckDB type, e.g. VARCHAR, DOUBLE, DATE")
+
+
+class UploadAnswers(BaseModel):
+    header_rows: list[int] | None = Field(None, description="1-based rows that form the "
+                                          "header; answering this settles `header_rows`")
+    header_join: Literal["space", "underscore", "bottom_only", "top_only"] | None = None
+    sheet: str | None = None
+    data_start: int | None = Field(None, description="1-based first data row")
+    footer_rows: int | None = Field(None, description="Rows at the end to leave out (totals)")
+    name: str | None = Field(None, description="Dataset name")
+    columns: list[ColumnAnswer] | None = None
+    model_config = _ex({"header_rows": [1, 2], "header_join": "space"})
+
+
 class ForkAnswers(BaseModel):
     fork_choices: dict[str, str]
     model_config = _ex({"fork_choices": {"conversion_source": "backend_orders",

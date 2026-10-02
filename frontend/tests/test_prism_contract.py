@@ -28,6 +28,7 @@ OPERATIONS = [
     Operation("get_turn", "get", "/turns/{turn_id}"),
     Operation("list_turns", "get", "/sessions/{sid}/turns"),
     Operation("upload_dataset", "post", "/workspaces/{ws}/uploads"),
+    Operation("answer_upload", "post", "/workspaces/{ws}/uploads/{upload_id}/answers", "UploadAnswers"),
     Operation("get_dataset", "get", "/datasets/{dataset_id}"),
     Operation("get_profile", "get", "/datasets/{dataset_id}/profile"),
     Operation("list_cleaning_proposals", "get", "/datasets/{dataset_id}/cleaning/proposals"),
@@ -62,6 +63,7 @@ IDS = {
     "tool_id": "marketing.channel_efficiency",
     "pack_id": "marketing",
     "result_id": "r_0a1b2c3d4e5f6a7b",
+    "upload_id": "multiheader.csv",
 }
 
 

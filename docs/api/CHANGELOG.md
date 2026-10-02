@@ -15,6 +15,12 @@ Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry h
   version, confirmed_at, grain, key, date column, measures with agg/definition/per/ratio,
   dimensions, analysis window, declared `caveats` and engine `measured_caveats` (kept apart),
   fork choices, approved metrics and validity rules. 409 `contract_required` before a confirm.
+- #16: the 422 `ingest_needs_answers` now carries `upload_id` and `preview` {sheet,
+  sheet_names, first_row_number, rows (first 20, as they sit in the file), guess {header_rows,
+  header_join, data_start_row, footer_skip_rows, name, columns[{source, target, type}]}}. New
+  `POST /workspaces/{ws}/uploads/{upload_id}/answers` (`UploadAnswers`: header_rows,
+  header_join, sheet, data_start, footer_rows, name, columns[{source, target, type}]) → 201
+  `Dataset`; still ambiguous → the same 422 again; an unknown upload → 404.
 
 ## 0.7.0 — 2026-10-02 (B9, additive)
 

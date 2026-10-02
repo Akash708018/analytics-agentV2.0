@@ -72,3 +72,37 @@ def test_contract_in_force_returns_what_the_person_confirmed(env):
         assert c["measured_caveats"] and c["caveats"] == []        # never merged
     finally:
         workspace.reset(ws)
+
+
+# --- #16: answer a refused upload's layout questions --------------------------------------------
+
+def test_a_stacked_header_file_loads_after_its_answers(env):
+    import secrets
+    from pathlib import Path
+    from backend.engine import workspace
+    data = (Path(__file__).resolve().parent / "fixtures" / "multiheader.csv").read_bytes()
+    ws = f"ws_{secrets.token_hex(6)}"
+    try:
+        r = env.post(f"/workspaces/{ws}/uploads", files={"file": ("multiheader.csv", data)})
+        assert r.status_code == 422
+        e = r.json()
+        assert e["error"]["code"] == "ingest_needs_answers" and e["unresolved"] == ["header_rows"]
+        uid, pv = e["upload_id"], e["preview"]
+        assert pv["rows"][0][0] == "Identifiers" and pv["rows"][1][0] == "order_id"
+        assert pv["guess"]["columns"]
+        # the person: row 1 is a band of group labels, row 2 holds the names
+        r = env.post(f"/workspaces/{ws}/uploads/{uid}/answers", json={
+            "header_rows": [1, 2], "header_join": "bottom_only",
+            "columns": [{"source": pv["guess"]["columns"][-1]["source"],
+                         "target": "revenue_inr"}]})
+        assert r.status_code == 201, r.text
+        did = r.json()["dataset_id"]
+        cols = [c["name"] for c in env.get(f"/datasets/{did}/profile").json()["columns"]]
+        assert "order_id" in cols and "revenue_inr" in cols and "Identifiers" not in cols
+        assert r.json()["rows"] > 0
+        assert env.post(f"/workspaces/{ws}/uploads/nope.csv/answers",
+                        json={"header_rows": [2]}).status_code == 404
+        assert env.post(f"/workspaces/{ws}/uploads/..%2Fx/answers",
+                        json={"header_rows": [2]}).status_code == 404
+    finally:
+        workspace.reset(ws)
