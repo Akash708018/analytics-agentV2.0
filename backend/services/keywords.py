@@ -83,6 +83,8 @@ class KeywordService:
             if not cols:
                 raise ServiceError(422, "needs_data", "no search term, query or keyword column")
             column = cols[0]
+        if column not in self.ds._columns(d):
+            raise ServiceError(422, "needs_data", f"no column '{column}' in {d['name']}")
         con = db.connect_read_only(d["workspace_id"])
         try:
             vals = [r[0] for r in con.execute(
@@ -163,9 +165,9 @@ class KeywordService:
             raise ServiceError(404 if missing else 422, "not_found" if missing else "bad_action",
                                f"unknown group(s): {missing}" if missing else "group_ids needed")
         kind = a["action"]
-        if kind == "approve":
+        if kind in ("approve", "unapprove"):
             for i in ids:
-                groups[i]["approved"] = True
+                groups[i]["approved"] = kind == "approve"
                 self._save(did, groups[i])
         elif kind == "rename":
             if not a.get("label"):

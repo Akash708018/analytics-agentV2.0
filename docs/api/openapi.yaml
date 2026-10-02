@@ -3,7 +3,7 @@ info:
   title: analytics-agent v2
   description: Contract-first API. Figures carry provenance; chart series are computed by the backend.
     501 = spec'd, not live yet.
-  version: 0.7.0
+  version: 0.8.0
 paths:
   /health:
     get:
@@ -2051,11 +2051,14 @@ components:
           type: string
           enum:
           - approve
+          - unapprove
           - rename
           - merge
           - move_keyword
           - split
           title: Action
+          description: 'unapprove (0.8.0): withdraw an approval; the group goes back to proposal and the
+            engine stops reading it'
         group_ids:
           items:
             type: string
@@ -3403,5 +3406,5 @@ components:
       - engine
       title: VersionInfo
       examples:
-      - api_version: 0.7.0
+      - api_version: 0.8.0
         engine: v1@0ba324b

@@ -2,6 +2,12 @@
 
 Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry here.
 
+## 0.8.0 — 2026-10-02 (B10, additive: the frontend's api-request issues)
+
+- #20: `KeywordGroupAction.action` gains `unapprove` (the group returns to proposal; the engine
+  stops reading it — and a tool on a dataset with no approved groups left answers 422 again).
+  `POST .../keyword-groups/run {"column": "<not a column>"}` answers 422 `needs_data`, not 500.
+
 ## 0.7.0 — 2026-10-02 (B9, additive)
 
 - `ContractProposal.prefill`: answers suggested from the most similar dataset (same workspace,

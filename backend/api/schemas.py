@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-API_VERSION = "0.7.0"
+API_VERSION = "0.8.0"
 
 
 def _ex(*examples: dict) -> ConfigDict:
@@ -606,7 +606,9 @@ class KeywordRun(BaseModel):
 
 
 class KeywordGroupAction(BaseModel):
-    action: Literal["approve", "rename", "merge", "move_keyword", "split"]
+    action: Literal["approve", "unapprove", "rename", "merge", "move_keyword", "split"] = Field(
+        description="unapprove (0.8.0): withdraw an approval; the group goes back to proposal "
+                    "and the engine stops reading it")
     group_ids: list[str]
     label: str | None = None
     keyword: str | None = None

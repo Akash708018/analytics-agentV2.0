@@ -573,6 +573,9 @@ def group_map_totals(con, gate, scope, key: str, measure: str, grain: str | None
     msum = _additive(gate, measure)
     exists = con.execute("SELECT count(*) FROM information_schema.tables WHERE table_name = ?",
                          [GROUP_MAP]).fetchone()[0]
+    if exists:          # the table outlives a withdrawn approval: count THIS dataset's rows
+        exists = con.execute(f"SELECT count(*) FROM {GROUP_MAP} WHERE dataset = ?",
+                             [gate.contract.dataset_name]).fetchone()[0]
     if not exists:
         raise ValueError("no keyword groups are approved yet: run and approve keyword grouping "
                          "first.")

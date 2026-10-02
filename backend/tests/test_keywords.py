@@ -182,3 +182,24 @@ def test_grouping_tool_runs_the_pipeline(api):
     c, did = api
     r = c.post("/tools/marketing.keyword_grouping/run", json={"dataset_id": did, "params": {}})
     assert r.status_code == 200 and "PROPOSALS until approved" in r.json()["caveats"][0]
+
+
+def test_an_approval_can_be_withdrawn_and_the_engine_stops_reading_it(api):
+    c, did = api
+    got = c.post(f"/datasets/{did}/keyword-groups/run", json={}).json()
+    g = _group_of(got, "sushi delivery pune")
+    act = lambda **kw: c.post(f"/datasets/{did}/keyword-groups/actions", json=kw)  # noqa: E731
+    act(action="approve", group_ids=[g["group_id"]])
+    assert c.post("/tools/marketing.keyword_group_performance/run",
+                  json={"dataset_id": did, "params": {}}).status_code == 200
+    r = act(action="unapprove", group_ids=[g["group_id"]]).json()
+    assert not _group_of(r, "sushi delivery pune")["approved"]
+    r = c.post("/tools/marketing.keyword_group_performance/run",
+               json={"dataset_id": did, "params": {}})
+    assert r.status_code == 422 and "no keyword groups are approved" in r.text
+
+
+def test_an_unknown_column_answers_422_not_500(api):
+    c, did = api
+    r = c.post(f"/datasets/{did}/keyword-groups/run", json={"column": "nope"})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "needs_data"
