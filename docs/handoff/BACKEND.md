@@ -4,6 +4,13 @@
 Done: B0–B7, **B8** (logistics pack: 6 tools, 2 playbooks, the 19 SLA checks reproduced through
 the API; API 0.6.0). Open for the user: approve the draft keyword gold (D-B7-3).
 
+2026-10-02, from the frontend session (branch `claude/beautiful-lovelace-07dnwu`, PR #15): **C9**
+in `backend/services/sessions.py`. `ui_state_problem` no longer reads an exact server id
+(`ds_/ws_` + 12 hex, `t_` + 16 hex) as a phone number; it refused 0.34% of dataset ids. 5 tests
+in `test_api_sessions.py`; full suite 2354 passed, 1 skipped. No API shape change. New
+api-requests from F3: #16 (answer ingest layout questions), #17 (return the contract in force);
+#14 (list a workspace's datasets) is still open.
+
 ## API: spec version — live | stubbed (501) | changed since last handoff
 
 **0.4.0** (additive; `docs/api/CHANGELOG.md`). Turns are now answered by the playbook agent

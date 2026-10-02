@@ -348,3 +348,47 @@ tab. Fix: after a network call returns, update only objects already in hand, nev
 `st.session_state`. Pinned by a test that stops the run at the first session-state access
 after the PUT, falsified by putting one such access back. The AppTests could not show this,
 because AppTest runs one rerun at a time.
+
+## F3 — guided preparation: clean, domain, contract (2026-10-02)
+
+**D-F3-1. Nothing is pre-ticked or preselected; suggestions are explicit clicks.** Cleaning
+steps the API marks `suggested`, forks with a `suggested` option, and strong aggregation
+suggestions all start blank. Each shows its reason, and a "Tick the N suggested" / "Use the N
+suggested answer(s)" / "Use the engine's N strong suggestion(s)" button fills only what is
+still unanswered. The API's own text allows pre-ticking (`CleaningProposal.suggested`: "may be
+pre-ticked"); AGENTS.md and CLAUDE.md ("never silently default") are stricter, and win.
+
+**D-F3-2. Cleaning ticks are kept by id+kind+column, and Apply re-reads the plan.** Measured:
+after applying C001+C002, the engine renumbered the remaining action to C001. A tick kept by
+id alone would have applied a different step. If any ticked step no longer matches, Apply
+sends nothing and asks for a review.
+
+**D-F3-3. Domain ticks start from the server's `confirmed` list, never from a score.**
+Marketing (0.385 on the F3 file) starts unticked, like every pack. Marketing is listed first
+(the priority domain); core is never offered.
+
+**D-F3-4. Contract answers stay in `ui_state.drafts` after a confirm.** The proposal does
+not return the definitions, window, `measure_per` or fork choices in force, so dropping the
+draft would blank those fields. That is api-request
+[#17](https://github.com/Akash708018/analytics-agentV2.0/issues/17). "Start over from the
+engine's proposal" drops the draft explicitly.
+
+**C8. F2 stored dataset metadata objects in `ui_state`, which the backend refuses.** Measured
+against the backend's own guard: 20 `{dataset_id, name, rows, columns}` objects →
+"20 same-shaped objects look like data rows", and a name like `leads_9876543210` → "looks like
+personal data". Schema 2 stores ids only (50 pass) and fetches names; schema 1 migrates.
+
+**C9. The backend refused 0.34% of its own dataset ids (0.51% of turn ids) as phone numbers.**
+Found by the F3 browser check: `ds_2a7207443888` holds "7207443888", so every save after
+that upload answered 422, and the session forgot the dataset. Fixed in
+`backend/services/sessions.py`: an exact server id (`ds_/ws_` + 12 hex, `t_` + 16 hex) skips
+the phone check, while a phone number in free text is still refused. Measured 0 of 20,000
+after the fix. 5 new tests; full backend suite 2354 passed, 1 skipped. This is a backend file,
+changed by the frontend owner because the user asked for unattended work: logged here, and in
+the PR, for the backend owner to review.
+
+**C10. The key cannot be a column role.** With one role per column, the date column could
+not also be in the key, so "one row per campaign per day" was sent as `primary_key
+["campaign"]` and refused (`LOAD_REFUSED`, why "grain, analysis_window."). Probed: `[date,
+campaign]` passes, and a key column may also be a dimension. The key is now its own
+multiselect; roles are date/measure/dimension/ignore.

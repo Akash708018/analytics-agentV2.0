@@ -1,65 +1,64 @@
 ## Status (date, branch, last commit)
 
-2026-10-01 · branch `claude/beautiful-lovelace-07dnwu` (restarted from main `f34dcd2` after
-PR #12 merged) · owner **Claude Code** (D-F1-5). **F2 complete**; stopped for the user's review.
-F1 (client + Prism mock, API 0.5.0) is on main via PR #12; PR #6 is closed.
+2026-10-02 · branch `claude/beautiful-lovelace-07dnwu` · owner **Claude Code** (D-F1-5).
+**F2 + F3 complete** on this branch, in PR #15 (unmerged; F3 stacked on F2 as separate
+commits, as D-B0-1). The user asked for unattended work through usage limits; scheduled resumes
+continue with F4.
 
 ## Screens: done | in progress | blocked (by which endpoint/issue)
 
-- Done (F2): a landing page with one explicit "Start a new session". Session (name the
-  analysis). Data (upload CSV/xlsx; choose the dataset questions use; a card from
-  `GET /datasets/{id}`). Ask (send once, follow by id, survives refresh). Expired, invalid-sid
-  and unreachable screens. Sidebar links carry `?sid=`. Conflict banner with Load latest /
-  Keep my changes.
-- Shown as returned but not yet acted on: `ingest_needs_answers` layout questions (Data),
-  answer `results[]` (Ask shows a count; no evidence view yet).
-- Next screens: ingest answers, cleaning approvals, domain confirm, contract + forks,
-  metrics, validity rules, tool runs with figures/charts/caveats, the turn evidence view,
-  keyword groups. Then F7: v1 parity (101 items, `docs/steps/F0.md`).
-- Blocked: nothing. [#14](https://github.com/Akash708018/analytics-agentV2.0/issues/14)
-  (list a workspace's datasets) would replace `ui_state.datasets[]` as the only pointer to uploads.
+- Done (F2): landing / expired / invalid / unreachable screens, sid-carrying navigation, saved
+  session work, conflict choices, Ask with turn resume.
+- Done (F3): Data (upload, choose, profile), Clean (tick → Apply, re-checked plan), Domain
+  (confirm, evidence, no score-ticking), Contract (grain, key, roles, measures, window,
+  caveats, forks, confirm with the engine's questions).
+- Next, F4: metrics templates (approve with bindings/forks), validity rules (tick → approve),
+  tools list (status, needs_domain, missing concepts) and tool runs with results (figures with
+  provenance, chart-ready series, caveats, validity filters applied). Run errors handled by
+  `code`: forks_unanswered → POST /forks, ambiguous_binding → bindings, param_required,
+  festival_dates_unconfirmed.
+- Then F5: the Ask evidence view (plan, tool calls, figure checks, answer.results as ToolResults,
+  flags, usage). F6: keyword groups. F7: v1 parity (101 items) + Playwright tests.
+- Blocked: ingest layout answers ([#16](https://github.com/Akash708018/analytics-agentV2.0/issues/16),
+  no endpoint). Nonblocking: [#17](https://github.com/Akash708018/analytics-agentV2.0/issues/17)
+  (contract in force), [#14](https://github.com/Akash708018/analytics-agentV2.0/issues/14)
+  (list datasets), [#4](https://github.com/Akash708018/analytics-agentV2.0/issues/4) (error examples).
 
 ## API: spec version consumed; endpoints live vs mocked
 
-**0.6.0** (B8, additive: no new operations; the suite passes, 173). F2 uses sessions (create/get/PUT ui-state), turns (create/get/list), upload and
-`GET /datasets/{id}` against the real backend (browser check) and a stateful fake (tests).
-`ui_state` allowlist: `schema, page, label, dataset_id, datasets[{dataset_id,name,rows,columns}]`.
-Unknown server keys pass through. Saved widget keys: `ui.session.label`, `ui.data.dataset_id`.
+**0.6.0**. Used against the real backend (browser checks) and a stateful fake (tests):
+sessions, turns, upload, datasets, profile, cleaning, domains, packs, contract.
+`ui_state` schema 2: `schema, page, label, dataset_id, datasets[ids], drafts{ds: {clean,
+domains, contract{grain,key,roles,aggregations,definitions,per,window_*,caveats}, forks,
+confirmed_version}}`; schema 1 migrates (C8). Unknown top-level keys pass through.
 
-0.6.0 items F3 will use: `DomainDetection.sources[]` (every pack's matched sources, with
-`domain`; `marketing_sources` now holds marketing only), a second domain (`logistics`), and
-`Confirmed.provisional` on comparison-template approvals (results then carry a PROVISIONAL caveat).
-
-Rules the next screens must keep (see `frontend/state.py` docstring and C7):
-- Session state is a cache; seed widgets with `state.seed`, record edits with
-  `state.on_widget_change`, register new saved fields in `state.WIDGETS` + `normalize`.
-- After any network call returns, update only objects already in hand. Never read or write
-  `st.session_state` between an API write and recording its result: Streamlit can stop the run there.
-- Never `st.stop()` in a view (it skips the router's save). Return early instead.
-- Branch on `APIError.code`; every 409 is a `VersionConflict` but only `version_conflict`
-  carries `current`.
+Rules the next screens must keep (`frontend/state.py` docstring, C7, C10):
+- Widgets: `state.bind(ss, key, path, default)` before the widget, then
+  `on_change=state.on_change, args=(ss, key, path)`. Add new draft fields to `normalize`.
+- After any network call, change only held objects (`ss[DRAFT]`, `state.work(ss)`); queue
+  widget resets in `work(ss)["reseed"]`; drop caches with `datasets.invalidate`.
+- Never `st.stop()` in a view. Every 409 is a `VersionConflict`; branch on `code`.
+- Nothing preselected; suggestions are explicit buttons (D-F3-1).
 
 ## api-request issues (links, status)
 
-- [#4](https://github.com/Akash708018/analytics-agentV2.0/issues/4): open. Path params fixed
-  in 0.5.0; only the generic error example remains. Nonblocking.
-- [#14](https://github.com/Akash708018/analytics-agentV2.0/issues/14): open, new.
-  `GET /workspaces/{ws}/datasets`. Nonblocking.
+#4 (error examples), #14 (list datasets), #16 (ingest answers), #17 (contract in force): all open.
 
 ## Test tail (pasted)
 
 ```text
 $ frontend/.venv/bin/python -m pytest frontend/tests -q -rs
-173 passed in 8.77s
+196 passed in 11.15s
+$ cd backend && uv run pytest -q -rs     # after C9
+2354 passed, 1 skipped, 1 warning in 286.48s (0:04:46)
 ```
 
-66 client unit, 58 Prism contract, 26 F2 state/turn unit, 19 F2 AppTests, 1 fake-vs-spec, 3 F0.
-No skips. Browser: 21-step check plus the B0–B3 blur check against the real backend
-(headless Chromium, one-off Playwright, D-F2-1). Output is in `docs/steps/F2.md`.
+66 client, 58 Prism, 27 F2 state, 19 F2 AppTests, 2 fake-vs-spec, 14 F3 AppTests, 7 F3 prep,
+3 F0. No frontend skips. Browser: F2 21 steps + blur check; F3 16 steps (upload → confirmed
+contract) on the real backend, output in `docs/steps/F2.md` and `F3.md`.
 
 ## Next milestone
 
-STOP after F2. The user reviews/merges the F2 PR. Proposed F3 (on the user's go-ahead): the
-guided path from upload to a confirmed contract. Ingest layout answers, cleaning proposals →
-approve, domain detect → confirm (no preselection), contract proposal + forks → confirm. Each
-approval is explicit, and drafts are saved through `state.py`.
+F4 (above). Setup in a fresh container: `uv venv frontend/.venv --python 3.12`, `uv pip install
+--python frontend/.venv/bin/python -r frontend/requirements.txt`, `npm ci --prefix frontend
+--ignore-scripts`, `uv sync` (backend for browser checks).
