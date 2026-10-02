@@ -2,7 +2,8 @@
 
 2026-10-02 · branch **main** (the user asked for work directly on main, D-F8-0) · owner
 **Claude Code** (D-F1-5). F0–F7 merged (PR #15; F3–F7 in `e405019`). **F8 done on main**: the
-screens consume API 0.7.0. What remains waits on api-requests or on the user (Playwright suite).
+screens consume API 0.7.0. **The user declared the frontend complete (2026-10-02, D-F8-5).**
+Start no new frontend milestone unless the user asks.
 
 ## Screens: done | in progress | blocked (by which endpoint/issue)
 
@@ -92,7 +93,8 @@ F8 8 steps (lineage, Results rows, focus choices, staleness, pre-fill, a blocked
 
 ## Next milestone
 
-None planned. When an api-request lands, build its blocked items:
+None: the frontend is complete (D-F8-5). If the user asks for follow-ups after an api-request
+lands, these are the items each one unblocks:
 - #16 → Upload & read (V1-I04–I14);
 - #21 → cleaning samples and SQL;
 - #22 → direct core analyses (Explore);

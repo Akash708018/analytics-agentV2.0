@@ -549,3 +549,8 @@ version, grain, metrics used and the result id are shown as returned, with a lin
 `sla_drivers` reads `focus` in its step filters, but its spec does not list it. The Tools page
 reads `filter[].focus_param` (`prep.optional_params`); #23 asks for a declaration.
 
+**D-F8-5. The frontend is complete (the user, 2026-10-02).** F0–F8 are on main, and the screens
+consume API 0.7.0. Frontend tests: 259 passed, no skips. Browser checks ran against the real
+backend for F2–F8. No further frontend milestone is planned. Open api-requests (#16, #17,
+#20–#23) and a Playwright suite are follow-ups only if the user asks. `docs/handoff/FRONTEND.md`
+lists what each would unblock.
