@@ -1496,6 +1496,30 @@ components:
           description: 'Lossless and conflict-free: may be pre-ticked for the person; never applied without
             approval'
           default: false
+        values_lost:
+          type: integer
+          title: Values Lost
+          description: '0.8.0: what a lossy step loses, in loss_unit'
+          default: 0
+        loss_unit:
+          type: string
+          title: Loss Unit
+          default: ''
+        samples:
+          items:
+            additionalProperties: true
+            type: object
+          type: array
+          title: Samples
+          description: '0.8.0: up to 3 of the engine''s own examples: {row, copies} for a duplicate, {value}
+            for a value the step changes'
+          default: []
+        sql:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sql
+          description: '0.8.0: the exact statement the step runs'
       type: object
       required:
       - action_id

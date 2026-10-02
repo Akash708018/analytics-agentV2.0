@@ -106,3 +106,26 @@ def test_a_stacked_header_file_loads_after_its_answers(env):
                         json={"header_rows": [2]}).status_code == 404
     finally:
         workspace.reset(ws)
+
+
+# --- #21: cleaning proposals show what they lose ------------------------------------------------
+
+def test_lossy_cleaning_steps_carry_samples_and_their_sql(env):
+    import secrets
+    from backend.engine import workspace
+    from backend.tests.test_logistics import FIXTURE
+    ws = f"ws_{secrets.token_hex(6)}"
+    try:
+        did = env.post(f"/workspaces/{ws}/uploads", files={"file": (
+            "logistics_sla.csv", FIXTURE.read_bytes())}).json()["dataset_id"]
+        props = {p["kind"] + ":" + str(p["column"]): p for p in
+                 env.get(f"/datasets/{did}/cleaning/proposals").json()["proposals"]}
+        dup = props["DROP_DUPLICATE_ROWS:None"]
+        assert dup["lossy"] and dup["values_lost"] == 8 and dup["loss_unit"] == "row"
+        assert len(dup["samples"]) == 3 and dup["samples"][0]["copies"] == 2
+        assert "order_id" in dup["samples"][0]["row"]
+        case = props["NORMALISE_CASE:hub"]
+        assert {s["value"] for s in case["samples"]} == {"PUNE_WEST", "Pune_West"}
+        assert case["sql"].startswith("CREATE OR REPLACE TABLE")
+    finally:
+        workspace.reset(ws)

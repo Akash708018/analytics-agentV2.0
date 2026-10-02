@@ -194,7 +194,9 @@ class DatasetService:
         return {"dataset_id": dataset_id, "proposals": [
             {"action_id": s.action_id, "kind": s.kind, "column": s.column,
              "description": s.intent, "rows_affected": s.rows_affected,
-             "lossy": s.lossy, "suggested": s.suggested} for s in p.steps]}
+             "lossy": s.lossy, "suggested": s.suggested, "values_lost": s.values_lost,
+             "loss_unit": s.loss_unit, "samples": _samples(s.sample), "sql": s.sql}
+            for s in p.steps]}
 
     def cleaning_approve(self, dataset_id: str, approve: list[str], reject: list[str]) -> dict:
         d = self._get(dataset_id)
@@ -684,6 +686,27 @@ class DatasetService:
     def tools_states(self, d: dict):
         bound, sources = self._bound(d)
         return registry.statuses(d["domains"], set(bound), sources)
+
+
+CLEANING_SAMPLES = 3
+
+
+def _samples(raw: list) -> list[dict]:
+    """The engine's own examples of a step (B10, issue #21), at most three: a duplicated row
+    as {row, copies}; any other step's affected value as {value}."""
+    import json as _json
+    out = []
+    for s in raw[:CLEANING_SAMPLES]:
+        try:
+            row = _json.loads(s) if isinstance(s, str) and s.startswith("{") else None
+        except ValueError:
+            row = None
+        if isinstance(row, dict):
+            copies = row.pop("duplicate_count", None)
+            out.append({"row": row, **({"copies": copies} if copies is not None else {})})
+        else:
+            out.append({"value": s})
+    return out
 
 
 def _measure_type(c, m: str) -> str:

@@ -21,6 +21,9 @@ Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry h
   `POST /workspaces/{ws}/uploads/{upload_id}/answers` (`UploadAnswers`: header_rows,
   header_join, sheet, data_start, footer_rows, name, columns[{source, target, type}]) → 201
   `Dataset`; still ambiguous → the same 422 again; an unknown upload → 404.
+- #21: `CleaningProposal` gains `values_lost`, `loss_unit`, `samples` (up to 3 of the
+  engine's own examples: `{row, copies}` for a duplicated row, `{value}` for a value the step
+  changes, e.g. the spellings a case fold merges) and `sql` (the exact statement).
 
 ## 0.7.0 — 2026-10-02 (B9, additive)
 

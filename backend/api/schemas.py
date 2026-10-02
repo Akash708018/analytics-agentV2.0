@@ -327,6 +327,12 @@ class CleaningProposal(BaseModel):
     lossy: bool = False
     suggested: bool = Field(False, description="Lossless and conflict-free: may be pre-ticked "
                                                "for the person; never applied without approval")
+    values_lost: int = Field(0, description="0.8.0: what a lossy step loses, in loss_unit")
+    loss_unit: str = ""
+    samples: list[dict[str, Any]] = Field([], description="0.8.0: up to 3 of the engine's own "
+                                          "examples: {row, copies} for a duplicate, {value} "
+                                          "for a value the step changes")
+    sql: str | None = Field(None, description="0.8.0: the exact statement the step runs")
 
 
 class CleaningProposals(BaseModel):
