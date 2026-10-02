@@ -337,3 +337,8 @@ the table (order-independent hash computed in DuckDB), the contract version and 
 versions; up to 500 rows per step are kept for inspection. A result is `stale` when the table
 or contract has changed since. Inspection sorts and filters stored engine rows; it computes
 nothing new.
+
+**C7. Two wrong test expectations in B9, both mine.** Routing tests used "drop"/"fall" where
+the playbook patterns say "dropped"/"fell" (led to stem matching, an improvement); the
+totals-row test expected a caveat the v1 loader makes unnecessary (it drops a trailing totals
+row at upload) and then matched 'Total' after cleaning had folded it to 'TOTAL'.

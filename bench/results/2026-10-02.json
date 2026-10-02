@@ -1,0 +1,240 @@
+{
+  "date": "2026-10-02",
+  "v1_commit": "0ba324b",
+  "estimator": "tokens = characters / 4 of each request (v1's CHARS_PER_TOKEN)",
+  "retail": {
+    "question": "For 2025 only, give revenue, cost and margin % by region, and list the data-quality issues I should know about.",
+    "v1 own tree (baseline)": {
+      "request_tokens": [
+        2890,
+        3144,
+        4566,
+        4973,
+        5583,
+        6151,
+        5974
+      ],
+      "tokens_in": 33281,
+      "llm_calls": 7,
+      "answered": true
+    },
+    "v1": {
+      "llm_calls": 7,
+      "tool_calls": 6,
+      "request_tokens": [
+        2890,
+        3151,
+        4581,
+        4995,
+        5605,
+        6169,
+        5968
+      ],
+      "tokens_in": 33359,
+      "first_request_tokens": 2890,
+      "answered": true,
+      "wall_s": 7.07,
+      "ws": "ws_ac40df0ecdf0",
+      "checks": {
+        "answered": true,
+        "every request under Groq's 8,000 TPM": true,
+        "revenue by region 2025 matches the file (of 4)": 4
+      }
+    },
+    "v2": {
+      "llm_calls": 2,
+      "tool_calls": 2,
+      "request_tokens": [
+        436,
+        3565
+      ],
+      "tokens_in": 4001,
+      "first_request_tokens": 436,
+      "answered": true,
+      "flags": [],
+      "wall_s": 6.62,
+      "checks": {
+        "answered": true,
+        "every request under Groq's 8,000 TPM": true,
+        "revenue by region 2025 matches the file (of 4)": 4
+      }
+    }
+  },
+  "marketing_benches": {
+    "marketing_bench.py": {
+      "lines": [
+        72,
+        72
+      ],
+      "identical": true,
+      "same_lines_any_order": true,
+      "differing": [],
+      "lines_in_only_one": []
+    },
+    "marketing_bench_v2.py": {
+      "lines": [
+        69,
+        69
+      ],
+      "identical": false,
+      "same_lines_any_order": false,
+      "differing": [
+        "v1:   revenue_usd per channel, once per order  affiliate    want 56363.57       got 56363.57       ok | v2:   revenue_usd per channel, once per order  direct       want 56170.39       got 56170.39       ok",
+        "v1:   revenue_usd per channel, once per order  direct       want 56170.39       got 56170.39       ok | v2:   revenue_usd per channel, once per order  email        want 56185.65       got 56185.65       ok",
+        "v1:   revenue_usd per channel, once per order  email        want 56185.65       got 56185.65       ok | v2:   revenue_usd per channel, once per order  paid_social  want 56130.83       got 56130.83       ok",
+        "v1:   revenue_usd per channel, once per order  paid_social  want 56130.83       got 56130.83       ok | v2:   revenue_usd per channel, once per order  affiliate    want 56363.57       got 56363.57       ok",
+        "v1:   conversion_value per platform            meta         want 566040.0       got 566040.0       ok | v2:   conversion_value per platform            google       want 566142.0       got 566142.0       ok",
+        "v1:   conversion_value per platform            tiktok       want 567240.0       got 567240.0       ok | v2:   conversion_value per platform            meta         want 566040.0       got 566040.0       ok",
+        "v1:   conversion_value per platform            google       want 566142.0       got 566142.0       ok | v2:   conversion_value per platform            tiktok       want 567240.0       got 567240.0       ok",
+        "v1:   conversion rate per variant              treatment    want 0.100248       got 0.1002         ok | v2:   conversion rate per variant              control      want 0.11969        got 0.1197         ok",
+        "v1:   conversion rate per variant              control      want 0.11969        got 0.1197         ok | v2:   conversion rate per variant              treatment    want 0.100248       got 0.1002         ok",
+        "v1:   win rate per channel                     paid_search  want 0.5            got 0.5            ok | v2:   win rate per channel                     organic      want 0.0            got 0.0            ok"
+      ],
+      "lines_in_only_one": [
+        "  fan_out_inflation: {'affiliate': 1.1, 'direct': 1.111, 'email': 2.117, 'paid_social': 1.105}",
+        "  fan_out_inflation: {'direct': 1.111, 'email': 2.117, 'paid_social': 1.105, 'affiliate': 1.1}"
+      ]
+    },
+    "suggest_bench.py": {
+      "lines": [
+        51,
+        51
+      ],
+      "identical": true,
+      "same_lines_any_order": true,
+      "differing": [],
+      "lines_in_only_one": []
+    }
+  },
+  "playbooks": {
+    "why_roas_dropped": {
+      "checks_passed": true,
+      "detail": true,
+      "llm_calls": 2,
+      "tool_calls": 3,
+      "tokens_in_est": 2432,
+      "tokens_out_est": 164,
+      "wall_s": 3.18,
+      "v1": "n/a -- v1 has no marketing tools or playbooks"
+    },
+    "where_is_spend_wasted": {
+      "checks_passed": true,
+      "detail": true,
+      "llm_calls": 1,
+      "tool_calls": 3,
+      "tokens_in_est": 1963,
+      "tokens_out_est": 167,
+      "wall_s": 2.8,
+      "v1": "n/a -- v1 has no marketing tools or playbooks"
+    },
+    "did_the_campaign_work": {
+      "checks_passed": true,
+      "detail": true,
+      "llm_calls": 3,
+      "tool_calls": 2,
+      "tokens_in_est": 1169,
+      "tokens_out_est": 181,
+      "wall_s": 0.71,
+      "v1": "n/a -- v1 has no marketing tools or playbooks"
+    },
+    "funnel_leak": {
+      "checks_passed": true,
+      "detail": true,
+      "llm_calls": 1,
+      "tool_calls": 3,
+      "tokens_in_est": 418,
+      "tokens_out_est": 48,
+      "wall_s": 0.79,
+      "v1": "n/a -- v1 has no marketing tools or playbooks"
+    },
+    "email_health": {
+      "checks_passed": true,
+      "detail": true,
+      "llm_calls": 1,
+      "tool_calls": 2,
+      "tokens_in_est": 992,
+      "tokens_out_est": 33,
+      "wall_s": 2.44,
+      "v1": "n/a -- v1 has no marketing tools or playbooks"
+    },
+    "why_organic_traffic_dropped": {
+      "checks_passed": true,
+      "detail": true,
+      "llm_calls": 2,
+      "tool_calls": 4,
+      "tokens_in_est": 2016,
+      "tokens_out_est": 80,
+      "wall_s": 1.51,
+      "v1": "n/a -- v1 has no marketing tools or playbooks"
+    }
+  },
+  "sla": {
+    "v2 run": "19/19 checks right",
+    "v1 recorded": {
+      "value": "19/19 checks right",
+      "source": "analytics-agent@0ba324b docs/steps/step3_provisional_metrics.md:95"
+    },
+    "vs v1 tree": {
+      "lines": [
+        22,
+        22
+      ],
+      "identical": true,
+      "same_lines_any_order": true,
+      "differing": [],
+      "lines_in_only_one": []
+    }
+  },
+  "interpretation": {
+    "cases": [
+      {
+        "rule": "no_sum_of_rate",
+        "v1 figure check flags it": true,
+        "v2 names the rule": true
+      },
+      {
+        "rule": "no_cross_source_conversion_sum",
+        "v1 figure check flags it": true,
+        "v2 names the rule": true
+      },
+      {
+        "rule": "bounds",
+        "v1 figure check flags it": true,
+        "v2 names the rule": true
+      },
+      {
+        "rule": "consequence_not_cause",
+        "v1 figure check flags it": false,
+        "v2 names the rule": true
+      },
+      {
+        "rule": "correlational_only",
+        "v1 figure check flags it": true,
+        "v2 names the rule": true
+      },
+      {
+        "rule": "required_stratifier",
+        "v1 figure check flags it": false,
+        "v2 names the rule": true
+      },
+      {
+        "rule": "measurement_change",
+        "v1 figure check flags it": true,
+        "v2 names the rule": true
+      },
+      {
+        "rule": "small_sample",
+        "v1 figure check flags it": false,
+        "v2 names the rule": true
+      },
+      {
+        "rule": "festival_confound",
+        "v1 figure check flags it": true,
+        "v2 names the rule": true
+      }
+    ],
+    "v1 caught": 6,
+    "v2 caught": 9,
+    "of": 9
+  }
+}

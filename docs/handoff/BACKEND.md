@@ -1,8 +1,10 @@
 ## Status (date, branch, last commit)
 
-2026-10-01 · branch `claude/analytics-agent-v2-backend-6gcu1p` · B7 merged (PR #11).
-Done: B0–B7, **B8** (logistics pack: 6 tools, 2 playbooks, the 19 SLA checks reproduced through
-the API; API 0.6.0). Open for the user: approve the draft keyword gold (D-B7-3).
+2026-10-02 · branch `claude/analytics-agent-v2-backend-6gcu1p` · PR #13 (B8 + B9).
+Done: B0–B8, review cleanup, **B9** (the Future Concepts doc's "Implement now" items that fit
+the finished backend: ranks 1, 2, 5, 6, 7, 9, 10, 12, 13, 14, 16, 22; 3/20/21 were already
+done; the rest are logged with reasons in D-B9-1). API **0.7.0** (additive).
+Open for the user: approve the draft keyword gold (D-B7-3).
 
 ## API: spec version — live | stubbed (501) | changed since last handoff
 
@@ -60,8 +62,21 @@ None (checked 2026-09-26).
 
     cd backend && uv run pytest -q -rs
     SKIPPED [1] tests/test_agent.py:580: v2 B0 (D-B0-2): the v1 Streamlit app ui/app.py is not seeded; v2 screens belong to the frontend
-    2349 passed, 1 skipped, 1 warning in 237.94s (0:03:57)
-    eval: SCORE: 76/76 (100%) · sla_bench: 19/19 checks right
+    2369 passed, 1 skipped, 1 warning in 280.10s (0:04:40)
+    eval: SCORE: 76/76 (100%) · sla_bench: 19/19 checks right · frontend: 133 passed
+
+## B9 for the frontend (0.7.0, additive — `docs/api/CHANGELOG.md`)
+
+- Contract screen: show `prefill` (from which file, similarity) as a one-click suggestion;
+  the person still confirms with the ordinary call.
+- Every tool result has `result_id`, `status`, `snapshot`, `contract_version`; a results list
+  per dataset with `stale` + `stale_reasons` (show "out of date: the data changed").
+  `GET /results/{id}/inspect` pages through all rows of a step (sort, group filter).
+- Turn plan: `routed_by` (rules | planner); a blocked playbook answers with its `recovery`.
+- Keyword groups: `generation`, `joins` (a proposal to join an approved group — accept by
+  merge with the approved group first); `run.carry_forward`; run body takes `backend`.
+- New 422 codes: `ambiguous_value` (`candidates`), `unknown_value` (`values`).
+- Client methods already added: `list_results`, `get_result`, `inspect_result`.
 
 ## Next milestone
 
