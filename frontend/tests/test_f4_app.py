@@ -112,7 +112,7 @@ def test_core_is_hidden_and_unavailable_tools_say_why(fake):
 
 def test_required_params_are_asked_and_a_run_shows_the_result_as_returned(fake):
     app = tool(open_app(ready(fake), page="views/tools.py"), "marketing.roas_change_explainer")
-    assert [t.label for t in app.text_input] == ["Period", "Compared with"]
+    assert [t.label for t in app.text_input][:2] == ["Period", "Compared with"]
     app.button(key="tools.run").click().run()
     assert "Fill in: Period, Compared with" in text(app)
     assert runs(fake)[-1] == ("marketing.roas_change_explainer", {})
@@ -176,3 +176,15 @@ def test_the_chosen_tool_and_its_params_come_back_after_a_refresh(fake):
     assert refreshed.selectbox(key=f"ui.tools.{ID}.tool").value == "marketing.roas_change_explainer"
     assert refreshed.text_input(key=f"ui.tools.{ID}.marketing.roas_change_explainer.p.period").value == "2026-09"
     assert not refreshed.dataframe                                       # results are not saved
+
+
+def test_a_concept_named_for_a_tool_is_sent_as_its_binding(fake):
+    app = tool(open_app(ready(fake), page="views/tools.py"), "marketing.roas_change_explainer")
+    prefix = f"tools.{ID}.marketing.roas_change_explainer"
+    app.text_input(key=f"{prefix}.concept").input("conv_value").run()
+    app.selectbox(key=f"{prefix}.column").set_value("cost").run()
+    app.button(key=f"{prefix}.add").click().run()
+    app.text_input(key=f"ui.tools.{ID}.marketing.roas_change_explainer.p.period").input("2026-09").run()
+    app.text_input(key=f"ui.tools.{ID}.marketing.roas_change_explainer.p.baseline").input("2026-08").run()
+    app.button(key="tools.run").click().run()
+    assert runs(fake)[-1][1]["bindings"] == {"conv_value": "cost"}

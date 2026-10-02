@@ -10,6 +10,7 @@ import streamlit as st
 
 from frontend import connection, datasets, prep, state
 from frontend.api_client import APIError
+from frontend.components.bindings import binding_form
 from frontend.components.results import render_result
 from frontend.components.shell import needs_dataset, show_error
 
@@ -106,8 +107,12 @@ def _error(dataset_id: str, tool_id: str, error: APIError, forks: list[dict]) ->
             st.caption(f"{year}: {start} to {end}")
         st.checkbox("These dates are right for this run", key=f"tools.{dataset_id}.{tool_id}.dates_ok",
                     help="Asked on every run: festival dates move every year (D-B3-6).")
-    elif error.code in ("needs_domain", "needs_data"):
+    elif error.code in ("needs_domain", "needs_data") and error.status_code == 409:
         show_error(error, "This tool cannot run on this data yet")
+    elif error.code == "needs_data":
+        show_error(error, "The tool did not run")
+        st.caption("If the data has this under another name, name the column for the concept "
+                   "above and run again.")
     else:
         show_error(error, "The tool did not run")
 
@@ -174,6 +179,7 @@ def main() -> None:
         st.selectbox(f"{slot.capitalize()} (optional)", columns, key=key,
                      placeholder="the tool's own choice: " + ", ".join(spec["slots"][slot]),
                      on_change=state.on_change, args=(ss, key, path))
+    binding_form(ss, f"tools.{dataset_id}.{tool_id}", p(dataset_id, tool_id, "bindings"), columns)
     st.button("Run", type="primary", key="tools.run", on_click=_run,
               args=(dataset_id, tool_id, required, slots))
     saved = state.work(ss)["results"].get(("forks", dataset_id))

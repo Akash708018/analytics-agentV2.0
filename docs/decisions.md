@@ -392,3 +392,29 @@ not also be in the key, so "one row per campaign per day" was sent as `primary_k
 ["campaign"]` and refused (`LOAD_REFUSED`, why "grain, analysis_window."). Probed: `[date,
 campaign]` passes, and a key column may also be a dimension. The key is now its own
 multiselect; roles are date/measure/dimension/ignore.
+
+## F4 — metrics, validity rules, tools and results (2026-10-02)
+
+**D-F4-1. The Tools page offers domain tools only.** `GET /tools` lists core analyses as active,
+but they run through a question (turn). Measured: running one as a tool answered 500 (fixed,
+C11). The page says so and points to Ask.
+
+**D-F4-2. Tool results stay in the browser; params are saved.** A result is data (figures,
+series), so it is not put in `ui_state`. The chosen tool, its params and its bindings are saved,
+so after a refresh the person runs again with one click. Festival-date confirmation is never
+saved: dates are confirmed per run (D-B3-6).
+
+**D-F4-3. Results are shown exactly as returned.** Figure values via `str()` (`null` → "suppressed"),
+provenance per figure, series in the backend's order (`bar` with `sort=False`; table/funnel/
+stacked_bar and series with suppressed points as tables), and every caveat, validity filter,
+pack rule, fork answer and figure-check note.
+
+**D-F4-4. "Name the column for a concept" is the person's answer to `needs_data`.** Metric
+approval sends it as `bindings`, tool runs as `params.bindings` (the runner's override). The
+frontend never infers a column. Measured: a binding given for a metric is not reused by tool
+runs (noted for the backend owner).
+
+**C11. A core analysis run as a tool answered 500.** `POST /tools/core.*/run` reached
+`m.tools[tool_id]` (KeyError) before the existing `not_a_domain_tool` check. The check runs
+first now; 2 tests fail without it. Backend file changed from the frontend session (unattended
+run); full suite 2356 passed, 1 skipped.

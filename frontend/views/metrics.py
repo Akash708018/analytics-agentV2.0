@@ -10,6 +10,7 @@ import streamlit as st
 
 from frontend import connection, datasets, state
 from frontend.api_client import APIError
+from frontend.components.bindings import binding_form
 from frontend.components.shell import needs_dataset, show_error
 
 ss = st.session_state
@@ -28,17 +29,6 @@ def _approve(dataset_id: str, template_id: str) -> None:
         return
     held["results"][("metric", dataset_id, template_id)] = {"approved": reply}
     datasets.invalidate(held, dataset_id, ("templates", "proposal"))
-
-
-def _add_binding(dataset_id: str, template_id: str) -> None:
-    concept = (ss.get(f"metrics.{dataset_id}.{template_id}.concept") or "").strip()
-    column = ss.get(f"metrics.{dataset_id}.{template_id}.column")
-    if concept and column:
-        state.set_path(ss[state.DRAFT], ("drafts", dataset_id, "bindings", template_id, concept), column)
-
-
-def _drop_binding(dataset_id: str, template_id: str, concept: str) -> None:
-    state.drop_path(ss[state.DRAFT], ("drafts", dataset_id, "bindings", template_id, concept))
 
 
 def _apply_rules(dataset_id: str, approve: list[str], reject: list[str]) -> None:
@@ -89,23 +79,6 @@ def _template_error(dataset_id: str, template: dict, error: APIError, columns: l
                        "approve again.")
 
 
-def _bindings(dataset_id: str, template_id: str, columns: list[str]) -> None:
-    current = state.get_path(draft, ("drafts", dataset_id, "bindings", template_id), {})
-    with st.expander("Name the column for a concept" + (f" ({len(current)})" if current else "")):
-        for concept, column in current.items():
-            left, right = st.columns([3, 1])
-            left.caption(f"{concept} → {column}")
-            right.button("Remove", key=f"metrics.{dataset_id}.{template_id}.drop.{concept}",
-                         on_click=_drop_binding, args=(dataset_id, template_id, concept))
-        left, right = st.columns(2)
-        left.text_input("Concept the engine named", key=f"metrics.{dataset_id}.{template_id}.concept",
-                        placeholder="e.g. conv_value")
-        right.selectbox("Column", columns, index=None, placeholder="choose…",
-                        key=f"metrics.{dataset_id}.{template_id}.column")
-        st.button("Add", key=f"metrics.{dataset_id}.{template_id}.add",
-                  on_click=_add_binding, args=(dataset_id, template_id))
-
-
 def _templates(dataset_id: str, columns: list[str]) -> None:
     st.subheader("Metrics")
     reply = datasets.cached(ss, "templates", dataset_id, lambda: api.list_metric_templates(dataset_id))
@@ -131,7 +104,8 @@ def _templates(dataset_id: str, columns: list[str]) -> None:
                 continue
             if result and "error" in result:
                 _template_error(dataset_id, t, result["error"], columns)
-            _bindings(dataset_id, tid, columns)
+            binding_form(ss, f"metrics.{dataset_id}.{tid}", ("drafts", dataset_id, "bindings", tid),
+                         columns)
             st.button("Approve", key=f"metrics.{dataset_id}.{tid}.approve", type="primary",
                       on_click=_approve, args=(dataset_id, tid))
     unavailable = [t for t in templates if not t["available"]]

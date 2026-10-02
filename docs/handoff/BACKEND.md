@@ -11,6 +11,12 @@ in `test_api_sessions.py`; full suite 2354 passed, 1 skipped. No API shape chang
 api-requests from F3: #16 (answer ingest layout questions), #17 (return the contract in force);
 #14 (list a workspace's datasets) is still open.
 
+2026-10-02, F4 (same branch): **C11** in `backend/services/datasets.py`: `POST /tools/core.*/run`
+answered 500 (KeyError at `m.tools[tool_id]`); the `not_a_domain_tool` check now runs first.
+2 tests in `test_logistics.py`; full suite 2356 passed, 1 skipped. Observation, not acted on: a
+concept named while approving a metric (`bindings`, e.g. `conv_value` → `revenue`) is not reused
+by tool runs on the same dataset; the person names it again in `params.bindings`.
+
 ## API: spec version — live | stubbed (501) | changed since last handoff
 
 **0.4.0** (additive; `docs/api/CHANGELOG.md`). Turns are now answered by the playbook agent
