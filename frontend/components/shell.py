@@ -16,6 +16,9 @@ TAGLINE = "Understand your digital marketing data, with a source for every figur
 def show_error(error: APIError, what: str) -> None:
     """The service's own message and code; extra details exactly as returned."""
     st.error(f"{what}: {error.message}")
+    refusal = error.payload.get("refusal") if isinstance(error.payload, dict) else None
+    if isinstance(refusal, dict) and refusal.get("why"):
+        st.markdown(f"**Why:** {refusal['why']}")
     st.caption(f"code: {error.code}" + (f" · HTTP {error.status_code}" if error.status_code else ""))
     details = {k: v for k, v in (error.payload or {}).items() if k != "error"} \
         if isinstance(error.payload, dict) else {}

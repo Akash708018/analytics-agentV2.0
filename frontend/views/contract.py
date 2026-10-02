@@ -16,8 +16,8 @@ from frontend.components.shell import needs_dataset, show_error
 ss = st.session_state
 api = connection.get_client()
 draft = ss[state.DRAFT]
-ROLE_LABELS = {"key": "Key (identifies a row)", "date": "Date", "measure": "Measure (a number)",
-               "dimension": "Dimension (a group)", "ignore": "Ignore"}
+ROLE_LABELS = {"date": "Date", "measure": "Measure (a number)", "dimension": "Dimension (a group)",
+               "ignore": "Ignore"}
 
 
 def k(dataset_id: str, *parts: str) -> str:
@@ -56,6 +56,7 @@ def _confirm(dataset_id: str, columns: list[str], measures: list[str], fork_ids:
     # Read every value first; after the POST only held objects change (state.py, C7).
     form = {
         "grain": ss.get(k(dataset_id, "grain")),
+        "key": ss.get(k(dataset_id, "key")),
         "roles": {c: ss.get(k(dataset_id, "role", c)) for c in columns},
         "aggregations": {m: ss.get(k(dataset_id, "agg", m)) for m in measures},
         "definitions": {m: ss.get(k(dataset_id, "def", m)) for m in measures},
@@ -118,6 +119,13 @@ def _roles(dataset_id: str, proposal: dict, profile: dict) -> dict[str, str]:
             help=f"{col['type']} · {col['distinct']} distinct · null {col['null_pct']}% · "
                  f"e.g. {sample}",
             on_change=state.on_change, args=(ss, key, path))
+    key, path = k(dataset_id, "key"), p(dataset_id, "key")
+    state.bind(ss, key, path, [c for c in proposal.get("key", []) if c in columns])
+    st.multiselect("Which columns together identify one row?", columns, key=key,
+                   placeholder="choose the key columns",
+                   help="Usually the date plus the groups the grain names: for one row per "
+                        "campaign per day, date and campaign. The engine checks it is unique.",
+                   on_change=state.on_change, args=(ss, key, path))
     return {c: ss[k(dataset_id, "role", c)] for c in columns}
 
 
@@ -152,7 +160,7 @@ def _measures(dataset_id: str, proposal: dict, columns: list[str], measures: lis
                            f": {s.get('reason', '')}")
             key, path = k(dataset_id, "def", m), p(dataset_id, "definitions", m)
             state.bind(ss, key, path, "")
-            st.text_input("What it means", key=key, max_chars=500,
+            st.text_input("What it means (required)", key=key, max_chars=500,
                           placeholder="e.g. spend as billed by the ad platform, before GST",
                           on_change=state.on_change, args=(ss, key, path))
             key, path = k(dataset_id, "per", m), p(dataset_id, "per", m)

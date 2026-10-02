@@ -35,7 +35,10 @@ LABEL_MAX = 120
 TEXT_MAX = 2000
 NAME_MAX = 200
 DATASETS_MAX = 50
-ROLES = ("key", "date", "measure", "dimension", "ignore")
+# A column's role; the key is a separate list, because a key usually includes the date and
+# dimensions (F3 browser check: key [campaign] alone was refused for "one row per campaign
+# per day"; [date, campaign] passed).
+ROLES = ("date", "measure", "dimension", "ignore")
 _DATASET_ID = re.compile(r"^ds_[A-Za-z0-9_-]{1,64}$")
 _KNOWN = {"schema", "page", "label", "dataset_id", "datasets", "drafts"}
 
@@ -90,6 +93,8 @@ def _contract(raw: Any) -> dict:
     out: dict[str, Any] = {}
     if (grain := _text(raw.get("grain"))) is not None:
         out["grain"] = grain
+    if isinstance(raw.get("key"), list):
+        out["key"] = _names(raw["key"])
     roles = raw.get("roles") if isinstance(raw.get("roles"), dict) else {}
     if roles:
         out["roles"] = {k[:NAME_MAX]: v for k, v in roles.items()

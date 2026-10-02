@@ -29,8 +29,10 @@ def test_default_roles_follow_the_proposal_and_ignore_the_rest():
     proposal = {"key": ["date", "campaign"], "date": "date", "dimensions": ["channel", "cost"],
                 "measures": [{"column": "ctr"}]}
     roles = prep.default_roles(proposal, ["date", "campaign", "channel", "cost", "ctr", "notes"])
-    assert roles == {"date": "date", "campaign": "key", "channel": "dimension",
+    assert roles == {"date": "date", "campaign": "ignore", "channel": "dimension",
                      "cost": "dimension", "ctr": "measure", "notes": "ignore"}
+    # The key is its own list, not a role: it includes the date (F3 browser finding).
+    assert "key" not in roles.values()
 
 
 def test_only_agreed_aggregations_are_defaults_never_suggestions():
@@ -43,8 +45,9 @@ def test_only_agreed_aggregations_are_defaults_never_suggestions():
 def test_the_form_maps_to_the_apis_names_and_blanks_are_left_out():
     form = {
         "grain": "  one row per campaign per day ",
-        "roles": {"date": "date", "campaign": "key", "channel": "dimension", "cost": "measure",
-                  "ctr": "measure", "notes": "ignore"},
+        "key": ["date", "campaign"],
+        "roles": {"date": "date", "campaign": "dimension", "channel": "dimension",
+                  "cost": "measure", "ctr": "measure", "notes": "ignore"},
         "aggregations": {"cost": "sum", "ctr": None},
         "definitions": {"cost": " spend, before GST ", "ctr": "   "},
         "per": {"cost": [], "ctr": ["campaign"]},
@@ -55,8 +58,8 @@ def test_the_form_maps_to_the_apis_names_and_blanks_are_left_out():
     contract, forks = prep.contract_body(form)
     assert contract == {
         "grain": "one row per campaign per day",
-        "primary_key": ["campaign"], "date_column": "date",
-        "measures": ["cost", "ctr"], "dimensions": ["channel"],
+        "primary_key": ["date", "campaign"], "date_column": "date",
+        "measures": ["cost", "ctr"], "dimensions": ["campaign", "channel"],
         "aggregations": {"cost": "sum"},
         "measure_definitions": {"cost": "spend, before GST"},
         "measure_per": {"ctr": ["campaign"]},

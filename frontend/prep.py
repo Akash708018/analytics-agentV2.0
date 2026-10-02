@@ -33,11 +33,12 @@ def to_apply(proposals: Iterable[Mapping[str, Any]], ticked: Iterable[str]) -> t
 # --- contract ------------------------------------------------------------------------------
 
 def default_roles(proposal: Mapping[str, Any], columns: Iterable[str]) -> dict[str, str]:
-    """Each column's role as the proposal states it; columns it does not name: ignore."""
+    """Each column's role as the proposal states it; columns it does not name: ignore.
+    The key is not a role: it is its own list (`proposal["key"]`), and may include the
+    date and dimension columns."""
     roles = {c: "ignore" for c in columns}
     roles.update({c: "dimension" for c in proposal.get("dimensions", [])})
     roles.update({m["column"]: "measure" for m in proposal.get("measures", [])})
-    roles.update({c: "key" for c in proposal.get("key", [])})
     if proposal.get("date"):
         roles[proposal["date"]] = "date"
     return roles
@@ -73,7 +74,7 @@ def contract_body(form: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, st
     roles: Mapping[str, str] = form.get("roles", {})
     measures = [c for c, r in roles.items() if r == "measure"]
     contract: dict[str, Any] = {
-        "primary_key": [c for c, r in roles.items() if r == "key"],
+        "primary_key": list(form.get("key") or []),
         "measures": measures,
         "dimensions": [c for c, r in roles.items() if r == "dimension"],
     }

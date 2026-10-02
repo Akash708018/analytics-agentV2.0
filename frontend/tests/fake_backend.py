@@ -138,9 +138,18 @@ class FakeBackend:
                           "Every fork is answered by the person; none is defaulted.",
                           missing=missing, invalid=invalid)
         c = body["contract"]
+        if c.get("primary_key") and c.get("date_column") and c["date_column"] not in c["primary_key"]:
+            # Measured (F3): key [campaign] for "one row per campaign per day" is refused.
+            return _error(422, "refused", "the engine still finds this contract PROVISIONAL.",
+                          refusal={"reason": "LOAD_REFUSED",
+                                   "what": "the engine still finds this contract PROVISIONAL.",
+                                   "why": "grain, analysis_window."})
         provisional = [] if c.get("grain") else ["grain"]
+        provisional += [] if c.get("primary_key") else ["primary_key"]
         provisional += [f"measures[{m}].agg" for m in c.get("measures", [])
                         if m not in c.get("aggregations", {})]
+        provisional += [f"measures[{m}].definition" for m in c.get("measures", [])
+                        if m not in c.get("measure_definitions", {})]
         if not c.get("analysis_window_start"):
             provisional.append("analysis_window")
         if provisional:
