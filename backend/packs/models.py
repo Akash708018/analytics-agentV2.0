@@ -186,6 +186,15 @@ class Step(Strict):
     title: str = ""
 
 
+class ParamSpec(Strict):
+    """An optional parameter a person may set (B10, issue #23). Declared, never guessed."""
+    name: str
+    kind: Literal["text", "number", "date", "month", "list", "boolean", "column", "json"]
+    help: str = Field(max_length=200)
+    default: str | None = Field(None, description="What the tool uses when it is not given; "
+                                "None: the tool decides and says so (e.g. the worst group)")
+
+
 class Tool(Strict):
     id: str
     kind: Literal["preset", "pipeline"] = Field("preset", description="pipeline: a service "
@@ -198,6 +207,7 @@ class Tool(Strict):
     slots: dict[str, list[str]] = Field({}, description="slot -> candidate concepts, first "
                                         "bound wins; the person may override per run")
     params_required: list[str] = []
+    params_optional: list[ParamSpec] = []
     required_concepts: list[str] = []
     required_sources: list[str] = []
     forks: list[str] = []

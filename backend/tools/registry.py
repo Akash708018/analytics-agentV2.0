@@ -82,6 +82,8 @@ def llm_schemas(states: list[ToolState]) -> list[dict]:
         if s.pack != "core" and s.status == "active":
             t = s.tool
             props = {k: {"type": "string"} for k in (*t.params_required, *t.slots)}
+            props.update({p.name: {"type": "string", "description": p.help}
+                          for p in t.params_optional})
             schema = {"type": "object", "properties": props}
             if t.params_required:
                 schema["required"] = list(t.params_required)

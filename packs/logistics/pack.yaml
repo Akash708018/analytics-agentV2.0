@@ -107,6 +107,7 @@ tools:
       - {analysis: group_compare, params: {dimension: "@by", measure: "@distance"}, filter: [{concept: delivery_status, keep_matching: delivered}, {concept: "@by", focus_param: focus, worst_by: "@metric:sla_breach"}, {concept: delivery_minutes, compare: ">", other: promised_minutes}], optional: true, title: Distance when late}
       - {analysis: group_compare, params: {dimension: "@by", measure: "@distance"}, filter: [{concept: delivery_status, keep_matching: delivered}, {concept: "@by", focus_param: focus, worst_by: "@metric:sla_breach"}, {concept: delivery_minutes, compare: "<=", other: promised_minutes}], optional: true, title: Distance when on time}
     rules: [delivered_after_created, sla_on_delivered_only, drivers_are_associations, no_sum_of_rate]
+    params_optional: [{name: focus, kind: text, help: "Which hub, courier or zone to look inside; spellings and aliases are matched"}]
     output: {shape: groups, chart: bar}
   - id: logistics.otif
     description: On-time rate, in-full rate, and on-time among in-full orders, by hub or courier; the joint rate is not guessed.
@@ -141,6 +142,7 @@ tools:
     steps:
       - {analysis: frequency, params: {column: "@by", limit: 50}, filter: [{concept: delivery_status, keep_matching: "pending|in transit|in_transit|out for delivery|picked up|manifested|shipped"}, {concept: created_at, older_than: {as_of_param: as_of, days_param: days}}], title: Stuck by group}
       - {analysis: frequency, params: {column: "@delivery_status", limit: 20}, filter: [{concept: delivery_status, keep_matching: "pending|in transit|in_transit|out for delivery|picked up|manifested|shipped"}, {concept: created_at, older_than: {as_of_param: as_of, days_param: days}}], optional: true, title: Stuck by status}
+    params_optional: [{name: days, kind: number, help: "Open at least this many days before as_of", default: "3"}]
     output: {shape: groups, chart: bar}
   - id: logistics.rto_analysis
     description: RTO rate by hub, zone, payment mode or address quality, the reasons, and where the RTO flag and status disagree.

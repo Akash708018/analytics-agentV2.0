@@ -108,6 +108,28 @@ def merge(packs: dict[str, Pack], ids: list[str]) -> Merged:
     return m
 
 
+def step_params(t: Tool) -> set[str]:
+    """Every param a tool's steps read: @param:x, @param?:x, and the filters' *_param keys."""
+    import re
+    out: set[str] = set()
+
+    def walk(v):
+        if isinstance(v, str):
+            out.update(re.findall(r"@param\??:([a-z_]+)", v))
+        elif isinstance(v, dict):
+            for k, x in v.items():
+                if k.endswith("_param") and isinstance(x, str):
+                    out.add(x)
+                walk(x)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x)
+    for s in t.steps:
+        walk(s.params)
+        walk(s.filter)
+    return out
+
+
 def _check_refs(m: Merged) -> None:
     bad = []
     for t in m.templates.values():
@@ -120,6 +142,9 @@ def _check_refs(m: Merged) -> None:
         bad += [f"tool {t.id}: unknown fork {f}" for f in t.forks if f not in m.forks]
         bad += [f"tool {t.id}: unknown source {s}" for s in t.required_sources
                 if s not in m.sources]
+        bad += [f"tool {t.id}: optional param '{p}' read by a step is not declared in "
+                f"params_required or params_optional" for p in step_params(t)
+                if p not in set(t.params_required) | {x.name for x in t.params_optional}]
         known = set(m.validity_rules) | set(m.interpretation_rules)
         bad += [f"tool {t.id}: unknown rule {r}" for r in t.rules if r not in known]
     for b in m.playbooks.values():

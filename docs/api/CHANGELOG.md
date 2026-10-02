@@ -7,6 +7,10 @@ Every change to `docs/api/openapi.yaml` bumps `info.version` and adds an entry h
 - #20: `KeywordGroupAction.action` gains `unapprove` (the group returns to proposal; the engine
   stops reading it — and a tool on a dataset with no approved groups left answers 422 again).
   `POST .../keyword-groups/run {"column": "<not a column>"}` answers 422 `needs_data`, not 500.
+- #23: every tool in `GET /packs/{id}` declares `params_optional: [{name, kind, help,
+  default}]` — e.g. `logistics.sla_drivers.focus` (default null: the engine picks the worst
+  group and says so), `logistics.stuck_shipments.days` (default "3"). A pack whose step reads an
+  undeclared param no longer loads.
 
 ## 0.7.0 — 2026-10-02 (B9, additive)
 

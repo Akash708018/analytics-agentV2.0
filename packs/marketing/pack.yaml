@@ -311,6 +311,7 @@ tools:
       - {analysis: growth_decomposition, params: {measure: "@spend", dimension: "@by", period: "@param:period", baseline: "@param:baseline", grain: "@param:grain=month"}, title: Spend change by group}
     forks: [roas_revenue_basis, attribution_window]
     rules: [exclude_test_campaigns, roas_spend_positive, no_sum_of_rate]
+    params_optional: [{name: grain, kind: text, help: "Period length the labels use: month, week or day", default: "month"}]
     output: {shape: decomposition, chart: bar}
   - id: marketing.spend_waste
     description: Campaigns, keywords or search terms taking spend with few or no conversions.
@@ -411,6 +412,7 @@ tools:
       - {analysis: period_compare, params: {measure: "@metric:ctr", period: "@param:period", baseline: "@param:baseline", grain: "@param:grain=month"}, optional: true, title: CTR}
     forks: [gsc_aggregation]
     rules: [no_sum_of_rate]
+    params_optional: [{name: grain, kind: text, help: "Period length the labels use: month, week or day", default: "month"}]
     output: {shape: decomposition, chart: bar}
   - id: marketing.striking_distance
     description: Queries ranking 4 to 15 with many impressions -- closest wins for page one.
@@ -509,6 +511,7 @@ tools:
     required_concepts: [user_pseudo_id, event_name, date]
     steps:
       - {analysis: funnel, params: {entity: "@user_pseudo_id", step_column: "@event_name", steps: "@param:steps=view_item,add_to_cart,begin_checkout,purchase", window_days: "@param?:window_days"}}
+    params_optional: [{name: steps, kind: list, help: "Funnel steps in order (event names)", default: "view_item,add_to_cart,begin_checkout,purchase"}, {name: window_days, kind: number, help: "Steps must happen within this many days of the first"}]
     output: {shape: funnel, chart: funnel}
   - id: marketing.conversion_reconciliation
     description: Platform, GA4 and backend conversions side by side, never added, each as a ratio to the backend count.
@@ -519,6 +522,7 @@ tools:
     steps:
       - {analysis: source_reconciliation, params: {measures: "@param:sources", reference: "@param:reference", dimension: "@param?:by"}}
     rules: [no_cross_source_conversion_sum]
+    params_optional: [{name: by, kind: column, help: "Also split each source by this column"}]
     output: {shape: groups, chart: bar}
   - id: marketing.ab_test_readout
     description: A/B test result with sample-ratio check and minimum detectable effect; says not enough data rather than guess.
@@ -529,6 +533,7 @@ tools:
     required_concepts: []
     steps:
       - {analysis: ab_test, params: {dimension: "@variant", measure: "@param:rate_measure", expected_split: "@param?:expected_split"}}
+    params_optional: [{name: expected_split, kind: text, help: "The planned split between variants, e.g. 50/50"}]
     output: {shape: comparison, chart: bar}
   - id: marketing.budget_pacing
     description: Spend to date this month against the budget you enter, with a straight-line month-end projection.
@@ -539,6 +544,7 @@ tools:
     steps:
       - {analysis: pacing, params: {measure: "@spend", budget: "@param:budget", month: "@param:month", as_of: "@param?:as_of"}}
     rules: [exclude_test_campaigns]
+    params_optional: [{name: as_of, kind: date, help: "Pace up to this date instead of the last date in the data"}]
     output: {shape: table, chart: table}
   - id: marketing.keyword_ngrams
     description: The words and word pairs in search terms or queries, ranked by clicks.
@@ -548,6 +554,7 @@ tools:
     required_concepts: [clicks]
     steps:
       - {analysis: text_ngrams, params: {column: "@text", measure: "@clicks", n: "@param:n=1", limit: 30}}
+    params_optional: [{name: n, kind: number, help: "Words per phrase: 1 words, 2 word pairs", default: "1"}]
     output: {shape: groups, chart: bar}
   - id: marketing.cannibalization
     description: Search queries where several of your pages split the clicks.
@@ -578,6 +585,7 @@ tools:
     steps:
       - {analysis: before_after_baseline, params: {measure: "@measure", start: "@param:start", pre_days: "@param:pre_days=28", post_days: "@param:post_days=28", holdout: "@param?:holdout"}}
     rules: [correlational_only]
+    params_optional: [{name: pre_days, kind: number, help: "Days before the start used as the baseline", default: "28"}, {name: post_days, kind: number, help: "Days after the start measured", default: "28"}, {name: holdout, kind: text, help: "A holdout you ran, so the answer may say caused"}]
     output: {shape: table, chart: table}
   - id: marketing.delivered_roas
     description: ROAS on revenue net of GST with cancelled and RTO orders removed, split COD vs prepaid.
@@ -597,6 +605,7 @@ tools:
     steps:
       - {analysis: unit_economics, params: {entity: "@customer_id", measure: "@order_revenue", spend: "@param:spend", min_months: "@param:min_months=3"}}
     forks: [cac_scope]
+    params_optional: [{name: min_months, kind: number, help: "Cohorts younger than this are marked, not judged", default: "3"}]
     output: {shape: cohorts, chart: table}
   - id: marketing.ltv_to_cac
     description: Revenue per customer to date against CAC, per cohort; young cohorts marked, never extrapolated.
@@ -607,6 +616,7 @@ tools:
     steps:
       - {analysis: unit_economics, params: {entity: "@customer_id", measure: "@order_revenue", spend: "@param:spend", min_months: "@param:min_months=6"}}
     forks: [cac_scope]
+    params_optional: [{name: min_months, kind: number, help: "Cohorts younger than this are marked, not judged", default: "6"}]
     output: {shape: cohorts, chart: table}
   # --- keyword grouping (B7) ---
   - id: marketing.keyword_grouping
