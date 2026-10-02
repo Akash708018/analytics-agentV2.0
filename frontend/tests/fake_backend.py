@@ -352,6 +352,48 @@ class FakeBackend:
                                              "provisional": None})
         return None
 
+    def add_event(self, turn_id: str, kind: str, data: dict) -> None:
+        t = self.turns[turn_id]
+        t["events"].append({"seq": len(t["events"]), "type": kind, "at": STAMP, "data": data})
+
+    def answer_turn(self, turn_id: str, *, flags=(), with_result: bool = True) -> None:
+        """A finished playbook turn shaped like the F5 probe of the real backend."""
+        steps = ["marketing.spend_waste", "marketing.keyword_ngrams"]
+        self.add_event(turn_id, "plan", {"playbook": "where_is_spend_wasted", "slots": {},
+                                         "steps": steps})
+        self.add_event(turn_id, "tool_call", {"tool_id": steps[0], "params": {}, "status": "ok",
+                                              "ms": 167})
+        self.add_event(turn_id, "tool_call", {
+            "tool_id": steps[1], "params": {}, "status": "skipped", "code": "needs_data",
+            "reason": "text_ngrams: none of ['search_term', 'query', 'keyword'] is in this data",
+            "ms": 102})
+        self.add_event(turn_id, "figure_check", {"status": "passed", "checked": 3,
+                                                 "detail": "3 of 3 figure(s) match the tool replies."})
+        self.add_event(turn_id, "interpretation_check", {"rule": "all", "status": "passed",
+                                                         "detail": ""})
+        text = "Spend goes mostly to search: 560.0 (55.5%)."
+        self.add_event(turn_id, "answer", {"text": text, "flags": list(flags)})
+        result = {"tool_id": steps[0], "dataset_id": self.turns[turn_id]["dataset_id"],
+                  "summary": "Where spend is wasted: 2 step(s) run",
+                  "figures": [{"name": "Where the spend goes: 1", "value": 560.0, "unit": "cost",
+                               "provenance": "contract"},
+                              {"name": "Where the spend goes: 1 [share]", "value": 55.5,
+                               "unit": "share", "provenance": "contract"},
+                              {"name": "Conversions per group: tiny", "value": None,
+                               "unit": None, "provenance": "contract"}],
+                  "series": [{"chart": "bar", "name": "Where the spend goes", "x_label": "rank",
+                              "y_label": "cost", "points": [{"x": "1", "y": 560.0},
+                                                            {"x": "2", "y": 449.0}]}],
+                  "validity_filters_applied": ["exclude_test_campaigns"],
+                  "pack_rules_applied": [], "forks": {}, "caveats": ["Small groups suppressed."],
+                  "figure_check": {"status": "not_run", "notes": []}}
+        self.turns[turn_id].update(status="done", answer={
+            "text": text, "flags": list(flags), "playbook": "where_is_spend_wasted",
+            "results": [result] if with_result else [],
+            "skipped": [{"tool_id": steps[1], "code": "needs_data", "reason": "no text column"}],
+            "usage": {"llm_calls": 2, "tool_calls": 2, "tokens_in_est": 1001,
+                      "tokens_out_est": 56, "per_call": [], "model": "scripted"}})
+
     def finish_turn(self, turn_id: str, text: str = "ROAS fell from 4.1 to 3.2.") -> None:
         t = self.turns[turn_id]
         t["status"] = "done"

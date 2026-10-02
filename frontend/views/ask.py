@@ -1,14 +1,16 @@
-"""Ask page (F2 minimum): send a question once, follow it by id, survive refresh.
+"""Ask page: send a question once, follow it by id, survive refresh, show the evidence.
 
 The turn list is the server's. A refresh shows a running turn and keeps polling
 it; it never sends the question again. The question box is browser-only (free
-text is not put in ui_state). Rendering tool results and figures is a later milestone.
+text is not put in ui_state). Each answer shows how it was reached and the tool
+results it rests on (components/evidence.py, F5).
 """
 
 import streamlit as st
 
 from frontend import connection, datasets, state, turns
 from frontend.api_client import APIError
+from frontend.components.evidence import render_answer, render_steps
 from frontend.components.shell import show_error
 
 POLL_SECONDS = 2
@@ -26,22 +28,13 @@ def render_turn(turn: dict) -> None:
     with st.chat_message("assistant"):
         status = turn["status"]
         if status == "done":
-            answer = turn.get("answer") or {}
-            st.markdown(answer.get("text", ""))
-            for flag in answer.get("flags", []):
-                st.warning(flag if isinstance(flag, str) else str(flag))
-            results = answer.get("results", [])
-            if results:
-                st.caption(f"{len(results)} tool result(s) back this answer; the evidence "
-                           "view arrives in a later milestone.")
+            render_answer(turn)
         elif turns.is_active(turn):
-            steps = [e["type"] for e in turn["events"]]
-            st.info(f"Working ({status})" + (f": {', '.join(steps)}" if steps else "") + ".")
+            st.info(f"Working ({status}).")
+            render_steps(turn["events"])             # live: the plan and each tool as it runs
         else:
             st.error(turns.TERMINAL_NOTES.get(status, f"Status: {status}"))
-            for event in turn["events"]:
-                if event["type"] == "error":
-                    st.caption(f"{event['data'].get('code')}: {event['data'].get('message')}")
+            render_steps(turn["events"])
         st.caption(f"{turn['turn_id']} · {turn['created_at']}")
 
 
