@@ -28,9 +28,7 @@ as D-B0-1). Every planned frontend milestone (F0–F7) is done. What remains wai
   test suite if the user says yes (D-F7-3).
 - Blocked: ingest layout answers ([#16](https://github.com/Akash708018/analytics-agentV2.0/issues/16),
   no endpoint). Nonblocking: [#17](https://github.com/Akash708018/analytics-agentV2.0/issues/17)
-  (contract in force), [#14](https://github.com/Akash708018/analytics-agentV2.0/issues/14)
-  (list datasets), [#4](https://github.com/Akash708018/analytics-agentV2.0/issues/4) (error examples),
-  [#20](https://github.com/Akash708018/analytics-agentV2.0/issues/20) (withdraw a keyword-group
+  (contract in force), [#20](https://github.com/Akash708018/analytics-agentV2.0/issues/20) (withdraw a keyword-group
   approval; 500 on an unknown column), [#21](https://github.com/Akash708018/analytics-agentV2.0/issues/21)
   (cleaning samples/SQL), [#22](https://github.com/Akash708018/analytics-agentV2.0/issues/22)
   (direct core analyses and reports: 35 v1 items).
@@ -60,9 +58,12 @@ Rules the next screens must keep (`frontend/state.py` docstring, C7, C10):
 
 ## api-request issues (links, status)
 
-#4 (error examples), #14 (list datasets), #16 (ingest answers), #17 (contract in force),
-#20 (keyword groups: withdraw an approval; 500 on an unknown column), #21 (cleaning samples and
-SQL), #22 (direct core analyses and reports): all open.
+Open: #16 (ingest answers), #17 (contract in force), #20 (keyword groups: withdraw an approval;
+500 on an unknown column), #21 (cleaning samples and SQL), #22 (direct core analyses and reports).
+Closed on 2026-10-01 at 20:40 UTC by the repo-owner account (checked 2026-10-02 06:56Z): #14
+(list a workspace's datasets; closed "completed", but API 0.6.0 has no such endpoint, so the
+frontend keeps dataset ids in `ui_state`, C8) and #4 (spec error examples). Earlier handoffs
+listed both as open by mistake.
 
 ## Test tail (pasted)
 

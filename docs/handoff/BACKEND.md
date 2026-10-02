@@ -9,7 +9,7 @@ in `backend/services/sessions.py`. `ui_state_problem` no longer reads an exact s
 (`ds_/ws_` + 12 hex, `t_` + 16 hex) as a phone number; it refused 0.34% of dataset ids. 5 tests
 in `test_api_sessions.py`; full suite 2354 passed, 1 skipped. No API shape change. New
 api-requests from F3: #16 (answer ingest layout questions), #17 (return the contract in force);
-#14 (list a workspace's datasets) is still open.
+#14 (list a workspace's datasets) was closed on 2026-10-01 without the endpoint (corrected 2026-10-02; this note first said it was open).
 
 2026-10-02, F4 (same branch): **C11** in `backend/services/datasets.py`: `POST /tools/core.*/run`
 answered 500 (KeyError at `m.tools[tool_id]`); the `not_a_domain_tool` check now runs first.
