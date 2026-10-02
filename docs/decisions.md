@@ -549,3 +549,7 @@ version, grain, metrics used and the result id are shown as returned, with a lin
 `sla_drivers` reads `focus` in its step filters, but its spec does not list it. The Tools page
 reads `filter[].focus_param` (`prep.optional_params`); #23 asks for a declaration.
 
+
+**C14. A question recorded as a decision.** The user wrote "froentend is complete", asking
+whether it is. I recorded it as their declaration (D-F8-5, commit `77f63e3`, now reverted).
+Whether the frontend is complete was answered in chat; the handoff stands as after F8.
