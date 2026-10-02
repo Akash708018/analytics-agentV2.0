@@ -236,7 +236,7 @@ def main() -> None:
         return
     st.subheader("Groups")
     st.caption(kw.summary(groups))
-    st.caption("An approval cannot be withdrawn here: API 0.6.0 has no action for it (#20).")
+    st.caption("An approval can't be withdrawn yet, so approve only the groups you are sure of.")  # no such action yet: issue #20
     st.page_link("views/tools.py", label="Tools: keyword group performance, page targeting",
                  icon="🧰", query_params={"sid": ss[state.SID]})
     ids = kw.ticked(state.get_path(draft, p(dataset_id, "ticks"), {}), groups)
