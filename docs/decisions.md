@@ -585,3 +585,33 @@ the engine (`_produce`), so nothing the rules protect is bypassed. The person pi
 behaviour); `where` is never accepted. A "report" is a playbook the PERSON chooses, run step
 by step with no LLM call; its results share one `run_id`. Fields are read from each analysis's
 own signature, so the declaration cannot drift from the code.
+
+## F10 — upload answers, contract in force, losses, withdraw, optional params, Explore (2026-10-02)
+
+**D-F10-1. Core analyses and reports get their own page, Explore, after Tools.**
+- Tools stays the domain tools.
+- Explore holds the 27 core analyses (B11) and the playbook reports.
+- Both pages share `render_result`, so lineage, the link to every row, CSV and caveats are the
+  same.
+
+Nothing is chosen for the person: no analysis, no field, no playbook. The contract's own
+choices are the only options for measure, dimension, column and grain fields.
+
+**D-F10-2. A refused upload's answers are not saved with the session.**
+- They belong to one upload, not to a dataset, and the reader asks again with the same
+  `upload_id`.
+- The form lives in the browser (`data.answers.<upload_id>.*`) until the file loads.
+- "Use the reader's guess" fills only blank fields: an explicit button, never applied by
+  itself (D-F3-1).
+
+**D-F10-3. A declared number param is a whole number unless its default is fractional.** The
+runner reads the declared counts (days, n, months) as integers; it converts a digit default with
+`int`. A float 5.0 would reach analyses that expect 5. A pack that wants decimals says so with a
+fractional default.
+
+**D-F10-4. The contract in force sits above the form, collapsed.**
+- Its label carries the version and the confirmation time.
+- The person's caveats and the engine's counted caveats are separate lists, as the API keeps
+  them.
+- Its cache drops on everything that changes it: confirm, metric approval, rule approval and
+  answered forks.

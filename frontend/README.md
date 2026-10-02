@@ -24,13 +24,17 @@ ANALYTICS_API_URL=http://127.0.0.1:8000 frontend/.venv/bin/python -m streamlit r
 
 Open the printed URL and click **Start a new session**. The address then holds
 `?sid=<uuid>`: that link is the session. Pages: **Session** (name the analysis),
-**Data** (upload a CSV/xlsx, choose the dataset, see its profile), **Clean** (tick the
-engine's proposals, then apply), **Domain** (confirm what kind of data it is), **Contract**
-(what each column is, how measures add up, the questions only you can answer), **Metrics**
+**Data** (upload a CSV/xlsx, choose the dataset, see its profile; when the reader can't settle
+a file's layout, answer its questions from a blank form beside the file's first rows), **Clean**
+(tick the engine's proposals, see what each loses, with examples and its SQL, then apply),
+**Domain** (confirm what kind of data it is), **Contract** (the contract in force, then what
+each column is, how measures add up, the questions only you can answer), **Metrics**
 (approve metrics such as CTR, CPA, ROAS, and validity rules), **Keyword groups** (the engine
-proposes groups of search terms; you approve, merge, rename, split or move them; only approved
-groups reach the tools), **Tools** (run a marketing or logistics tool;
-every figure with its source, charts as the backend computed them), **Results** (every stored
+proposes groups of search terms; you approve, withdraw an approval, merge, rename, split or move
+them; only approved groups reach the tools), **Tools** (run a marketing or logistics tool;
+every figure with its source, charts as the backend computed them), **Explore** (run any of
+the engine's 27 core analyses with the fields you choose, or build a report from a playbook of
+a confirmed domain, no model call), **Results** (every stored
 result, whether it is out of date and why, and all its rows, paged), and **Ask**
 (questions and answers; a running question survives refresh and is never sent twice; each
 answer shows how it was reached and the tool results behind it). Every result downloads its
