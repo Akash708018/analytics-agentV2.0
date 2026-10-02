@@ -1,29 +1,9 @@
 ## Status (date, branch, last commit)
 
-2026-10-02 · branch `claude/analytics-agent-v2-backend-6gcu1p` · PR #13 (B8 + B9).
-Done: B0–B8, review cleanup, **B9** (the Future Concepts doc's "Implement now" items that fit
-the finished backend: ranks 1, 2, 5, 6, 7, 9, 10, 12, 13, 14, 16, 22; 3/20/21 were already
-done; the rest are logged with reasons in D-B9-1). API **0.7.0** (additive).
-Open for the user: approve the draft keyword gold (D-B7-3).
-
-2026-10-02, from the frontend session (branch `claude/beautiful-lovelace-07dnwu`, PR #15): **C9**
-in `backend/services/sessions.py`. `ui_state_problem` no longer reads an exact server id
-(`ds_/ws_` + 12 hex, `t_` + 16 hex) as a phone number; it refused 0.34% of dataset ids. 5 tests
-in `test_api_sessions.py`; full suite 2354 passed, 1 skipped. No API shape change. New
-api-requests from F3: #16 (answer ingest layout questions), #17 (return the contract in force);
-#14 (list a workspace's datasets) was closed on 2026-10-01 without the endpoint (corrected 2026-10-02; this note first said it was open).
-
-2026-10-02, F4 (same branch): **C11** in `backend/services/datasets.py`: `POST /tools/core.*/run`
-answered 500 (KeyError at `m.tools[tool_id]`); the `not_a_domain_tool` check now runs first.
-2 tests in `test_logistics.py`; full suite 2356 passed, 1 skipped. Observation, not acted on: a
-concept named while approving a metric (`bindings`, e.g. `conv_value` → `revenue`) is not reused
-by tool runs on the same dataset; the person names it again in `params.bindings`.
-
-2026-10-02, F6 (same branch, no backend change): api-request
-[#20](https://github.com/Akash708018/analytics-agentV2.0/issues/20). (1) Keyword groups have no
-action that withdraws an approval. (2) `POST .../keyword-groups/run {"column": "nope"}` answers 500
-(DuckDB binder error escapes `KeywordService.run`). The screen only offers the profile's
-columns, so (2) is unreachable from the UI. Neither blocks the frontend.
+2026-10-02 · working on `main` (user's instruction; other branches merged, deletion left to
+the user — the proxy refuses branch deletes). Done: B0–B10. **B10** = the frontend's
+api-request issues #16, #17, #20, #21, #23 (closed). API **0.8.0** (additive). Open: #22
+(direct core analyses + report) needs the user's product decision; D-B7-3 keyword gold.
 
 ## API: spec version — live | stubbed (501) | changed since last handoff
 
@@ -81,14 +61,23 @@ None (checked 2026-09-26).
 
     cd backend && uv run pytest -q -rs
     SKIPPED [1] tests/test_agent.py:580: v2 B0 (D-B0-2): the v1 Streamlit app ui/app.py is not seeded; v2 screens belong to the frontend
-    2369 passed, 1 skipped, 1 warning in 280.10s (0:04:40)
-    eval: SCORE: 76/76 (100%) · sla_bench: 19/19 checks right · frontend: 133 passed
+    2384 passed, 1 skipped, 1 warning in 409.46s (0:06:49)
+    eval: SCORE: 76/76 (100%) · sla_bench: 19/19 checks right · frontend: 267 passed
 
 2026-10-02, F8 on main (no backend change): the frontend consumes 0.7.0 (results, lineage,
 inspect, routing/blocked plans, joins, prefill, value errors). api-request
 [#23](https://github.com/Akash708018/analytics-agentV2.0/issues/23): `logistics.sla_drivers`
 reads `focus` but its spec doesn't declare it; the frontend reads `filter[].focus_param` until
 it does.
+
+## B10 for the frontend (0.8.0, additive)
+
+- Upload: on 422 `ingest_needs_answers` show `preview.rows` and `preview.guess`; send the
+  answers to `POST /workspaces/{ws}/uploads/{upload_id}/answers` (client `answer_upload`).
+- Contract: `GET /datasets/{id}/contract` (client `get_contract`) is the record of what was
+  confirmed; the `ui_state.drafts` stopgap can go.
+- Cleaning: show `samples`, `values_lost` + `loss_unit` on lossy steps; `sql` in an expander.
+- Keyword groups: `unapprove` action. Tools: read `params_optional` instead of step filters.
 
 ## B9 for the frontend (0.7.0, additive — `docs/api/CHANGELOG.md`)
 
