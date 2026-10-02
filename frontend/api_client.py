@@ -1,4 +1,4 @@
-"""Thin HTTP boundary for docs/api/openapi.yaml v0.5.0.
+"""Thin HTTP boundary for docs/api/openapi.yaml v0.6.0.
 
 Responses are returned unchanged. No retries, figure calculations, or backend
 imports: callers decide when to poll and people decide how to resolve conflicts.

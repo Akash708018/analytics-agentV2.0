@@ -8,13 +8,13 @@ FRONTEND = Path(__file__).resolve().parents[1]
 PROBE = FRONTEND / "dev" / "state_probe.py"
 
 
-def test_landing_explains_service_readiness_without_collecting_unsaved_work():
+def test_landing_collects_no_unsaved_work_and_offers_one_explicit_start():
+    # F2: the landing starts a backend session only on this click (test_f2_app.py).
     app = AppTest.from_file(str(FRONTEND / "app.py")).run()
     assert not app.exception
     assert app.title[0].value == "Analytics agent"
-    assert "session saving is ready" in app.info[0].value
     assert not app.text_input
-    assert not app.button
+    assert [b.label for b in app.button] == ["Start a new session"]
 
 
 def test_probe_shared_field_survives_a_rerun():
