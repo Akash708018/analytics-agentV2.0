@@ -1,0 +1,178 @@
+row_id,date,query,page,clicks,impressions,position
+0,2026-09-01,sushi delivery pune,/sushi-delivery,19,190,5
+1,2026-09-01,sushi home delivery,/menu,19,190,5
+2,2026-09-01,sushi delivry pune,/sushi-delivery,18,180,5
+3,2026-09-01,order sushi online,/menu,18,180,5
+4,2026-09-01,sushi online order pune,/sushi-delivery,23,230,5
+5,2026-09-01,sushi ghar pe delivery,/sushi-delivery,22,220,5
+6,2026-09-01,sushi swiggy pune,/sushi-delivery,17,170,5
+7,2026-09-01,sushi zomato,/sushi-delivery,12,120,5
+8,2026-09-01,sushi takeaway pune,/sushi-delivery,19,190,5
+9,2026-09-01,sushii delivery,/sushi-delivery,15,150,5
+10,2026-09-01,sushi delivery kalyani nagar,/sushi-delivery,28,280,5
+11,2026-09-01,sushi delivery baner,/sushi-delivery,20,200,5
+12,2026-09-01,best sushi delivery pune,/sushi-delivery,24,240,5
+13,2026-09-01,sushi home delivery kothrud,/sushi-delivery,27,270,5
+14,2026-09-01,shushi delivery,/sushi-delivery,15,150,5
+15,2026-09-01,sushi near me,/sushi_near_me,13,130,5
+16,2026-09-01,sushi nearby,/sushi_near_me,12,120,5
+17,2026-09-01,sushi restaurant near me,/sushi_near_me,24,240,5
+18,2026-09-01,sushi places near me,/sushi_near_me,20,200,5
+19,2026-09-01,sushi paas mein,/sushi_near_me,15,150,5
+20,2026-09-01,sushi near by,/sushi_near_me,13,130,5
+21,2026-09-01,sushi aas paas,/sushi_near_me,14,140,5
+22,2026-09-01,best sushi near me,/sushi_near_me,18,180,5
+23,2026-09-01,sushi near me open now,/sushi_near_me,22,220,5
+24,2026-09-01,sushi close to me,/sushi_near_me,17,170,5
+25,2026-09-01,sushie near me,/sushi_near_me,14,140,5
+26,2026-09-01,sushi koregaon park,/sushi_area,19,190,5
+27,2026-09-01,sushi in baner,/sushi_area,14,140,5
+28,2026-09-01,sushi viman nagar,/sushi_area,17,170,5
+29,2026-09-01,sushi aundh,/sushi_area,11,110,5
+30,2026-09-01,sushi restaurant kalyani nagar,/sushi_area,30,300,5
+31,2026-09-01,sushi hinjewadi,/sushi_area,15,150,5
+32,2026-09-01,sushi fc road,/sushi_area,13,130,5
+33,2026-09-01,sushi wakad,/sushi_area,11,110,5
+34,2026-09-01,sushi magarpatta,/sushi_area,16,160,5
+35,2026-09-01,sushi kp pune,/sushi_area,13,130,5
+36,2026-09-01,sushi camp pune,/sushi_area,15,150,5
+37,2026-09-01,sushi kothrud,/sushi_area,13,130,5
+38,2026-09-01,sushi price pune,/sushi_price,16,160,5
+39,2026-09-01,sushi platter price,/sushi_price,19,190,5
+40,2026-09-01,cheap sushi pune,/sushi_price,16,160,5
+41,2026-09-01,sushi sasta,/sushi_price,11,110,5
+42,2026-09-01,sushi rate pune,/sushi_price,15,150,5
+43,2026-09-01,sushi cost,/sushi_price,10,100,5
+44,2026-09-01,affordable sushi pune,/sushi_price,21,210,5
+45,2026-09-01,sushi under 500,/sushi_price,15,150,5
+46,2026-09-01,sushi offers pune,/sushi_price,17,170,5
+47,2026-09-01,sushi discount,/sushi_price,14,140,5
+48,2026-09-01,budget sushi,/sushi_price,12,120,5
+49,2026-09-01,what is sushi,/sushi_info,13,130,5
+50,2026-09-01,sushi kaise khate hai,/sushi_info,21,210,5
+51,2026-09-01,sushi calories,/sushi_info,14,140,5
+52,2026-09-01,sushi meaning,/sushi_info,13,130,5
+53,2026-09-01,how to eat sushi,/sushi_info,16,160,5
+54,2026-09-01,sushi kya hai,/sushi_info,13,130,5
+55,2026-09-01,sushi vs sashimi,/sushi_info,16,160,5
+56,2026-09-01,sushi recipe,/sushi_info,12,120,5
+57,2026-09-01,difference between sushi and maki,/sushi_info,33,330,5
+58,2026-09-01,how to make sushi at home,/sushi_info,25,250,5
+59,2026-09-01,ramen delivery pune,/ramen_delivery,19,190,5
+60,2026-09-01,ramen home delivery,/ramen_delivery,19,190,5
+61,2026-09-01,order ramen online,/ramen_delivery,18,180,5
+62,2026-09-01,ramen swiggy,/ramen_delivery,12,120,5
+63,2026-09-01,ramen zomato pune,/ramen_delivery,17,170,5
+64,2026-09-01,ramen ghar pe,/ramen_delivery,13,130,5
+65,2026-09-01,raman delivery pune,/ramen_delivery,19,190,5
+66,2026-09-01,ramen takeaway,/ramen_delivery,14,140,5
+67,2026-09-01,ramen delivery viman nagar,/ramen_delivery,26,260,5
+68,2026-09-01,ramen online order,/ramen_delivery,18,180,5
+69,2026-09-01,ramen koregaon park,/ramen_area,19,190,5
+70,2026-09-01,ramen baner,/ramen_area,11,110,5
+71,2026-09-01,ramen viman nagar,/ramen_area,17,170,5
+72,2026-09-01,ramen aundh,/ramen_area,11,110,5
+73,2026-09-01,ramen kalyani nagar,/ramen_area,19,190,5
+74,2026-09-01,ramen fc road,/ramen_area,13,130,5
+75,2026-09-01,ramen hinjewadi,/ramen_area,15,150,5
+76,2026-09-01,ramen camp,/ramen_area,10,100,5
+77,2026-09-01,best ramen pune,/ramen_generic,15,150,5
+78,2026-09-01,ramen pune,/ramen_generic,10,100,5
+79,2026-09-01,ramen restaurant pune,/ramen_generic,21,210,5
+80,2026-09-01,top ramen in pune,/ramen_generic,17,170,5
+81,2026-09-01,japanese ramen pune,/ramen_generic,19,190,5
+82,2026-09-01,good ramen pune,/ramen_generic,15,150,5
+83,2026-09-01,ramen bowl pune,/ramen_generic,15,150,5
+84,2026-09-01,ramen noodles pune,/ramen_generic,18,180,5
+85,2026-09-01,tonkotsu ramen pune,/ramen_generic,19,190,5
+86,2026-09-01,spicy ramen pune,/ramen_generic,16,160,5
+87,2026-09-01,japanese restaurant koregaon park,/japanese_area,33,330,5
+88,2026-09-01,japanese restaurant baner,/japanese_area,25,250,5
+89,2026-09-01,japanese food viman nagar,/japanese_area,25,250,5
+90,2026-09-01,japanese restaurant kalyani nagar,/japanese_area,33,330,5
+91,2026-09-01,japanese restaurant aundh,/japanese_area,25,250,5
+92,2026-09-01,japanese food hinjewadi,/japanese_area,23,230,5
+93,2026-09-01,japanese restaurant fc road,/japanese_area,27,270,5
+94,2026-09-01,japanese cuisine koregaon park,/japanese_area,30,300,5
+95,2026-09-01,japanese restaurant kp,/japanese_area,22,220,5
+96,2026-09-01,japanese food camp,/japanese_area,18,180,5
+97,2026-09-01,japnese restaurant baner,/japanese_area,24,240,5
+98,2026-09-01,japanese restaurant magarpatta,/japanese_area,30,300,5
+99,2026-09-01,japanese restaurant near me,/japanese_near_me,27,270,5
+100,2026-09-01,japanese food near me,/japanese_near_me,21,210,5
+101,2026-09-01,japanese restaurant nearby,/japanese_near_me,26,260,5
+102,2026-09-01,japanese food paas mein,/japanese_near_me,23,230,5
+103,2026-09-01,japanese restaurants near me open now,/japanese_near_me,37,370,5
+104,2026-09-01,japanese cuisine near me,/japanese_near_me,24,240,5
+105,2026-09-01,japanese restaurant near by,/japanese_near_me,27,270,5
+106,2026-09-01,japanese food aas paas,/japanese_near_me,22,220,5
+107,2026-09-01,best japanese restaurant near me,/japanese_near_me,32,320,5
+108,2026-09-01,japanise food near me,/japanese_near_me,21,210,5
+109,2026-09-01,japanese restaurant pune,/japanese_generic,24,240,5
+110,2026-09-01,best japanese restaurant pune,/japanese_generic,29,290,5
+111,2026-09-01,japanese food pune,/japanese_generic,18,180,5
+112,2026-09-01,top japanese restaurants in pune,/japanese_generic,32,320,5
+113,2026-09-01,japanese cuisine pune,/japanese_generic,21,210,5
+114,2026-09-01,authentic japanese pune,/japanese_generic,23,230,5
+115,2026-09-01,good japanese food pune,/japanese_generic,23,230,5
+116,2026-09-01,japanese restaurant,/japanese_generic,19,190,5
+117,2026-09-01,japanese dining pune,/japanese_generic,20,200,5
+118,2026-09-01,japani khana pune,/japanese_generic,17,170,5
+119,2026-09-01,japanese restaurants pune,/japanese_generic,25,250,5
+120,2026-09-01,fine dining japanese pune,/japanese_generic,25,250,5
+121,2026-09-01,japanese food delivery pune,/japanese_delivery,27,270,5
+122,2026-09-01,japanese food home delivery,/japanese_delivery,27,270,5
+123,2026-09-01,order japanese food online,/japanese_delivery,26,260,5
+124,2026-09-01,japanese food swiggy,/japanese_delivery,20,200,5
+125,2026-09-01,japanese food zomato,/japanese_delivery,20,200,5
+126,2026-09-01,japanese takeaway pune,/japanese_delivery,22,220,5
+127,2026-09-01,japanese food ghar pe delivery,/japanese_delivery,30,300,5
+128,2026-09-01,japanese food delivry,/japanese_delivery,21,210,5
+129,2026-09-01,hana japanese restaurant,/brand_hana,24,240,5
+130,2026-09-01,hana restaurant pune,/brand_hana,20,200,5
+131,2026-09-01,hana menu,/brand_hana,9,90,5
+132,2026-09-01,hana pune,/brand_hana,9,90,5
+133,2026-09-01,hana japanese pune reviews,/brand_hana,26,260,5
+134,2026-09-01,hana restaurant koregaon park,/brand_hana,29,290,5
+135,2026-09-01,hana booking,/brand_hana,12,120,5
+136,2026-09-01,hana japanese menu price,/brand_hana,24,240,5
+137,2026-09-01,hana contact number,/brand_hana,19,190,5
+138,2026-09-01,hana timings,/brand_hana,12,120,5
+139,2026-09-01,bento box delivery pune,/bento_delivery,23,230,5
+140,2026-09-01,bento delivery,/bento_delivery,14,140,5
+141,2026-09-01,order bento online,/bento_delivery,18,180,5
+142,2026-09-01,bento swiggy,/bento_delivery,12,120,5
+143,2026-09-01,bento box home delivery,/bento_delivery,23,230,5
+144,2026-09-01,bento lunch delivery pune,/bento_delivery,25,250,5
+145,2026-09-01,bento zomato,/bento_delivery,12,120,5
+146,2026-09-01,teppanyaki price pune,/teppanyaki_price,21,210,5
+147,2026-09-01,teppanyaki buffet price,/teppanyaki_price,23,230,5
+148,2026-09-01,teppanyaki cost,/teppanyaki_price,15,150,5
+149,2026-09-01,teppanyaki rate,/teppanyaki_price,15,150,5
+150,2026-09-01,cheap teppanyaki pune,/teppanyaki_price,21,210,5
+151,2026-09-01,teppanyaki offers,/teppanyaki_price,17,170,5
+152,2026-09-01,teppanyaki discount,/teppanyaki_price,19,190,5
+153,2026-09-01,what is japanese food,/japanese_info,21,210,5
+154,2026-09-01,japanese food kya hai,/japanese_info,21,210,5
+155,2026-09-01,japanese food calories,/japanese_info,22,220,5
+156,2026-09-01,how to use chopsticks,/japanese_info,21,210,5
+157,2026-09-01,japanese cuisine meaning,/japanese_info,24,240,5
+158,2026-09-01,what is teppanyaki,/japanese_info,18,180,5
+159,2026-09-01,what is bento,/japanese_info,13,130,5
+160,2026-09-01,tempura recipe,/japanese_info,14,140,5
+161,2026-09-01,what is ramen,/japanese_info,13,130,5
+162,2026-09-01,gyoza recipe,/japanese_info,12,120,5
+163,2026-09-01,udon vs ramen,/japanese_info,13,130,5
+164,2026-09-01,what is katsu,/japanese_info,13,130,5
+165,2026-09-01,tempura pune,/dishes_generic,12,120,5
+166,2026-09-01,gyoza pune,/dishes_generic,10,100,5
+167,2026-09-01,udon pune,/dishes_generic,9,90,5
+168,2026-09-01,katsu pune,/dishes_generic,10,100,5
+169,2026-09-01,donburi pune,/dishes_generic,12,120,5
+170,2026-09-01,dim sum pune,/dishes_generic,12,120,5
+171,2026-09-01,best tempura pune,/dishes_generic,17,170,5
+172,2026-09-01,gyoza restaurant pune,/dishes_generic,21,210,5
+173,2026-09-01,katsu curry pune,/dishes_generic,16,160,5
+174,2026-09-01,udon noodles pune,/dishes_generic,17,170,5
+175,2026-09-01,teppanyaki pune,/dishes_generic,15,150,5
+176,2026-09-01,bento box pune,/dishes_generic,14,140,5

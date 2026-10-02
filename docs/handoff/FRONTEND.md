@@ -4,8 +4,10 @@
 **Claude Code** (D-F1-5). F0–F7 merged (PR #15; F3–F7 in `e405019`). **F8 done on main**: the
 screens consume API 0.7.0. **F9 done on main**: the "sunset foundry" look (theme, motion, scroll
 effects; `docs/steps/F9.md`). **F10 done on main**: API 0.9.0. These are the last api-requests
-(#16, #17, #20–#23), so no v1 item is blocked now (`docs/steps/F7.md`, update). What remains
-waits on the user: a Playwright test suite in the repo (D-F7-3).
+(#16, #17, #20–#23), so no v1 item is blocked now (`docs/steps/F7.md`, update). **F11 done on
+main**: an end-to-end Playwright suite in the repo, with the user's yes (D-F11-1): 17 tests on the
+real backend, 51 of 51 over three repeats. It found a backend bug,
+[#24](https://github.com/Akash708018/analytics-agentV2.0/issues/24) (open).
 
 ## Screens: done | in progress | blocked (by which endpoint/issue)
 
@@ -47,9 +49,15 @@ waits on the user: a Playwright test suite in the repo (D-F7-3).
   - Tools: declared optional params, a widget per kind.
   - **Explore** (new page): the 27 core analyses run directly, and playbook reports.
   - Parity: 52 ported, 42 changed, 7 dropped, 0 blocked.
-- Next, waiting on the user: a Playwright test suite in the repo (D-F7-3: a test dependency is
-  their call). Until then each milestone's browser check is a one-off script.
-- Blocked: nothing.
+- Done (F11): `frontend/e2e/`, run by `npm run e2e --prefix frontend`. It starts the real backend
+  (scripted model) and Streamlit, runs 17 tests in 3 workers (about 2 minutes), and removes the
+  run's workspaces. A large-file test is included: 300,000 rows load in about 4 s, and 2,000,000
+  rows (89 MB) in 5 s.
+  - **From now on a milestone adds or updates e2e tests instead of a one-off script.**
+  - Use the helpers' `choose`, `tick`, `multiselect`/`chips` and `eventually`; they encode what
+    F2–F11 learned about Streamlit 1.64's DOM and reruns.
+- Blocked: nothing. Open on the backend: #24 (concurrent requests on one workspace can answer
+  500). The page shows the service's error; a reload recovers.
 
 ## API: spec version consumed; endpoints live vs mocked
 
@@ -83,7 +91,10 @@ Rules the next screens must keep (`frontend/state.py` docstring, C7, C10):
 
 ## api-request issues (links, status)
 
-Open: none. Closed on 2026-10-02 after B10/B11 (checked 2026-10-02 ~20:30Z): #16 (ingest
+Open: [#24](https://github.com/Akash708018/analytics-agentV2.0/issues/24). Two requests on one
+workspace at once can answer 500 (a DuckDB attach conflict in `db.connect`). It was found by the
+F11 suite and reproduced on a plain backend; the backend owns the fix.
+Closed on 2026-10-02 after B10/B11 (checked 2026-10-02 ~20:30Z): #16 (ingest
 answers), #17 (contract in force), #20 (withdraw; the unknown-column 500 is now a 422), #21
 (cleaning samples and SQL), #22 (direct core analyses and reports), #23 (declared optional params).
 F10 consumes all six.
@@ -96,7 +107,9 @@ listed both as open by mistake.
 
 ```text
 $ frontend/.venv/bin/python -m pytest frontend/tests -q -rs
-289 passed in 29.73s
+289 passed in 29.29s
+$ npm run e2e --prefix frontend                    # F11: real backend, headless Chromium
+17 passed (1.8m)                                    # --repeat-each=3: 51 passed (5.0m)
 $ cd backend && uv run pytest -q -rs     # main after B9 + C9 + C11 (F8 changes no backend file)
 2376 passed, 1 skipped, 1 warning in 289.85s (0:04:49)
 ```
@@ -115,7 +128,9 @@ the API's, no contract and no domain).
 
 ## Next milestone
 
-None planned: every api-request is consumed. A Playwright test suite in the repo needs the
-user's yes (D-F7-3). Setup in a fresh container: `uv venv frontend/.venv --python 3.12`, `uv pip install
+None planned. When #24 is fixed, the e2e helpers' GET retry (`helpers.get`) and the
+"read before the page loads" ordering can stay; they cost nothing. The new suite needs Node
+and Chromium: `npm ci --prefix frontend`, plus `npx --prefix frontend playwright install
+chromium` outside this container (Chromium build 1194 is preinstalled here). Setup in a fresh container: `uv venv frontend/.venv --python 3.12`, `uv pip install
 --python frontend/.venv/bin/python -r frontend/requirements.txt`, `npm ci --prefix frontend
 --ignore-scripts`, `uv sync` (backend for browser checks).

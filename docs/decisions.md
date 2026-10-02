@@ -615,3 +615,16 @@ fractional default.
   them.
 - Its cache drops on everything that changes it: confirm, metric approval, rule approval and
   answered forks.
+
+## F11 — an end-to-end browser suite (2026-10-02)
+
+**D-F11-1. A Playwright suite in the repo, with the user's yes.** Asked after F10 whether to add
+one (D-F7-3, and AGENTS.md: "Ask before adding other dependencies"), the user answered "yes go
+ahead" (2026-10-02). This supersedes D-F7-3's "no suite".
+- `@playwright/test` 1.56.1 is a dev dependency of `frontend/package.json`. That is the version
+  this container's preinstalled Playwright and its Chromium build 1194 have.
+- The suite lives in `frontend/e2e/`. It starts the real backend (scripted model) and
+  Streamlit, and is run by `npm run e2e --prefix frontend`.
+- The pytest suite stays the fast check and is unchanged.
+- One-off scripts are no longer needed for a milestone's browser check. A milestone adds or
+  updates e2e tests instead.
