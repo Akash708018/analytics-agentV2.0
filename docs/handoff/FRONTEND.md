@@ -2,7 +2,8 @@
 
 2026-10-02 · branch **main** (the user asked for work directly on main, D-F8-0) · owner
 **Claude Code** (D-F1-5). F0–F7 merged (PR #15; F3–F7 in `e405019`). **F8 done on main**: the
-screens consume API 0.7.0. What remains waits on api-requests or on the user (Playwright suite).
+screens consume API 0.7.0. **F9 done on main**: the "sunset foundry" look (theme, motion, scroll
+effects; `docs/steps/F9.md`). What remains waits on api-requests or on the user (Playwright suite).
 
 ## Screens: done | in progress | blocked (by which endpoint/issue)
 
@@ -30,6 +31,11 @@ screens consume API 0.7.0. What remains waits on api-requests or on the user (Pl
   - carry-forward "Add to" on Keyword groups;
   - contract pre-fill from a similar file;
   - `focus` and the `ambiguous_value` / `unknown_value` choices on Tools.
+- Done (F9): the look.
+  - The theme lives in `frontend/.streamlit/config.toml`; motion and textures in
+    `components/style.py`.
+  - Keep new bordered containers as `style.card(key)` so they get the card style.
+  - Keep motion inside the reduced-motion and `@supports` guards.
 - Next, waiting on others: the api-requests below (each unblocks named F7 items); a Playwright
   test suite if the user says yes (D-F7-3).
 - Blocked: ingest layout answers ([#16](https://github.com/Akash708018/analytics-agentV2.0/issues/16),
@@ -77,18 +83,20 @@ listed both as open by mistake.
 
 ```text
 $ frontend/.venv/bin/python -m pytest frontend/tests -q -rs
-259 passed in 26.75s
+263 passed in 27.58s
 $ cd backend && uv run pytest -q -rs     # main after B9 + C9 + C11 (F8 changes no backend file)
 2376 passed, 1 skipped, 1 warning in 289.85s (0:04:49)
 ```
 
 66 client, 64 Prism, 28 F2 state (incl. C13), 19 F2 AppTests, 2 fake-vs-spec, 14 F3 AppTests,
-7 F3 prep, 13 F4 AppTests, 5 F4 prep, 6 F5, 12 F6, 4 F7, 16 F8, 3 F0. No frontend skips. Browser (real backend): F2 21 steps +
+7 F3 prep, 13 F4 AppTests, 5 F4 prep, 6 F5, 12 F6, 4 F7, 16 F8, 4 F9, 3 F0. No frontend skips. Browser (real backend): F2 21 steps +
 blur check; F3 16 steps (upload → confirmed contract); F4 15 steps (metrics, rules, tools,
 results); F5 8 steps (answers with evidence, real app + scripted model); F6 18 steps (keyword groups:
 propose, approve, merge, split, move, rename, refresh, performance by approved group); F7 4 steps
 (CSV identical to the API; new session leaves the old one), and F2 + F6 re-run in full after C13;
-F8 8 steps (lineage, Results rows, focus choices, staleness, pre-fill, a blocked plan).
+F8 8 steps (lineage, Results rows, focus choices, staleness, pre-fill, a blocked plan); F9 every
+screen screenshotted and reviewed, plus scroll reveal, the progress line and reduced motion
+measured.
 
 ## Next milestone
 

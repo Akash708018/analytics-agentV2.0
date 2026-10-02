@@ -38,6 +38,11 @@ figures as CSV, exactly as shown. **Session** can also start a new, empty sessio
 stays at its link.
 Nothing is ticked or chosen for you: suggestions come with reasons and their own buttons.
 
+The look ("sunset foundry": warm paper, graphite, ember-to-dusk accents, quiet motion and
+scroll effects) is the theme in `frontend/.streamlit/config.toml` plus `components/style.py`.
+Run from the repository root as above and Streamlit picks the theme up. Motion stops when the
+system asks for reduced motion. See [F9](../docs/steps/F9.md).
+
 Everything the person sets is saved to the backend session (`ui_state`, an explicit
 allowlist in `state.py`) and comes back after refresh or on another device. Two tabs
 editing the same thing get an explicit **Load latest** / **Keep my changes** choice.

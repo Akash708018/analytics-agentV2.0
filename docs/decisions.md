@@ -553,3 +553,23 @@ reads `filter[].focus_param` (`prep.optional_params`); #23 asks for a declaratio
 **C14. A question recorded as a decision.** The user wrote "froentend is complete", asking
 whether it is. I recorded it as their declaration (D-F8-5, commit `77f63e3`, now reverted).
 Whether the frontend is complete was answered in chat; the handoff stands as after F8.
+
+## F9 — the look: "sunset foundry" (2026-10-02, on main)
+
+**D-F9-1. Theme in Streamlit's config; motion in one CSS-only stylesheet.**
+- `frontend/.streamlit/config.toml` (script-level config) sets colours, fonts, radii and the chart
+  palette.
+- `components/style.py` adds textures, motion and scroll-driven effects as style-only `st.html`
+  (no space, no script).
+- Bordered containers that should look like cards are keyed (`style.card`) so the stylesheet can
+  find them.
+
+**D-F9-2. Motion never hides content and can be turned off.**
+- Scroll effects sit inside `@supports (animation-timeline: view())`.
+- `prefers-reduced-motion: reduce` stops every animation and transition (measured: 0
+  animations, the farthest card fully visible).
+
+**D-F9-3. Chart colours come from the dataviz validator, not taste.**
+- The reference steps are re-ordered with orange first; all gates pass on `#FBF7F2`.
+- Slot 1 is 3.0:1. Sub-3:1 slots are relieved by every result's figures table.
+- Text pairs are ≥ 4.5:1 (captions are un-dimmed for this).
