@@ -214,7 +214,7 @@ def main() -> None:
         _error(dataset_id, tool_id, outcome["error"], forks)
     else:
         st.divider()
-        render_result(outcome["result"])
+        render_result(outcome["result"], key=f"tools.{dataset_id}.{tool_id}.result")
 
 
 main()

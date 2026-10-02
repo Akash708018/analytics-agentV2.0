@@ -5,7 +5,9 @@ about the data. See docs/steps/F3.md.
 
 from __future__ import annotations
 
+import csv
 import datetime as dt
+import io
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -163,6 +165,15 @@ def shown(value: Any) -> str:
 def figure_rows(figures: Iterable[Mapping[str, Any]]) -> list[dict[str, str]]:
     return [{"figure": f["name"], "value": shown(f.get("value")), "unit": f.get("unit") or "",
              "source": f.get("provenance", "")} for f in figures]
+
+
+def figures_csv(figures: Iterable[Mapping[str, Any]]) -> str:
+    """The results table as CSV, cell for cell (F7: replaces v1's downloads and Files page)."""
+    out = io.StringIO()
+    writer = csv.DictWriter(out, fieldnames=["figure", "value", "unit", "source"], lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(figure_rows(figures))
+    return out.getvalue()
 
 
 def series_data(series: Mapping[str, Any]) -> dict[str, list]:

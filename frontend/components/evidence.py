@@ -75,9 +75,9 @@ def render_answer(turn: Mapping[str, Any]) -> None:
         render_steps(turn.get("events", []))
         if answer.get("usage"):
             st.caption(usage_line(answer["usage"]))
-    for result in results:
+    for i, result in enumerate(results):
         with st.expander(f"Evidence: {result['summary']}", expanded=False):
-            render_result(result)
+            render_result(result, key=f"ask.{turn.get('turn_id')}.{i}")
     if not results:
         st.caption("No tool result backs this answer"
                    + (": every step was skipped (see How this was answered)." if answer.get("skipped") else "."))

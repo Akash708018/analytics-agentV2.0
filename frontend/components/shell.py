@@ -46,8 +46,8 @@ def _start_session() -> None:
     st.query_params["sid"] = created["sid"]
 
 
-def _start_button(label: str) -> None:
-    st.button(label, type="primary", on_click=_start_session, key="shell.start")
+def start_button(label: str, key: str = "shell.start", primary: bool = True) -> None:
+    st.button(label, type="primary" if primary else "secondary", on_click=_start_session, key=key)
     error = st.session_state.get("_start_error")
     if error is not None:
         show_error(error, "Could not start a session")
@@ -60,13 +60,13 @@ def landing() -> None:
         "Your work is saved on the analytics service under a private link: this page's "
         "address once a session starts. Keep the link to come back to it."
     )
-    _start_button("Start a new session")
+    start_button("Start a new session")
 
 
 def invalid_sid() -> None:
     st.title("Analytics agent")
     st.error("This link's session id is not valid, so nothing was loaded.")
-    _start_button("Start a new session")
+    start_button("Start a new session")
 
 
 def expired(message: str) -> None:
@@ -76,7 +76,7 @@ def expired(message: str) -> None:
         "the last activity."
     )
     st.caption(message)
-    _start_button("Start a new session")
+    start_button("Start a new session")
 
 
 def unreachable(error: APIError) -> None:
@@ -180,4 +180,4 @@ def render_banner(container: Any, ss: Mapping) -> None:
     elif save["status"] == "expired":
         with container:
             st.warning("This session has expired, so your latest changes were not saved.")
-            _start_button("Start a new session")
+            start_button("Start a new session")

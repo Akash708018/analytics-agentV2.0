@@ -3,7 +3,7 @@
 import streamlit as st
 
 from frontend import state
-from frontend.components.shell import TAGLINE
+from frontend.components.shell import TAGLINE, start_button
 
 ss = st.session_state
 server = ss[state.SERVER]
@@ -32,3 +32,10 @@ if ss[state.DRAFT]["datasets"]:
                  query_params={"sid": ss[state.SID]})
 st.page_link("views/data.py", label="Add or choose data", icon="📄",
              query_params={"sid": ss[state.SID]})
+
+st.divider()
+st.markdown("**Start over**")
+st.caption("A new session starts empty, in a new workspace. This one is not deleted: it stays "
+           "at this page's address for 30 days after its last activity, so copy the address "
+           "first to come back to it.")
+start_button("Start a new session", key="session.new", primary=False)

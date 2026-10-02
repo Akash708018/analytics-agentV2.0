@@ -32,7 +32,8 @@ def _chart(series: Mapping[str, Any]) -> None:
                      hide_index=True, use_container_width=True)
 
 
-def render_result(result: Mapping[str, Any]) -> None:
+def render_result(result: Mapping[str, Any], key: str) -> None:
+    """`key` tells apart two results on one page (an answer may rest on the same tool twice)."""
     st.markdown(f"#### {result['summary']}")
     st.caption(f"{result['tool_id']} · {result['dataset_id']}")
     for series in result.get("series", []):
@@ -41,6 +42,9 @@ def render_result(result: Mapping[str, Any]) -> None:
     if figures:
         with st.expander(f"Every figure ({len(figures)}), with its source", expanded=not result.get("series")):
             st.dataframe(prep.figure_rows(figures), hide_index=True, use_container_width=True)
+            st.download_button("Download every figure (CSV)", prep.figures_csv(figures),
+                               file_name=f"{result['tool_id']}-figures.csv", mime="text/csv",
+                               key=f"{key}.csv", on_click="ignore")
             st.caption(" · ".join(f"{k}: {v}" for k, v in prep.PROVENANCE.items())
                        + " · suppressed: a group too small to show")
     caveats = result.get("caveats", [])
