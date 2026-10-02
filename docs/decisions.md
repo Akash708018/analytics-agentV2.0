@@ -387,3 +387,135 @@ nothing new.
 the playbook patterns say "dropped"/"fell" (led to stem matching, an improvement); the
 totals-row test expected a caveat the v1 loader makes unnecessary (it drops a trailing totals
 row at upload) and then matched 'Total' after cleaning had folded it to 'TOTAL'.
+
+## F3 — guided preparation: clean, domain, contract (2026-10-02)
+
+**D-F3-1. Nothing is pre-ticked or preselected; suggestions are explicit clicks.** Cleaning
+steps the API marks `suggested`, forks with a `suggested` option, and strong aggregation
+suggestions all start blank. Each shows its reason, and a "Tick the N suggested" / "Use the N
+suggested answer(s)" / "Use the engine's N strong suggestion(s)" button fills only what is
+still unanswered. The API's own text allows pre-ticking (`CleaningProposal.suggested`: "may be
+pre-ticked"); AGENTS.md and CLAUDE.md ("never silently default") are stricter, and win.
+
+**D-F3-2. Cleaning ticks are kept by id+kind+column, and Apply re-reads the plan.** Measured:
+after applying C001+C002, the engine renumbered the remaining action to C001. A tick kept by
+id alone would have applied a different step. If any ticked step no longer matches, Apply
+sends nothing and asks for a review.
+
+**D-F3-3. Domain ticks start from the server's `confirmed` list, never from a score.**
+Marketing (0.385 on the F3 file) starts unticked, like every pack. Marketing is listed first
+(the priority domain); core is never offered.
+
+**D-F3-4. Contract answers stay in `ui_state.drafts` after a confirm.** The proposal does
+not return the definitions, window, `measure_per` or fork choices in force, so dropping the
+draft would blank those fields. That is api-request
+[#17](https://github.com/Akash708018/analytics-agentV2.0/issues/17). "Start over from the
+engine's proposal" drops the draft explicitly.
+
+**C8. F2 stored dataset metadata objects in `ui_state`, which the backend refuses.** Measured
+against the backend's own guard: 20 `{dataset_id, name, rows, columns}` objects →
+"20 same-shaped objects look like data rows", and a name like `leads_9876543210` → "looks like
+personal data". Schema 2 stores ids only (50 pass) and fetches names; schema 1 migrates.
+
+**C9. The backend refused 0.34% of its own dataset ids (0.51% of turn ids) as phone numbers.**
+Found by the F3 browser check: `ds_2a7207443888` holds "7207443888", so every save after
+that upload answered 422, and the session forgot the dataset. Fixed in
+`backend/services/sessions.py`: an exact server id (`ds_/ws_` + 12 hex, `t_` + 16 hex) skips
+the phone check, while a phone number in free text is still refused. Measured 0 of 20,000
+after the fix. 5 new tests; full backend suite 2354 passed, 1 skipped. This is a backend file,
+changed by the frontend owner because the user asked for unattended work: logged here, and in
+the PR, for the backend owner to review.
+
+**C10. The key cannot be a column role.** With one role per column, the date column could
+not also be in the key, so "one row per campaign per day" was sent as `primary_key
+["campaign"]` and refused (`LOAD_REFUSED`, why "grain, analysis_window."). Probed: `[date,
+campaign]` passes, and a key column may also be a dimension. The key is now its own
+multiselect; roles are date/measure/dimension/ignore.
+
+## F4 — metrics, validity rules, tools and results (2026-10-02)
+
+**D-F4-1. The Tools page offers domain tools only.** `GET /tools` lists core analyses as active,
+but they run through a question (turn). Measured: running one as a tool answered 500 (fixed,
+C11). The page says so and points to Ask.
+
+**D-F4-2. Tool results stay in the browser; params are saved.** A result is data (figures,
+series), so it is not put in `ui_state`. The chosen tool, its params and its bindings are saved,
+so after a refresh the person runs again with one click. Festival-date confirmation is never
+saved: dates are confirmed per run (D-B3-6).
+
+**D-F4-3. Results are shown exactly as returned.** Figure values via `str()` (`null` → "suppressed"),
+provenance per figure, series in the backend's order (`bar` with `sort=False`; table/funnel/
+stacked_bar and series with suppressed points as tables), and every caveat, validity filter,
+pack rule, fork answer and figure-check note.
+
+**D-F4-4. "Name the column for a concept" is the person's answer to `needs_data`.** Metric
+approval sends it as `bindings`, tool runs as `params.bindings` (the runner's override). The
+frontend never infers a column. Measured: a binding given for a metric is not reused by tool
+runs (noted for the backend owner).
+
+**C11. A core analysis run as a tool answered 500.** `POST /tools/core.*/run` reached
+`m.tools[tool_id]` (KeyError) before the existing `not_a_domain_tool` check. The check runs
+first now; 2 tests fail without it. Backend file changed from the frontend session (unattended
+run); full suite 2356 passed, 1 skipped.
+
+## F5 — the evidence behind each answer (2026-10-02)
+
+**D-F5-1. Every answer carries its trail, collapsed by default.** The answer text and its
+unresolved flags are always visible. "How this was answered" (plan, every tool call with its
+skip reason, the checks, usage) and one "Evidence" expander per tool result sit under it. An
+answer with no result says so. The trail is the backend's record (TurnEvent, Turn.answer),
+shown as returned; tokens are labelled as estimates, as the backend labels them.
+
+**D-F5-2. Answered turns for evidence come from the real app with a scripted model.** This
+container has no model keys. `create_app(llm=ScriptedLLM(...))` (the backend tests' seam)
+gives real playbook runs, tool results, skips, checks and usage with scripted wording. The
+harness lives in the scratchpad, not the repo; its code is in `docs/steps/F5.md`.
+
+## F6 — keyword groups (2026-10-02)
+
+**D-F6-1. The person chooses the search-term column; the run always sends it.** No endpoint says
+which column the pack binds to the search-term concept before a run, and `run {}` uses that
+binding silently. So the column box starts empty, Propose is disabled until a column is chosen,
+and the run's own record (column, embedding, threshold, keywords read, proposals, spellings
+merged) is shown as returned.
+
+**D-F6-2. What an action does to approval is said before it is sent.** Measured: a merge lands
+in the first id and takes its approval; a keyword takes the approval of the group it lands in;
+split-off keywords become a proposal; proposing again drops every unapproved group with the
+person's edits. The person picks the merge target (no default), the request is sent as
+`[target, others…]`, and the screen warns when an approved group would lose its approval and
+when a new proposal run would replace edits. There is no withdraw action (#20); the screen
+says so.
+
+**D-F6-3. Saved: the column and ticked group ids.** Keywords, typed names and view filters
+stay in the browser. Ticks are cleared after approve, merge and a new run (their ids are
+spent or replaced); ticks for ids that no longer exist are ignored.
+
+**C12. The "Edit one group" choice was lost after every edit (browser check).** The browser
+hands a selectbox's choice back as its shown text ("Sushi local (21)"). A split, move or rename
+changes that text, so after the edit the choice matched no option and the edit controls
+vanished. AppTest re-sends with the current labels and passed. The chosen group id is now held
+in a plain session key and set on the selector each run. Before: the browser check failed at
+step 12 in two runs. After: 18 of 18 steps.
+
+## F7 — v1 parity (2026-10-02)
+
+**D-F7-1. v1 parity is assessed item by item, not copied.** `docs/steps/F7.md` gives each of the
+101 F0 items a verdict with where and why: 20 ported, 63 changed, 7 dropped, 11 blocked. Changes
+follow v2's rules (nothing preselected, figures as returned, work saved on the server).
+Blocked items are api-requests (#16, #21, #22).
+
+**D-F7-2. Results download as CSV; a new session replaces "Reset workspace".** The CSV is the
+results table cell for cell (no formatting), on Tools and on each Evidence. A new session
+destroys nothing (the old one stays at its link), so it needs no confirmation.
+
+**D-F7-3. No Playwright test suite without the user's yes.** D-F2-1 chose one-off scripts, and a
+test dependency is the user's call. The scripts stay in the scratchpad; their output is pasted
+into each milestone doc.
+
+**C13. A saved value could show as empty after a cut-short run (browser check).** `state.bind`
+set a widget's value only when its key was new. When the browser rebuilt a widget while the
+server kept the key, it showed the widget's default (an empty name over "F4 check": 2 of 4 F7
+runs; the draft and server were untouched). `bind` now sets the key on every run, keeping the
+"cut-short edit wins" rule. Before: 1 of 4 instrumented runs wrong. After: 8 of 8 right, and the
+F2 (21), F6 (18) and F7 checks pass. A unit test fails without the fix.

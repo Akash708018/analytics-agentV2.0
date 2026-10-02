@@ -110,6 +110,27 @@ def test_keys_pii_and_data_rows_are_rejected(client, bad):
     assert r.status_code == 422 and r.json()["error"]["code"] == "ui_state_rejected"
 
 
+@pytest.mark.parametrize("ok", [
+    {"dataset_id": "ds_2a7207443888"},                 # F3 browser check: refused before C9
+    {"datasets": ["ds_2a7207443888"], "workspace": "ws_9876543210ab"},
+    {"turn": "t_ab9876543210cd12"},
+])
+def test_the_servers_own_ids_are_not_phone_numbers(client, ok):
+    sid = _new(client)["sid"]
+    r = client.put(f"/sessions/{sid}/ui-state", json={"ui_state": ok, "version": 1})
+    assert r.status_code == 200
+
+
+@pytest.mark.parametrize("bad", [
+    {"note": "call ds_2a7207443888 owner on 9876543210"},   # an id in text does not hide a phone
+    {"x": "ds_9876543210"},                                # not a server id: 10 hex, not 12
+])
+def test_phone_numbers_near_ids_are_still_rejected(client, bad):
+    sid = _new(client)["sid"]
+    r = client.put(f"/sessions/{sid}/ui-state", json={"ui_state": bad, "version": 1})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "ui_state_rejected"
+
+
 def test_expiry_is_sliding_30_days(client, clock):
     sid = _new(client)["sid"]
     clock.t += timedelta(days=29)

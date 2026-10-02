@@ -6,6 +6,25 @@ the finished backend: ranks 1, 2, 5, 6, 7, 9, 10, 12, 13, 14, 16, 22; 3/20/21 we
 done; the rest are logged with reasons in D-B9-1). API **0.7.0** (additive).
 Open for the user: approve the draft keyword gold (D-B7-3).
 
+2026-10-02, from the frontend session (branch `claude/beautiful-lovelace-07dnwu`, PR #15): **C9**
+in `backend/services/sessions.py`. `ui_state_problem` no longer reads an exact server id
+(`ds_/ws_` + 12 hex, `t_` + 16 hex) as a phone number; it refused 0.34% of dataset ids. 5 tests
+in `test_api_sessions.py`; full suite 2354 passed, 1 skipped. No API shape change. New
+api-requests from F3: #16 (answer ingest layout questions), #17 (return the contract in force);
+#14 (list a workspace's datasets) was closed on 2026-10-01 without the endpoint (corrected 2026-10-02; this note first said it was open).
+
+2026-10-02, F4 (same branch): **C11** in `backend/services/datasets.py`: `POST /tools/core.*/run`
+answered 500 (KeyError at `m.tools[tool_id]`); the `not_a_domain_tool` check now runs first.
+2 tests in `test_logistics.py`; full suite 2356 passed, 1 skipped. Observation, not acted on: a
+concept named while approving a metric (`bindings`, e.g. `conv_value` → `revenue`) is not reused
+by tool runs on the same dataset; the person names it again in `params.bindings`.
+
+2026-10-02, F6 (same branch, no backend change): api-request
+[#20](https://github.com/Akash708018/analytics-agentV2.0/issues/20). (1) Keyword groups have no
+action that withdraws an approval. (2) `POST .../keyword-groups/run {"column": "nope"}` answers 500
+(DuckDB binder error escapes `KeywordService.run`). The screen only offers the profile's
+columns, so (2) is unreachable from the UI. Neither blocks the frontend.
+
 ## API: spec version — live | stubbed (501) | changed since last handoff
 
 **0.4.0** (additive; `docs/api/CHANGELOG.md`). Turns are now answered by the playbook agent

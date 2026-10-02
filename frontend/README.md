@@ -24,8 +24,18 @@ ANALYTICS_API_URL=http://127.0.0.1:8000 frontend/.venv/bin/python -m streamlit r
 
 Open the printed URL and click **Start a new session**. The address then holds
 `?sid=<uuid>`: that link is the session. Pages: **Session** (name the analysis),
-**Data** (upload a CSV/xlsx, choose the dataset questions use), **Ask** (questions
-and answers; a running question survives refresh and is never sent twice).
+**Data** (upload a CSV/xlsx, choose the dataset, see its profile), **Clean** (tick the
+engine's proposals, then apply), **Domain** (confirm what kind of data it is), **Contract**
+(what each column is, how measures add up, the questions only you can answer), **Metrics**
+(approve metrics such as CTR, CPA, ROAS, and validity rules), **Keyword groups** (the engine
+proposes groups of search terms; you approve, merge, rename, split or move them; only approved
+groups reach the tools), **Tools** (run a marketing tool;
+every figure with its source, charts as the backend computed them), and **Ask**
+(questions and answers; a running question survives refresh and is never sent twice; each
+answer shows how it was reached and the tool results behind it). Every result downloads its
+figures as CSV, exactly as shown. **Session** can also start a new, empty session; the old one
+stays at its link.
+Nothing is ticked or chosen for you: suggestions come with reasons and their own buttons.
 
 Everything the person sets is saved to the backend session (`ui_state`, an explicit
 allowlist in `state.py`) and comes back after refresh or on another device. Two tabs
@@ -33,8 +43,11 @@ editing the same thing get an explicit **Load latest** / **Keep my changes** cho
 Text is saved on Enter or when the field loses focus. See
 [F2 evidence](../docs/steps/F2.md).
 
-Layout: `app.py` (router), `state.py` (hydrate/save/conflicts), `turns.py`,
-`connection.py`, `components/shell.py`, `views/` (pages; not `pages/`, see D-F2-2).
+Layout: `app.py` (router), `state.py` (hydrate/save/conflicts, schema-2 drafts),
+`prep.py` (form ↔ API mappings, params, figure display), `keywords.py` (keyword-group
+listing and what each action does to approval), `datasets.py` (cached server reads),
+`turns.py`, `connection.py`, `components/` (`shell`, `results`, `bindings`), `views/` (pages; not
+`pages/`, see D-F2-2).
 Nothing here imports the backend; `api_client.py` is the only HTTP boundary.
 
 ## API client and mock (F1)

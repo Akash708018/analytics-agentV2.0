@@ -16,6 +16,9 @@ TAGLINE = "Understand your digital marketing data, with a source for every figur
 def show_error(error: APIError, what: str) -> None:
     """The service's own message and code; extra details exactly as returned."""
     st.error(f"{what}: {error.message}")
+    refusal = error.payload.get("refusal") if isinstance(error.payload, dict) else None
+    if isinstance(refusal, dict) and refusal.get("why"):
+        st.markdown(f"**Why:** {refusal['why']}")
     st.caption(f"code: {error.code}" + (f" · HTTP {error.status_code}" if error.status_code else ""))
     details = {k: v for k, v in (error.payload or {}).items() if k != "error"} \
         if isinstance(error.payload, dict) else {}
@@ -35,7 +38,7 @@ def _start_session() -> None:
     # Nothing from the previous session may leak into the new one (an unsent question,
     # an upload result, widget values).
     stale = [key for key in ss if key in {state.SID, state.SERVER, state.DRAFT, state.SAVE,
-                                          state.RESTORE}
+                                          state.RESTORE, state.WORK}
              or key.startswith(("ui.", "ask.", "data."))]
     for key in stale:
         del ss[key]
@@ -43,8 +46,8 @@ def _start_session() -> None:
     st.query_params["sid"] = created["sid"]
 
 
-def _start_button(label: str) -> None:
-    st.button(label, type="primary", on_click=_start_session, key="shell.start")
+def start_button(label: str, key: str = "shell.start", primary: bool = True) -> None:
+    st.button(label, type="primary" if primary else "secondary", on_click=_start_session, key=key)
     error = st.session_state.get("_start_error")
     if error is not None:
         show_error(error, "Could not start a session")
@@ -57,13 +60,13 @@ def landing() -> None:
         "Your work is saved on the analytics service under a private link: this page's "
         "address once a session starts. Keep the link to come back to it."
     )
-    _start_button("Start a new session")
+    start_button("Start a new session")
 
 
 def invalid_sid() -> None:
     st.title("Analytics agent")
     st.error("This link's session id is not valid, so nothing was loaded.")
-    _start_button("Start a new session")
+    start_button("Start a new session")
 
 
 def expired(message: str) -> None:
@@ -73,7 +76,7 @@ def expired(message: str) -> None:
         "the last activity."
     )
     st.caption(message)
-    _start_button("Start a new session")
+    start_button("Start a new session")
 
 
 def unreachable(error: APIError) -> None:
@@ -113,12 +116,43 @@ def render_status(slot: Any, ss: Mapping) -> None:
 
 
 def _values(ui_state: Mapping) -> dict[str, str]:
-    names = {d["dataset_id"]: d["name"] or d["dataset_id"] for d in ui_state["datasets"]}
+    drafts = ui_state["drafts"]
     return {
         "Analysis name": ui_state["label"] or "(none)",
-        "Dataset for questions": names.get(ui_state["dataset_id"], "(none)"),
+        "Active dataset": ui_state["dataset_id"] or "(none)",
+        "Datasets": ", ".join(ui_state["datasets"]) or "(none)",
+        "Preparation drafts": "; ".join(
+            f"{ds}: {', '.join(sorted(parts))}" for ds, parts in sorted(drafts.items())) or "(none)",
         "Page": ui_state["page"],
     }
+
+
+def needs_dataset(ss: Mapping) -> None:
+    st.info("Choose or upload a dataset on Data first.")
+    st.page_link("views/data.py", label="Go to Data", icon="📄",
+                 query_params={"sid": ss[state.SID]})
+
+
+STEPS = (
+    ("views/clean.py", "Clean", "🧹", "review the engine's cleaning proposals; nothing runs "
+                                     "until you apply it"),
+    ("views/domain.py", "Domain", "🏷️", "confirm what kind of data this is; it turns on that "
+                                        "domain's tools and questions"),
+    ("views/contract.py", "Contract", "📝", "say what each column is and how it adds up; "
+                                           "analyses run under it"),
+    ("views/metrics.py", "Metrics", "📐", "approve the metrics (CTR, CPA, ROAS…) and the "
+                                         "validity rules analyses use"),
+    ("views/keywords.py", "Keyword groups", "🔤", "review the proposed search-term groups; "
+                                                  "only approved groups reach the tools"),
+    ("views/tools.py", "Tools", "🧰", "run a marketing tool and see every figure with its source"),
+    ("views/ask.py", "Ask", "💬", "ask questions about the data"),
+)
+
+
+def next_steps(ss: Mapping) -> None:
+    st.markdown("**Next steps**")
+    for path, title, icon, why in STEPS:
+        st.page_link(path, label=f"{title}: {why}", icon=icon, query_params={"sid": ss[state.SID]})
 
 
 def render_banner(container: Any, ss: Mapping) -> None:
@@ -146,4 +180,4 @@ def render_banner(container: Any, ss: Mapping) -> None:
     elif save["status"] == "expired":
         with container:
             st.warning("This session has expired, so your latest changes were not saved.")
-            _start_button("Start a new session")
+            start_button("Start a new session")

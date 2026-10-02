@@ -219,3 +219,13 @@ def test_sla_where_and_why_playbook(env):
         print("\nplaybook usage:", t["answer"]["usage"])
     finally:
         workspace.reset(ws)
+
+
+@pytest.mark.parametrize("tool", ["core.summary_stats", "core.trend"])
+def test_a_core_analysis_is_refused_as_a_tool_run_not_a_500(api, tool):
+    """C11 (F4 probe): GET /tools lists core analyses as active, but they run through a turn.
+    POST /tools/core.*/run hit m.tools[tool_id] before the core check: KeyError, HTTP 500."""
+    c, did, _, _ = api
+    assert {t["tool_id"]: t["status"] for t in c.get(f"/datasets/{did}/tools").json()["tools"]}[tool] == "active"
+    r = c.post(f"/tools/{tool}/run", json={"dataset_id": did, "params": {}})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "not_a_domain_tool"
