@@ -21,6 +21,10 @@ _KEY_RX = re.compile(r"\b(sk-[A-Za-z0-9_-]{16,}|sk-ant-[A-Za-z0-9_-]{16,}|AIza[0
 # string with no "@" (measured: 63 s on 256 KB of "x").
 _EMAIL_RX = re.compile(r"[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,24}")
 _PHONE_RX = re.compile(r"(?<!\d)(?:\+?91[\s-]?)?[6-9]\d{9}(?!\d)|\+\d{1,3}[\s-]?\d{6,14}")
+# The server's own ids (ds_/ws_ + 12 hex, t_ + 16 hex) are random hex: 0.34% of dataset ids
+# and 0.51% of turn ids hold ten digits that read as an Indian mobile number (measured over
+# 20,000 each; F3 browser check: ds_2a7207443888). An exact id is never personal data.
+_SERVER_ID_RX = re.compile(r"(?:ds|ws)_[0-9a-f]{12}|t_[0-9a-f]{16}")
 
 
 class ServiceError(Exception):
@@ -39,7 +43,7 @@ def ui_state_problem(ui_state: Any) -> str | None:
         if isinstance(v, str):
             if _KEY_RX.search(v):
                 return f"{path}: looks like an API key"
-            if _EMAIL_RX.search(v) or _PHONE_RX.search(v):
+            if _EMAIL_RX.search(v) or (_PHONE_RX.search(v) and not _SERVER_ID_RX.fullmatch(v)):
                 return f"{path}: looks like personal data (email/phone)"
         elif isinstance(v, dict):
             for k, x in v.items():
