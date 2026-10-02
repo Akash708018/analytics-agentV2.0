@@ -84,6 +84,12 @@ None (checked 2026-09-26).
     2369 passed, 1 skipped, 1 warning in 280.10s (0:04:40)
     eval: SCORE: 76/76 (100%) · sla_bench: 19/19 checks right · frontend: 133 passed
 
+2026-10-02, F8 on main (no backend change): the frontend consumes 0.7.0 (results, lineage,
+inspect, routing/blocked plans, joins, prefill, value errors). api-request
+[#23](https://github.com/Akash708018/analytics-agentV2.0/issues/23): `logistics.sla_drivers`
+reads `focus` but its spec doesn't declare it; the frontend reads `filter[].focus_param` until
+it does.
+
 ## B9 for the frontend (0.7.0, additive — `docs/api/CHANGELOG.md`)
 
 - Contract screen: show `prefill` (from which file, similarity) as a one-click suggestion;

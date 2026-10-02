@@ -519,3 +519,33 @@ server kept the key, it showed the widget's default (an empty name over "F4 chec
 runs; the draft and server were untouched). `bind` now sets the key on every run, keeping the
 "cut-short edit wins" rule. Before: 1 of 4 instrumented runs wrong. After: 8 of 8 right, and the
 F2 (21), F6 (18) and F7 checks pass. A unit test fails without the fix.
+
+**ID note (main merge of F3–F7 with B9, 2026-10-02).** Two entries are named C7: F2's (a
+Streamlit run cut short between the PUT and its bookkeeping) and B9's (two wrong test
+expectations). C8–C13 are the frontend's (F3–F7). The next self-correction takes C14.
+
+## F8 — API 0.7.0 in the screens (2026-10-02, on main)
+
+**D-F8-0. Frontend work is committed to main.** The user asked for work directly on main after
+F3–F7 were merged (`e405019`). Shared files are still appended, not rewritten.
+
+**D-F8-1. Stored results get their own page; nothing about them is recomputed.** Results
+lists `GET /datasets/{id}/results`. The chosen one renders through the same results view, and
+its rows come from `inspect` (the backend sorts, filters and pages). Staleness is shown with
+every reason as returned. Only the chosen result id is saved. D-F4-2 still holds: the browser
+keeps no result, and the server now does.
+
+**D-F8-2. Every result says where it came from.** Status, snapshot rows and hash, contract
+version, grain, metrics used and the result id are shown as returned, with a link to its rows.
+
+**D-F8-3. Suggestions from 0.7.0 stay suggestions.**
+- A similar file's contract fills only unanswered fields when clicked, and is confirmed as usual.
+- Its domains, metrics and rules are listed, not applied.
+- Carry-forward keywords join an approved group only through the person's "Add to" (merge with
+  the approved id first).
+- An ambiguous or unknown value offers the backend's values, none selected.
+
+**D-F8-4. Optional tool params come from the pack's steps until the spec declares them.**
+`sla_drivers` reads `focus` in its step filters, but its spec does not list it. The Tools page
+reads `filter[].focus_param` (`prep.optional_params`); #23 asks for a declaration.
+

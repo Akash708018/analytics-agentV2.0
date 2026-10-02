@@ -29,8 +29,9 @@ engine's proposals, then apply), **Domain** (confirm what kind of data it is), *
 (what each column is, how measures add up, the questions only you can answer), **Metrics**
 (approve metrics such as CTR, CPA, ROAS, and validity rules), **Keyword groups** (the engine
 proposes groups of search terms; you approve, merge, rename, split or move them; only approved
-groups reach the tools), **Tools** (run a marketing tool;
-every figure with its source, charts as the backend computed them), and **Ask**
+groups reach the tools), **Tools** (run a marketing or logistics tool;
+every figure with its source, charts as the backend computed them), **Results** (every stored
+result, whether it is out of date and why, and all its rows, paged), and **Ask**
 (questions and answers; a running question survives refresh and is never sent twice; each
 answer shows how it was reached and the tool results behind it). Every result downloads its
 figures as CSV, exactly as shown. **Session** can also start a new, empty session; the old one
