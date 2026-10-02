@@ -32,7 +32,9 @@ proposes groups of search terms; you approve, merge, rename, split or move them;
 groups reach the tools), **Tools** (run a marketing tool;
 every figure with its source, charts as the backend computed them), and **Ask**
 (questions and answers; a running question survives refresh and is never sent twice; each
-answer shows how it was reached and the tool results behind it).
+answer shows how it was reached and the tool results behind it). Every result downloads its
+figures as CSV, exactly as shown. **Session** can also start a new, empty session; the old one
+stays at its link.
 Nothing is ticked or chosen for you: suggestions come with reasons and their own buttons.
 
 Everything the person sets is saved to the backend session (`ui_state`, an explicit

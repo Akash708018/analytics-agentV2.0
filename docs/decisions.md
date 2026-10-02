@@ -458,3 +458,25 @@ changes that text, so after the edit the choice matched no option and the edit c
 vanished. AppTest re-sends with the current labels and passed. The chosen group id is now held
 in a plain session key and set on the selector each run. Before: the browser check failed at
 step 12 in two runs. After: 18 of 18 steps.
+
+## F7 — v1 parity (2026-10-02)
+
+**D-F7-1. v1 parity is assessed item by item, not copied.** `docs/steps/F7.md` gives each of the
+101 F0 items a verdict with where and why: 20 ported, 63 changed, 7 dropped, 11 blocked. Changes
+follow v2's rules (nothing preselected, figures as returned, work saved on the server).
+Blocked items are api-requests (#16, #21, #22).
+
+**D-F7-2. Results download as CSV; a new session replaces "Reset workspace".** The CSV is the
+results table cell for cell (no formatting), on Tools and on each Evidence. A new session
+destroys nothing (the old one stays at its link), so it needs no confirmation.
+
+**D-F7-3. No Playwright test suite without the user's yes.** D-F2-1 chose one-off scripts, and a
+test dependency is the user's call. The scripts stay in the scratchpad; their output is pasted
+into each milestone doc.
+
+**C13. A saved value could show as empty after a cut-short run (browser check).** `state.bind`
+set a widget's value only when its key was new. When the browser rebuilt a widget while the
+server kept the key, it showed the widget's default (an empty name over "F4 check": 2 of 4 F7
+runs; the draft and server were untouched). `bind` now sets the key on every run, keeping the
+"cut-short edit wins" rule. Before: 1 of 4 instrumented runs wrong. After: 8 of 8 right, and the
+F2 (21), F6 (18) and F7 checks pass. A unit test fails without the fix.

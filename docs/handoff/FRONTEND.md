@@ -1,9 +1,9 @@
 ## Status (date, branch, last commit)
 
 2026-10-02 · branch `claude/beautiful-lovelace-07dnwu` · owner **Claude Code** (D-F1-5).
-F2 merged (PR #15). **F3, F4, F5, F6 complete** on this branch, in PR #18 (unmerged; separate
-commits, as D-B0-1). The user asked for unattended work through usage limits; scheduled resumes
-continue with F7.
+F2 merged (PR #15). **F3–F7 complete** on this branch, in PR #18 (unmerged; separate commits,
+as D-B0-1). Every planned frontend milestone (F0–F7) is done. What remains waits on the user
+(merge, Playwright suite) or on api-requests.
 
 ## Screens: done | in progress | blocked (by which endpoint/issue)
 
@@ -21,13 +21,19 @@ continue with F7.
   facets, proposer, keywords); tick → approve; merge into a chosen group; rename, split or move
   a keyword. What each action does to approval is said before it is sent. Tools links here
   from the keyword tools.
-- Next, F7: v1 parity (101 items in F0.md) + Playwright tests (if the user allows a test dependency).
+- Done (F7): the 101 v1 items assessed in `docs/steps/F7.md` (20 ported, 63 changed, 7 dropped,
+  11 blocked). Every result downloads its figures as CSV, and the Session page starts a new
+  session (v1's reset). C13: `bind` sets widget values on every run.
+- Next, waiting on others: the api-requests below (each unblocks named F7 items); a Playwright
+  test suite if the user says yes (D-F7-3).
 - Blocked: ingest layout answers ([#16](https://github.com/Akash708018/analytics-agentV2.0/issues/16),
   no endpoint). Nonblocking: [#17](https://github.com/Akash708018/analytics-agentV2.0/issues/17)
   (contract in force), [#14](https://github.com/Akash708018/analytics-agentV2.0/issues/14)
   (list datasets), [#4](https://github.com/Akash708018/analytics-agentV2.0/issues/4) (error examples),
   [#20](https://github.com/Akash708018/analytics-agentV2.0/issues/20) (withdraw a keyword-group
-  approval; 500 on an unknown column).
+  approval; 500 on an unknown column), [#21](https://github.com/Akash708018/analytics-agentV2.0/issues/21)
+  (cleaning samples/SQL), [#22](https://github.com/Akash708018/analytics-agentV2.0/issues/22)
+  (direct core analyses and reports: 35 v1 items).
 
 ## API: spec version consumed; endpoints live vs mocked
 
@@ -49,32 +55,35 @@ Rules the next screens must keep (`frontend/state.py` docstring, C7, C10):
 - A selectbox whose shown text can change (a label with a count, a renamed group) loses its
   choice in the browser; hold the chosen value in a plain session key and set it each run (C12).
   AppTest does not show this; the browser check does.
+- `state.bind` sets the widget's value on every run (C13); keep it that way. A widget the browser
+  rebuilt while the server kept its key showed its default over a saved value.
 
 ## api-request issues (links, status)
 
 #4 (error examples), #14 (list datasets), #16 (ingest answers), #17 (contract in force),
-#20 (keyword groups: withdraw an approval; 500 on an unknown column): all open.
+#20 (keyword groups: withdraw an approval; 500 on an unknown column), #21 (cleaning samples and
+SQL), #22 (direct core analyses and reports): all open.
 
 ## Test tail (pasted)
 
 ```text
 $ frontend/.venv/bin/python -m pytest frontend/tests -q -rs
-232 passed in 15.76s
+237 passed in 16.72s
 $ cd backend && uv run pytest -q -rs     # after C9, C11
 2356 passed, 1 skipped, 1 warning in 245.59s (0:04:05)
 ```
 
 66 client, 58 Prism, 27 F2 state, 19 F2 AppTests, 2 fake-vs-spec, 14 F3 AppTests, 7 F3 prep,
-13 F4 AppTests, 5 F4 prep, 6 F5, 12 F6, 3 F0. No frontend skips. Browser (real backend): F2 21 steps +
+13 F4 AppTests, 5 F4 prep, 6 F5, 12 F6, 4 F7, 1 C13, 3 F0. No frontend skips. Browser (real backend): F2 21 steps +
 blur check; F3 16 steps (upload → confirmed contract); F4 15 steps (metrics, rules, tools,
 results); F5 8 steps (answers with evidence, real app + scripted model); F6 18 steps (keyword groups:
-propose, approve, merge, split, move, rename, refresh, performance by approved group).
+propose, approve, merge, split, move, rename, refresh, performance by approved group); F7 4 steps
+(CSV identical to the API; new session leaves the old one), and F2 + F6 re-run in full after C13.
 
 ## Next milestone
 
-F7: v1 parity. Walk the 101 items in `docs/steps/F0.md` against the v2 screens and mark each
-done / not applicable / missing with its endpoint; build the missing ones the API supports;
-file api-requests for the rest. Playwright as a test dependency needs the user's yes
-(D-F2-1 chose a one-off script). Setup in a fresh container: `uv venv frontend/.venv --python 3.12`, `uv pip install
+None planned. When an api-request lands, build its blocked items: #16 → Upload & read
+(V1-I04–I14); #21 → cleaning samples and SQL; #22 → direct core analyses (Explore). A Playwright
+test suite needs the user's yes. Setup in a fresh container: `uv venv frontend/.venv --python 3.12`, `uv pip install
 --python frontend/.venv/bin/python -r frontend/requirements.txt`, `npm ci --prefix frontend
 --ignore-scripts`, `uv sync` (backend for browser checks).
